@@ -17,13 +17,18 @@ describe('organization settings auth client errors', () => {
   })
 
   it('does not navigate away when Better Auth delete returns an error', () => {
-    expect(settingsPage).toMatch(/const result = await authClient\.organization\.delete/)
-    expect(settingsPage).toMatch(/if \(result\.error\)[\s\S]*Failed to delete organization/)
-    expect(settingsPage.indexOf("track('org_deleted')")).toBeLessThan(
-      settingsPage.indexOf("await navigateTo(localePath('/onboarding/create-org')"),
-    )
-    expect(settingsPage.indexOf('if (result.error)', settingsPage.indexOf('organization.delete'))).toBeLessThan(
-      settingsPage.indexOf("track('org_deleted')"),
-    )
+    const deleteStart = settingsPage.indexOf('const result = await authClient.organization.delete')
+    expect(deleteStart).toBeGreaterThanOrEqual(0)
+
+    const deleteGuard = settingsPage.indexOf('if (result.error)', deleteStart)
+    const deleteTrack = settingsPage.indexOf("track('org_deleted')", deleteStart)
+    const deleteNavigate = settingsPage.indexOf("await navigateTo(localePath('/onboarding/create-org')", deleteStart)
+
+    expect(deleteGuard).toBeGreaterThanOrEqual(0)
+    expect(deleteTrack).toBeGreaterThanOrEqual(0)
+    expect(deleteNavigate).toBeGreaterThanOrEqual(0)
+    expect(deleteGuard).toBeLessThan(deleteTrack)
+    expect(deleteTrack).toBeLessThan(deleteNavigate)
+    expect(settingsPage.slice(deleteStart, deleteNavigate)).toContain('Failed to delete organization')
   })
 })
