@@ -28,6 +28,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
+        id: install
         run: npm ci
 
       - name: Run tests (if present)
@@ -40,7 +41,7 @@ jobs:
 
       - name: Typecheck
         id: typecheck
-        run: npx nuxi typecheck
+        run: npm run typecheck
 
       - name: Audit dependencies (high severity+)
         id: audit
@@ -67,7 +68,7 @@ jobs:
 
           status_icon() { [ "$1" = "success" ] && echo "✅" || echo "❌"; }
 
-          echo "| Install dependencies | $(status_icon '${{ steps.tests.outcome != 'skipped' && 'success' || 'failure' }}') |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Install dependencies | $(status_icon '${{ steps.install.outcome }}') ${{ steps.install.outcome }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Tests | $(status_icon '${{ steps.tests.outcome }}') ${{ steps.tests.outcome }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Lint | $(status_icon '${{ steps.lint.outcome }}') ${{ steps.lint.outcome }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Typecheck | $(status_icon '${{ steps.typecheck.outcome }}') ${{ steps.typecheck.outcome }} |" >> "$GITHUB_STEP_SUMMARY"
