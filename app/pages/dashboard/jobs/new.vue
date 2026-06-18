@@ -112,7 +112,6 @@ type ScoringCriterionDraft = {
 }
 const scoringCriteria = ref<ScoringCriterionDraft[]>([])
 const scoringMode = ref<'none' | 'premade' | 'ai' | 'custom'>('none')
-const aiScoringChosen = ref(false)
 const selectedTemplate = ref<'standard' | 'technical' | 'non_technical'>('standard')
 const isGeneratingCriteria = ref(false)
 const showCustomForm = ref(false)
@@ -307,7 +306,6 @@ function saveFormToStorage() {
       applicationForm: applicationForm.value,
       scoringCriteria: scoringCriteria.value,
       scoringMode: scoringMode.value,
-      aiScoringChosen: aiScoringChosen.value,
       autoScoreOnApply: autoScoreOnApply.value,
       currentStep: currentStep.value,
     }
@@ -325,7 +323,6 @@ function restoreFormFromStorage() {
     if (data.applicationForm) Object.assign(applicationForm.value, data.applicationForm)
     if (data.scoringCriteria) scoringCriteria.value = data.scoringCriteria
     if (data.scoringMode) scoringMode.value = data.scoringMode
-    if (data.aiScoringChosen != null) aiScoringChosen.value = data.aiScoringChosen
     if (data.autoScoreOnApply != null) autoScoreOnApply.value = data.autoScoreOnApply
     if (data.currentStep) currentStep.value = data.currentStep
   } catch { /* corrupted data, ignore */ }
@@ -358,7 +355,6 @@ function resetState() {
   }
   scoringCriteria.value = []
   scoringMode.value = 'none'
-  aiScoringChosen.value = false
   autoScoreOnApply.value = false
   isPublished.value = false
   createdJobId.value = ''
@@ -377,7 +373,7 @@ watch(newJobResetSignal, (next, prev) => {
 })
 
 // Auto-save when step changes or form data changes
-watch([currentStep, form, applicationForm, scoringCriteria, scoringMode, aiScoringChosen, autoScoreOnApply], () => {
+watch([currentStep, form, applicationForm, scoringCriteria, scoringMode, autoScoreOnApply], () => {
   saveFormToStorage()
 }, { deep: true })
 
@@ -1376,7 +1372,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                     :class="scoringMode === 'ai'
                       ? 'border-brand-500 dark:border-brand-400 bg-brand-50/70 dark:bg-brand-950/30 ring-2 ring-brand-200 dark:ring-brand-900'
                       : 'border-surface-200 dark:border-surface-800 hover:border-surface-300 dark:hover:border-surface-700'"
-                    @click="generateAiCriteria(); scoringMode = 'ai'"
+                    @click="generateAiCriteria()"
                   >
                     <div class="inline-flex items-center justify-center size-10 rounded-lg bg-purple-100 dark:bg-purple-900/50">
                       <Sparkles class="size-5 text-purple-600 dark:text-purple-400" />
