@@ -27,6 +27,8 @@ export const createJobSchema = z.object({
   validThrough: z.coerce.date().nullable().optional(),
   /** Whether the application form requires a resume/CV upload */
   requireResume: z.boolean().optional().default(false),
+  /** Whether phone is hidden, optional, or required on the application form */
+  phoneRequirement: z.enum(['hidden', 'optional', 'required']).optional().default('optional'),
   /** Whether the application form asks for a cover letter upload */
   requireCoverLetter: z.boolean().optional().default(false),
   /** Whether to automatically run AI scoring when a candidate applies */
@@ -52,6 +54,7 @@ export const updateJobSchema = z.object({
   /** Pass null to explicitly clear the expiry date */
   validThrough: z.coerce.date().nullable().optional(),
   requireResume: z.boolean().optional(),
+  phoneRequirement: z.enum(['hidden', 'optional', 'required']).optional(),
   requireCoverLetter: z.boolean().optional(),
   /** Whether to automatically run AI scoring when a candidate applies */
   autoScoreOnApply: z.boolean().optional(),

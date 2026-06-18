@@ -11,6 +11,7 @@ type Question = {
 }
 
 type ApplicationForm = {
+  phoneRequirement: 'hidden' | 'optional' | 'required'
   requireResume: boolean
   requireCoverLetter: boolean
   questions: Question[]
@@ -63,6 +64,7 @@ const workplaceLabels: Record<string, string> = {
 }
 
 const previewJob = computed(() => ({
+  phoneRequirement: props.applicationForm.phoneRequirement,
   requireResume: props.applicationForm.requireResume,
   requireCoverLetter: props.applicationForm.requireCoverLetter,
   questions: props.applicationForm.questions,

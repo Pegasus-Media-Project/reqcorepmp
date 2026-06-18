@@ -90,6 +90,7 @@ const form = ref({
 
 // Step 2: Application form (client-only for now)
 const applicationForm = ref({
+  phoneRequirement: 'optional' as 'hidden' | 'optional' | 'required',
   requireResume: true,
   requireCoverLetter: false,
   questions: [] as DraftQuestion[],
@@ -303,6 +304,11 @@ function saveFormToStorage() {
   } catch { /* storage full or unavailable */ }
 }
 
+function openDraftPreview() {
+  saveFormToStorage()
+  window.open(localePath('/dashboard/jobs/preview'), '_blank', 'noopener,noreferrer')
+}
+
 function restoreFormFromStorage() {
   if (!import.meta.client) return
   try {
@@ -339,6 +345,7 @@ function resetState() {
     remoteStatus: undefined,
   }
   applicationForm.value = {
+    phoneRequirement: 'optional',
     requireResume: true,
     requireCoverLetter: false,
     questions: [],
@@ -603,6 +610,7 @@ async function handleSubmit(mode: 'publish' | 'draft' = publishChoice.value) {
       type: form.value.type,
       experienceLevel: form.value.experienceLevel || undefined,
       remoteStatus: form.value.remoteStatus || undefined,
+      phoneRequirement: applicationForm.value.phoneRequirement,
       requireResume: applicationForm.value.requireResume,
       requireCoverLetter: applicationForm.value.requireCoverLetter,
       autoScoreOnApply: autoScoreOnApply.value,
@@ -759,15 +767,24 @@ const typeOptions = [
         </li>
       </ol>
 
-      <button
-        v-if="!isPublished"
-        type="button"
-        class="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-surface-500 transition-colors hover:bg-surface-100 hover:text-surface-900 disabled:opacity-50 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:text-surface-100"
-        :disabled="isSubmitting"
-        @click="handleSubmit('draft')"
-      >
-        Save &amp; exit
-      </button>
+      <div v-if="!isPublished" class="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-surface-500 transition-colors hover:bg-surface-100 hover:text-surface-900 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:text-surface-100"
+          @click="openDraftPreview"
+        >
+          <Eye class="size-3.5" />
+          <span class="hidden sm:inline">View preview</span>
+        </button>
+        <button
+          type="button"
+          class="rounded-md px-2 py-1 text-xs font-medium text-surface-500 transition-colors hover:bg-surface-100 hover:text-surface-900 disabled:opacity-50 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:text-surface-100"
+          :disabled="isSubmitting"
+          @click="handleSubmit('draft')"
+        >
+          Save &amp; exit
+        </button>
+      </div>
     </div>
 
     <!-- Main Layout: editor + persistent live preview -->

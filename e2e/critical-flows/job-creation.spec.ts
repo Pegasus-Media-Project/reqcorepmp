@@ -83,6 +83,19 @@ test.describe('Job Creation Flow', () => {
     await expect(preview.getByLabel(UPDATED_QUESTION_LABEL)).toBeVisible()
     await expect(preview.getByLabel(QUESTION_LABEL)).toHaveCount(0)
 
+    // The full draft preview opens in a new tab and uses the applicant-facing form.
+    const previewPagePromise = page.waitForEvent('popup')
+    await page.getByRole('button', { name: 'View preview' }).click()
+    const previewPage = await previewPagePromise
+    await previewPage.waitForLoadState('domcontentloaded')
+    await expect(previewPage.getByText('Draft applicant preview')).toBeVisible()
+    await expect(previewPage.getByRole('heading', { name: JOB_TITLE })).toBeVisible()
+    await expect(previewPage.getByText(JOB_DESCRIPTION)).toBeVisible()
+    await expect(previewPage.getByLabel('Cover Letter')).toBeVisible()
+    await expect(previewPage.getByText('Resume / CV', { exact: false })).toHaveCount(0)
+    await expect(previewPage.getByLabel(UPDATED_QUESTION_LABEL)).toBeVisible()
+    await previewPage.close()
+
     // Device switching is part of the new persistent preview.
     const previewDevice = preview.getByRole('radiogroup', { name: 'Preview device' })
     await previewDevice.getByRole('radio', { name: 'Mobile' }).click()

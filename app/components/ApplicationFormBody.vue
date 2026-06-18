@@ -24,6 +24,7 @@ type Question = {
 
 const props = withDefaults(defineProps<{
   job: {
+    phoneRequirement?: 'hidden' | 'optional' | 'required'
     requireResume?: boolean
     requireCoverLetter?: boolean
     questions?: Question[]
@@ -183,11 +184,14 @@ function onFieldClick(field: string) {
 
         <!-- Phone -->
         <div
+          v-if="job.phoneRequirement !== 'hidden'"
           :class="isPreview ? 'cursor-pointer rounded-xl ring-offset-2 ring-offset-white dark:ring-offset-surface-900 hover:ring-2 hover:ring-brand-300 dark:hover:ring-brand-700 transition-shadow' : ''"
           @click="onFieldClick('phone')"
         >
           <label for="phone" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
-            Phone <span class="text-surface-400 font-normal text-xs">(optional)</span>
+            Phone
+            <span v-if="job.phoneRequirement === 'required'" class="text-danger-500">*</span>
+            <span v-else class="text-surface-400 font-normal text-xs">(optional)</span>
           </label>
           <input
             id="phone"
@@ -196,11 +200,17 @@ function onFieldClick(field: string) {
             placeholder="+1 (555) 123-4567"
             autocomplete="tel"
             :tabindex="isPreview ? -1 : undefined"
+            @input="emit('clear-error', 'phone')"
             :class="[
-              'w-full rounded-xl border border-surface-300 dark:border-surface-700 px-3.5 py-2.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors',
+              'w-full rounded-xl border px-3.5 py-2.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors',
+              errors.phone ? 'border-danger-300 dark:border-danger-700 focus:ring-danger-500 focus:border-danger-500' : 'border-surface-300 dark:border-surface-700',
               isPreview ? 'pointer-events-none' : '',
             ]"
           />
+          <p v-if="errors.phone" class="mt-1.5 flex items-center gap-1 text-xs text-danger-600 dark:text-danger-400">
+            <svg class="size-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            {{ errors.phone }}
+          </p>
         </div>
 
         <!-- Resume / Cover Letter uploads -->

@@ -27,6 +27,7 @@ type DraftQuestion = {
 }
 
 type ApplicationForm = {
+  phoneRequirement: 'hidden' | 'optional' | 'required'
   requireResume: boolean
   requireCoverLetter: boolean
   questions: DraftQuestion[]
@@ -43,6 +44,7 @@ type BuilderOperations = {
   updateQuestion: (id: string, data: QuestionInput) => Promise<unknown>
   deleteQuestion: (id: string) => Promise<unknown>
   reorderQuestions: (order: { id: string; displayOrder: number }[]) => Promise<unknown>
+  setPhoneRequirement: (value: 'hidden' | 'optional' | 'required') => Promise<unknown>
   setRequireResume: (value: boolean) => Promise<unknown>
   setRequireCoverLetter: (value: boolean) => Promise<unknown>
 }
@@ -79,6 +81,12 @@ const questionTypeLabels: Record<QuestionType, string> = {
   checkbox: 'Checkbox',
   file_upload: 'File Upload',
 }
+
+const phoneRequirementOptions = [
+  { value: 'hidden', label: 'Hidden' },
+  { value: 'optional', label: 'Optional' },
+  { value: 'required', label: 'Required' },
+] as const
 
 // ─────────────────────────────────────────────
 // Question CRUD (operates on the model in place)
@@ -202,6 +210,19 @@ function setRequireResume(value: boolean) {
   model.value.requireResume = value
 }
 
+function setPhoneRequirement(value: 'hidden' | 'optional' | 'required') {
+  if (model.value.phoneRequirement === value) return
+  if (props.operations) {
+    const previous = model.value.phoneRequirement
+    model.value.phoneRequirement = value
+    runOp(() => props.operations!.setPhoneRequirement(value)).then((ok) => {
+      if (!ok) model.value.phoneRequirement = previous
+    })
+    return
+  }
+  model.value.phoneRequirement = value
+}
+
 function setRequireCoverLetter(value: boolean) {
   if (model.value.requireCoverLetter === value) return
   if (props.operations) {
@@ -217,9 +238,14 @@ function setRequireCoverLetter(value: boolean) {
 
 const questionsAnchor = ref<HTMLElement | null>(null)
 const documentsAnchor = ref<HTMLElement | null>(null)
+const personalInformationAnchor = ref<HTMLElement | null>(null)
 
 /** Clicking a field in the preview jumps to (and opens) its editor on the left. */
 function handleEditField(field: string) {
+  if (field === 'phone') {
+    personalInformationAnchor.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    return
+  }
   if (field === 'resume' || field === 'coverLetter') {
     documentsAnchor.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     return
@@ -233,7 +259,7 @@ function handleEditField(field: string) {
     }
     return
   }
-  // name / email / phone are mandatory, fixed fields — nothing to edit.
+  // Name and email are mandatory, fixed fields — nothing to edit.
 }
 </script>
 
@@ -253,35 +279,45 @@ function handleEditField(field: string) {
       </div>
 
       <!-- Personal information -->
-      <div>
+      <div ref="personalInformationAnchor">
         <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100 pb-3 border-b border-surface-100 dark:border-surface-800">Personal information</h2>
         <div class="divide-y divide-surface-100 dark:divide-surface-800">
           <div
-            v-for="field in [
-              { label: 'First name', required: true },
-              { label: 'Last name', required: true },
-              { label: 'Email', required: true },
-              { label: 'Phone', required: false },
-            ]"
-            :key="field.label"
+            v-for="field in ['First name', 'Last name', 'Email']"
+            :key="field"
             class="flex items-center justify-between py-3.5 px-1"
           >
             <div class="flex items-center gap-2.5">
-              <span class="text-sm text-surface-900 dark:text-surface-100">{{ field.label }}</span>
+              <span class="text-sm text-surface-900 dark:text-surface-100">{{ field }}</span>
               <Lock class="size-3 text-surface-300 dark:text-surface-600" />
             </div>
             <span
-              v-if="field.required"
               class="inline-flex items-center rounded-md bg-brand-50 dark:bg-brand-950/50 px-2.5 py-1 text-xs font-medium text-brand-700 dark:text-brand-300 ring-1 ring-inset ring-brand-200 dark:ring-brand-800"
             >
               Mandatory
             </span>
-            <span
-              v-else
-              class="inline-flex items-center rounded-md bg-surface-100 dark:bg-surface-800 px-2.5 py-1 text-xs font-medium text-surface-600 dark:text-surface-400 ring-1 ring-inset ring-surface-200 dark:ring-surface-700"
-            >
-              Optional
-            </span>
+          </div>
+          <div class="flex flex-col gap-3 py-3.5 px-1 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <span class="text-sm text-surface-900 dark:text-surface-100">Phone</span>
+              <p class="mt-0.5 text-xs text-surface-400 dark:text-surface-500">Choose whether candidates see this field.</p>
+            </div>
+            <div class="inline-flex self-start rounded-lg bg-surface-100 p-0.5 dark:bg-surface-800" role="radiogroup" aria-label="Phone field requirement">
+              <button
+                v-for="option in phoneRequirementOptions"
+                :key="option.value"
+                type="button"
+                role="radio"
+                :aria-checked="model.phoneRequirement === option.value"
+                class="rounded-md px-2.5 py-1.5 text-xs font-medium transition-all"
+                :class="model.phoneRequirement === option.value
+                  ? 'bg-white text-surface-900 shadow-sm dark:bg-surface-700 dark:text-surface-100'
+                  : 'text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200'"
+                @click="setPhoneRequirement(option.value)"
+              >
+                {{ option.label }}
+              </button>
+            </div>
           </div>
         </div>
       </div>

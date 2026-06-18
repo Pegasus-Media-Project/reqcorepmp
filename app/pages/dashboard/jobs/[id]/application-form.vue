@@ -55,24 +55,30 @@ const {
   reorderQuestions,
 } = useJobQuestions(jobId)
 
+type QuestionType =
+  | 'short_text' | 'long_text' | 'single_select' | 'multi_select'
+  | 'number' | 'date' | 'url' | 'checkbox' | 'file_upload'
+
 type BuilderQuestion = {
   id: string
   label: string
-  type: string
+  type: QuestionType
   description?: string | null
   required: boolean
   options?: string[] | null
 }
 
 const builderModel = ref<{
+  phoneRequirement: 'hidden' | 'optional' | 'required'
   requireResume: boolean
   requireCoverLetter: boolean
   questions: BuilderQuestion[]
-}>({ requireResume: false, requireCoverLetter: false, questions: [] })
+}>({ phoneRequirement: 'optional', requireResume: false, requireCoverLetter: false, questions: [] })
 
 // Keep the builder model in sync with server state.
 watch(job, (j) => {
   if (j) {
+    builderModel.value.phoneRequirement = j.phoneRequirement ?? 'optional'
     builderModel.value.requireResume = j.requireResume ?? false
     builderModel.value.requireCoverLetter = j.requireCoverLetter ?? false
   }
@@ -82,7 +88,7 @@ watch(jobQuestions, (qs) => {
   builderModel.value.questions = (qs ?? []).map((q: any) => ({
     id: q.id,
     label: q.label,
-    type: q.type,
+    type: q.type as QuestionType,
     description: q.description ?? null,
     required: q.required,
     options: q.options ?? null,
@@ -94,6 +100,7 @@ const builderOperations = {
   updateQuestion: (id: string, data: any) => updateQuestion(id, data),
   deleteQuestion: (id: string) => deleteQuestion(id),
   reorderQuestions: (order: { id: string; displayOrder: number }[]) => reorderQuestions(order),
+  setPhoneRequirement: (value: 'hidden' | 'optional' | 'required') => updateJob({ phoneRequirement: value }),
   setRequireResume: (value: boolean) => updateJob({ requireResume: value }),
   setRequireCoverLetter: (value: boolean) => updateJob({ requireCoverLetter: value }),
 }

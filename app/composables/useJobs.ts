@@ -30,6 +30,7 @@ export function useJobs(options?: {
     type?: 'full_time' | 'part_time' | 'contract' | 'internship'
     experienceLevel?: 'junior' | 'mid' | 'senior' | 'lead'
     remoteStatus?: 'remote' | 'hybrid' | 'onsite'
+    phoneRequirement?: 'hidden' | 'optional' | 'required'
     requireResume?: boolean
     requireCoverLetter?: boolean
     autoScoreOnApply?: boolean
