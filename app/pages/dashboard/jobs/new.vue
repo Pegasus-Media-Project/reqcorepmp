@@ -3,15 +3,10 @@ import {
   ArrowLeft,
   Check,
   Plus,
-  Pencil,
   Trash2,
-  ChevronUp,
-  ChevronDown,
   ChevronRight,
   ArrowRight,
-  GripVertical,
   Link2,
-  ClipboardCopy,
   Rocket,
   FileEdit,
   ExternalLink,
@@ -25,9 +20,6 @@ import {
   Sparkles,
   Loader2,
   SlidersHorizontal,
-  Lock,
-  Upload,
-  CircleHelp,
   Share2,
   Globe,
   Mail,
@@ -43,6 +35,7 @@ import { z } from 'zod'
 definePageMeta({
   layout: 'dashboard',
   middleware: ['auth', 'require-org'],
+  fullbleed: true,
 })
 
 useSeoMeta({
@@ -77,6 +70,7 @@ type DraftQuestion = {
 
 // Wizard state
 const currentStep = ref<1 | 2 | 3 | 4>(1)
+const wizardEditor = useTemplateRef<HTMLElement>('wizardEditor')
 const steps = [
   { id: 1, title: 'Job details', description: 'Tell applicants about this role.' },
   { id: 2, title: 'Application form', description: 'Design the application form.' },
@@ -281,11 +275,7 @@ function autoGenerateKey(name: string): string {
 
 const isSubmitting = ref(false)
 const errors = ref<Record<string, string>>({})
-const showAddForm = ref(false)
-const editingQuestion = ref<DraftQuestion | null>(null)
 const linkCopied = ref(false)
-const questionActionError = ref<string | null>(null)
-const nextQuestionId = ref(1)
 
 // Check if at least one AI provider is configured with a valid API key.
 // /api/ai-config returns an array of configurations now (multi-config era).
@@ -562,68 +552,10 @@ function prevStep() {
   if (currentStep.value > 1) currentStep.value--
 }
 
-function handleAddQuestion(data: {
-  label: string
-  type: string
-  description?: string
-  required: boolean
-  options?: string[]
-}) {
-  applicationForm.value.questions.push({
-    id: `draft-${nextQuestionId.value++}`,
-    label: data.label,
-    type: data.type as QuestionType,
-    description: data.description ?? null,
-    required: data.required,
-    options: data.options ?? null,
-  })
-  showAddForm.value = false
-  questionActionError.value = null
-}
-
-function handleUpdateQuestion(data: {
-  label: string
-  type: string
-  description?: string
-  required: boolean
-  options?: string[]
-}) {
-  if (!editingQuestion.value) return
-
-  const index = applicationForm.value.questions.findIndex((q) => q.id === editingQuestion.value?.id)
-  if (index === -1) return
-
-  const existingQuestion = applicationForm.value.questions[index]
-  if (!existingQuestion) return
-
-  applicationForm.value.questions[index] = {
-    id: existingQuestion.id,
-    label: data.label,
-    type: data.type as QuestionType,
-    description: data.description ?? null,
-    required: data.required,
-    options: data.options ?? null,
-  }
-  editingQuestion.value = null
-  questionActionError.value = null
-}
-
-function handleDeleteQuestion(questionId: string) {
-  const index = applicationForm.value.questions.findIndex((q) => q.id === questionId)
-  if (index === -1) return
-  applicationForm.value.questions.splice(index, 1)
-  if (editingQuestion.value?.id === questionId) {
-    editingQuestion.value = null
-  }
-  questionActionError.value = null
-}
-
-function moveQuestion(index: number, direction: 'up' | 'down') {
-  const list = applicationForm.value.questions
-  const targetIndex = direction === 'up' ? index - 1 : index + 1
-  if (targetIndex < 0 || targetIndex >= list.length) return
-  ;[list[index], list[targetIndex]] = [list[targetIndex]!, list[index]!]
-}
+watch(currentStep, async () => {
+  await nextTick()
+  wizardEditor.value?.scrollTo({ top: 0, behavior: 'auto' })
+})
 
 function slugifyTitle(raw: string) {
   return raw
@@ -777,61 +709,33 @@ const typeOptions = [
   { value: 'contract', label: 'Contract' },
   { value: 'internship', label: 'Internship' },
 ]
-
-const questionTypeLabels: Record<QuestionType, string> = {
-  short_text: 'Short Text',
-  long_text: 'Long Text',
-  single_select: 'Single Select',
-  multi_select: 'Multi Select',
-  number: 'Number',
-  date: 'Date',
-  url: 'URL',
-  checkbox: 'Checkbox',
-  file_upload: 'File Upload',
-}
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl px-4 -mt-2">
-    <!-- Header with top actions -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3">
-      <div>
-        <NuxtLink
-          :to="$localePath('/dashboard/jobs')"
-          class="inline-flex items-center gap-1 text-sm text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 mb-1 transition-colors"
-        >
-          <ArrowLeft class="size-4" />
-          Back to Jobs
-        </NuxtLink>
-        <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-100">New Job</h1>
-      </div>
-      <div v-if="!isPublished" class="flex items-center gap-3">
-        <button
-          type="button"
-          class="px-4 py-2 text-sm font-medium text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100 transition-colors"
-          @click="handleSubmit('draft')"
-          :disabled="isSubmitting"
-        >
-          Save & exit
-        </button>
-      </div>
-    </div>
+  <div class="mx-auto flex h-full w-full max-w-7xl flex-col overflow-y-auto px-4 py-2 sm:px-6 lg:px-8 lg:py-3 xl:min-h-0 xl:overflow-hidden">
+    <!-- Compact wizard navigation -->
+    <div class="mb-3 flex items-center gap-3">
+      <NuxtLink
+        :to="$localePath('/dashboard/jobs')"
+        class="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-surface-500 transition-colors hover:bg-surface-100 hover:text-surface-800 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:text-surface-100"
+      >
+        <ArrowLeft class="size-3.5" />
+        <span class="hidden sm:inline">Jobs</span>
+      </NuxtLink>
 
-    <!-- Stepper -->
-    <div class="mb-4">
-      <ol class="flex items-center w-full gap-2">
+      <ol class="flex min-w-0 flex-1 items-center gap-1">
         <li
           v-for="(step, idx) in steps"
           :key="step.id"
           class="flex items-center flex-1 min-w-0 cursor-pointer"
           @click="goToStep(step.id as typeof currentStep)"
         >
-          <div class="flex items-center gap-2 min-w-0">
+          <div class="flex min-w-0 items-center gap-1.5">
             <div
-              class="flex items-center justify-center size-7 rounded-full border text-xs font-medium shrink-0 transition-all"
+              class="flex size-6 shrink-0 items-center justify-center rounded-full border text-[11px] font-medium transition-all"
               :class="[
                 currentStep === step.id
-                  ? 'bg-brand-600 text-white border-brand-600 ring-2 ring-brand-100 dark:ring-brand-950'
+                  ? 'bg-brand-600 text-white border-brand-600 ring-1 ring-brand-100 dark:ring-brand-950'
                   : currentStep > step.id
                     ? 'bg-brand-100 dark:bg-brand-900 text-brand-700 dark:text-brand-300 border-brand-200 dark:border-brand-800'
                     : 'bg-white dark:bg-surface-900 text-surface-400 dark:text-surface-500 border-surface-200 dark:border-surface-800'
@@ -841,7 +745,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
               <span v-else>{{ step.id }}</span>
             </div>
             <span
-              class="text-xs font-medium truncate hidden sm:inline"
+              class="hidden truncate text-[11px] font-medium md:inline"
               :class="currentStep >= step.id ? 'text-surface-900 dark:text-surface-100' : 'text-surface-400 dark:text-surface-500'"
             >
               {{ step.title }}
@@ -849,16 +753,34 @@ const questionTypeLabels: Record<QuestionType, string> = {
           </div>
           <div
             v-if="idx < steps.length - 1"
-            class="flex-1 h-0.5 mx-2 rounded-full transition-colors"
+            class="mx-1.5 h-px flex-1 rounded-full transition-colors"
             :class="currentStep > step.id ? 'bg-brand-600' : 'bg-surface-200 dark:bg-surface-800'"
           />
         </li>
       </ol>
+
+      <button
+        v-if="!isPublished"
+        type="button"
+        class="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-surface-500 transition-colors hover:bg-surface-100 hover:text-surface-900 disabled:opacity-50 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:text-surface-100"
+        :disabled="isSubmitting"
+        @click="handleSubmit('draft')"
+      >
+        Save &amp; exit
+      </button>
     </div>
 
-    <!-- Main Layout: Form -->
-    <div>
-      <div class="space-y-6">
+    <!-- Main Layout: editor + persistent live preview -->
+    <div
+      class="grid gap-6 xl:min-h-0 xl:flex-1"
+      :class="currentStep <= 2
+        ? 'xl:grid-cols-[minmax(0,3fr)_minmax(24rem,2fr)]'
+        : 'mx-auto w-full max-w-3xl xl:grid-cols-1'"
+    >
+      <div
+        ref="wizardEditor"
+        class="min-w-0 space-y-6 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain xl:pb-1 xl:pr-1"
+      >
 
         <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 shadow-sm overflow-hidden">
           <form @submit.prevent="() => handleSubmit()" class="p-5 md:p-6">
@@ -963,261 +885,13 @@ const questionTypeLabels: Record<QuestionType, string> = {
             </section>
 
             <!-- Step 2: Application form -->
-            <section v-else-if="currentStep === 2" class="space-y-8">
-              <div>
-                <p class="text-xs font-semibold text-surface-400 dark:text-surface-500 uppercase tracking-wider mb-3">Customize your application form</p>
-                <p class="text-sm text-surface-500 dark:text-surface-400 leading-relaxed">
-                  Configure which fields candidates see when they apply. Locked fields are always collected and cannot be turned off.
-                </p>
-              </div>
-
-              <!-- Personal information -->
-              <div>
-                <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100 pb-3 border-b border-surface-100 dark:border-surface-800">Personal information</h2>
-                <div class="divide-y divide-surface-100 dark:divide-surface-800">
-                  <div class="flex items-center justify-between py-3.5 px-1">
-                    <div class="flex items-center gap-2.5">
-                      <span class="text-sm text-surface-900 dark:text-surface-100">First name</span>
-                      <Lock class="size-3 text-surface-300 dark:text-surface-600" />
-                    </div>
-                    <span class="inline-flex items-center rounded-md bg-brand-50 dark:bg-brand-950/50 px-2.5 py-1 text-xs font-medium text-brand-700 dark:text-brand-300 ring-1 ring-inset ring-brand-200 dark:ring-brand-800">
-                      Mandatory
-                    </span>
-                  </div>
-                  <div class="flex items-center justify-between py-3.5 px-1">
-                    <div class="flex items-center gap-2.5">
-                      <span class="text-sm text-surface-900 dark:text-surface-100">Last name</span>
-                      <Lock class="size-3 text-surface-300 dark:text-surface-600" />
-                    </div>
-                    <span class="inline-flex items-center rounded-md bg-brand-50 dark:bg-brand-950/50 px-2.5 py-1 text-xs font-medium text-brand-700 dark:text-brand-300 ring-1 ring-inset ring-brand-200 dark:ring-brand-800">
-                      Mandatory
-                    </span>
-                  </div>
-                  <div class="flex items-center justify-between py-3.5 px-1">
-                    <div class="flex items-center gap-2.5">
-                      <span class="text-sm text-surface-900 dark:text-surface-100">Email</span>
-                      <Lock class="size-3 text-surface-300 dark:text-surface-600" />
-                    </div>
-                    <span class="inline-flex items-center rounded-md bg-brand-50 dark:bg-brand-950/50 px-2.5 py-1 text-xs font-medium text-brand-700 dark:text-brand-300 ring-1 ring-inset ring-brand-200 dark:ring-brand-800">
-                      Mandatory
-                    </span>
-                  </div>
-                  <div class="flex items-center justify-between py-3.5 px-1">
-                    <div class="flex items-center gap-2.5">
-                      <span class="text-sm text-surface-900 dark:text-surface-100">Phone</span>
-                      <Lock class="size-3 text-surface-300 dark:text-surface-600" />
-                    </div>
-                    <span class="inline-flex items-center rounded-md bg-surface-100 dark:bg-surface-800 px-2.5 py-1 text-xs font-medium text-surface-600 dark:text-surface-400 ring-1 ring-inset ring-surface-200 dark:ring-surface-700">
-                      Optional
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Documents -->
-              <div>
-                <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100 pb-3 border-b border-surface-100 dark:border-surface-800">Documents</h2>
-                <div class="divide-y divide-surface-100 dark:divide-surface-800">
-                  <!-- Resume -->
-                  <div class="flex items-center justify-between py-4 px-1">
-                    <div>
-                      <div class="flex items-center gap-2">
-                        <Upload class="size-4 text-surface-400 dark:text-surface-500" />
-                        <span class="text-sm font-medium text-surface-900 dark:text-surface-100">Resume / CV</span>
-                      </div>
-                      <p class="text-xs text-surface-400 dark:text-surface-500 mt-1 ml-6">PDF, DOC, or DOCX up to 10 MB</p>
-                    </div>
-                    <div class="inline-flex items-center rounded-lg bg-surface-100 dark:bg-surface-800 p-0.5" role="radiogroup" aria-label="Resume requirement">
-                      <button
-                        type="button"
-                        role="radio"
-                        :aria-checked="applicationForm.requireResume"
-                        @click="applicationForm.requireResume = true"
-                        class="px-3 py-1.5 text-xs font-medium rounded-md transition-all"
-                        :class="applicationForm.requireResume
-                          ? 'bg-brand-600 text-white shadow-sm'
-                          : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200'"
-                      >
-                        Required
-                      </button>
-                      <button
-                        type="button"
-                        role="radio"
-                        :aria-checked="!applicationForm.requireResume"
-                        @click="applicationForm.requireResume = false"
-                        class="px-3 py-1.5 text-xs font-medium rounded-md transition-all"
-                        :class="!applicationForm.requireResume
-                          ? 'bg-white dark:bg-surface-700 text-surface-700 dark:text-surface-300 shadow-sm'
-                          : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200'"
-                      >
-                        Off
-                      </button>
-                    </div>
-                  </div>
-                  <!-- Cover letter -->
-                  <div class="flex items-center justify-between py-4 px-1">
-                    <div>
-                      <div class="flex items-center gap-2">
-                        <FileText class="size-4 text-surface-400 dark:text-surface-500" />
-                        <span class="text-sm font-medium text-surface-900 dark:text-surface-100">Cover letter</span>
-                      </div>
-                      <p class="text-xs text-surface-400 dark:text-surface-500 mt-1 ml-6">Free-text field, max 10,000 characters</p>
-                    </div>
-                    <div class="inline-flex items-center rounded-lg bg-surface-100 dark:bg-surface-800 p-0.5" role="radiogroup" aria-label="Cover letter requirement">
-                      <button
-                        type="button"
-                        role="radio"
-                        :aria-checked="applicationForm.requireCoverLetter"
-                        @click="applicationForm.requireCoverLetter = true"
-                        class="px-3 py-1.5 text-xs font-medium rounded-md transition-all"
-                        :class="applicationForm.requireCoverLetter
-                          ? 'bg-brand-600 text-white shadow-sm'
-                          : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200'"
-                      >
-                        Required
-                      </button>
-                      <button
-                        type="button"
-                        role="radio"
-                        :aria-checked="!applicationForm.requireCoverLetter"
-                        @click="applicationForm.requireCoverLetter = false"
-                        class="px-3 py-1.5 text-xs font-medium rounded-md transition-all"
-                        :class="!applicationForm.requireCoverLetter
-                          ? 'bg-white dark:bg-surface-700 text-surface-700 dark:text-surface-300 shadow-sm'
-                          : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200'"
-                      >
-                        Off
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Screening questions -->
-              <div>
-                <div class="flex items-center justify-between pb-3 border-b border-surface-100 dark:border-surface-800">
-                  <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">Screening questions</h2>
-                  <span v-if="applicationForm.questions.length > 0" class="text-xs font-medium text-surface-400 dark:text-surface-500 tabular-nums">
-                    {{ applicationForm.questions.length }} {{ applicationForm.questions.length === 1 ? 'question' : 'questions' }} added
-                  </span>
-                </div>
-
-                <div
-                  v-if="questionActionError"
-                  class="rounded-lg border border-danger-200 dark:border-danger-800 bg-danger-50 dark:bg-danger-950 p-3 text-sm text-danger-700 dark:text-danger-400 mt-4"
-                >
-                  {{ questionActionError }}
-                  <button class="ml-2 underline" @click="questionActionError = null">Dismiss</button>
-                </div>
-
-                <div v-if="applicationForm.questions.length > 0" class="divide-y divide-surface-100 dark:divide-surface-800">
-                  <div
-                    v-for="(q, index) in applicationForm.questions"
-                    :key="q.id"
-                    class="flex items-center gap-3 py-3.5 px-1 group"
-                  >
-                    <div class="text-surface-300 dark:text-surface-600 cursor-grab">
-                      <GripVertical class="size-4" />
-                    </div>
-                    <div class="flex-1 min-w-0">
-                      <div class="flex items-center gap-2">
-                        <span class="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">{{ q.label }}</span>
-                        <span
-                          v-if="q.required"
-                          class="inline-flex items-center rounded-md bg-brand-50 dark:bg-brand-950/50 px-2 py-0.5 text-[10px] font-medium text-brand-700 dark:text-brand-300 ring-1 ring-inset ring-brand-200 dark:ring-brand-800"
-                        >
-                          Required
-                        </span>
-                        <span
-                          v-else
-                          class="inline-flex items-center rounded-md bg-surface-100 dark:bg-surface-800 px-2 py-0.5 text-[10px] font-medium text-surface-500 dark:text-surface-400 ring-1 ring-inset ring-surface-200 dark:ring-surface-700"
-                        >
-                          Optional
-                        </span>
-                      </div>
-                      <div class="flex items-center gap-1.5 mt-0.5 ml-0">
-                        <span class="text-xs text-surface-400 dark:text-surface-500">{{ questionTypeLabels[q.type] ?? q.type }}</span>
-                        <span v-if="q.description" class="text-xs text-surface-400 dark:text-surface-500 truncate">
-                          &middot; {{ q.description }}
-                        </span>
-                        <span
-                          v-if="(q.type === 'single_select' || q.type === 'multi_select') && q.options"
-                          class="text-xs text-surface-400 dark:text-surface-500"
-                        >
-                          &middot; {{ q.options.length }} options
-                        </span>
-                      </div>
-                    </div>
-                    <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
-                      <button
-                        type="button"
-                        :disabled="index === 0"
-                        class="rounded p-1.5 text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors disabled:opacity-30"
-                        title="Move up"
-                        @click="moveQuestion(index, 'up')"
-                      >
-                        <ChevronUp class="size-4" />
-                      </button>
-                      <button
-                        type="button"
-                        :disabled="index === applicationForm.questions.length - 1"
-                        class="rounded p-1.5 text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors disabled:opacity-30"
-                        title="Move down"
-                        @click="moveQuestion(index, 'down')"
-                      >
-                        <ChevronDown class="size-4" />
-                      </button>
-                      <button
-                        type="button"
-                        class="rounded p-1.5 text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
-                        title="Edit"
-                        @click="editingQuestion = q; showAddForm = false"
-                      >
-                        <Pencil class="size-4" />
-                      </button>
-                      <button
-                        type="button"
-                        class="rounded p-1.5 text-surface-400 hover:text-danger-600 dark:hover:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors"
-                        title="Delete"
-                        @click="handleDeleteQuestion(q.id)"
-                      >
-                        <Trash2 class="size-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <p v-else class="text-sm text-surface-400 dark:text-surface-500 py-6 text-center">
-                  No screening questions added yet.
-                </p>
-
-                <QuestionForm
-                  v-if="editingQuestion"
-                  :question="editingQuestion"
-                  class="mt-4 mb-2"
-                  @save="handleUpdateQuestion"
-                  @cancel="editingQuestion = null"
-                />
-
-                <QuestionForm
-                  v-if="showAddForm && !editingQuestion"
-                  class="mt-4 mb-2"
-                  @save="handleAddQuestion"
-                  @cancel="showAddForm = false"
-                />
-
-                <div class="mt-4 flex items-center gap-3">
-                  <button
-                    v-if="!showAddForm && !editingQuestion"
-                    type="button"
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-surface-300 dark:border-surface-700 px-3 py-2 text-sm font-medium text-surface-600 dark:text-surface-400 hover:border-brand-400 dark:hover:border-brand-600 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50/50 dark:hover:bg-brand-950/30 transition-colors"
-                    @click="showAddForm = true"
-                  >
-                    <Plus class="size-4" />
-                    Add a question
-                  </button>
-                </div>
-              </div>
+            <!-- Step 2: Application form (live builder) -->
+            <section v-else-if="currentStep === 2">
+              <ApplicationBuilder
+                v-model="applicationForm"
+                :job-title="form.title"
+                :show-preview="false"
+              />
             </section>
 
             <!-- Step 3: AI scoring criteria -->
@@ -2010,6 +1684,17 @@ const questionTypeLabels: Record<QuestionType, string> = {
           </form>
         </div>
       </div>
+
+      <aside
+        v-if="currentStep <= 2"
+        class="hidden min-w-0 xl:block xl:min-h-0 xl:overflow-hidden"
+      >
+        <ApplicationBuilderPreview
+          :application-form="applicationForm"
+          :job-details="form"
+          max-height="100%"
+        />
+      </aside>
     </div>
   </div>
 </template>
