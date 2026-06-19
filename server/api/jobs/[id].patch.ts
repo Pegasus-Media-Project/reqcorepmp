@@ -55,6 +55,7 @@ export default defineEventHandler(async (event) => {
       salaryNegotiable: job.salaryNegotiable,
       remoteStatus: job.remoteStatus,
       validThrough: job.validThrough,
+      phoneRequirement: job.phoneRequirement,
       requireResume: job.requireResume,
       requireCoverLetter: job.requireCoverLetter,
       autoScoreOnApply: job.autoScoreOnApply,

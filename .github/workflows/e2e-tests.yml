@@ -49,7 +49,25 @@ jobs:
       S3_FORCE_PATH_STYLE: "true"
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22.22
+          cache: npm
+
+      - name: Install dependencies
+        timeout-minutes: 20
+        env:
+          npm_config_fetch_retries: 5
+          npm_config_fetch_retry_mintimeout: 20000
+          npm_config_fetch_retry_maxtimeout: 120000
+        run: npm ci --no-audit
+
       - name: Start MinIO
+        timeout-minutes: 2
         run: |
           docker run -d \
             --name minio-ci \
@@ -63,18 +81,6 @@ jobs:
           aws s3 mb s3://reqcore \
             --endpoint-url http://localhost:9000 \
             --region us-east-1
-
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22.22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
 
       - name: Push database schema
         run: npx drizzle-kit push

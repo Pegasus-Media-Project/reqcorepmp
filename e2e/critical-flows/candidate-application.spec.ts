@@ -1,4 +1,4 @@
-import { test, expect } from '../fixtures'
+import { test, expect, declineAnalyticsConsent } from '../fixtures'
 
 /**
  * Critical flow: Candidate applies to a published job that contains every
@@ -202,6 +202,7 @@ test.describe('Candidate Application Flow — All Custom Question Field Types', 
     // ── Candidate flow: fresh unauthenticated context ─────────────────────────
 
     const candidateContext = await browser.newContext()
+    await declineAnalyticsConsent(candidateContext)
     const candidatePage = await candidateContext.newPage()
 
     // Unique identity per run + retry — static emails cause a 409 "already
@@ -513,6 +514,7 @@ test.describe('Candidate Application — Required Cover Letter Validation', () =
 
     // ── Candidate flow ────────────────────────────────────────────────────────
     const candidateContext = await browser.newContext()
+    await declineAnalyticsConsent(candidateContext)
     const candidatePage = await candidateContext.newPage()
 
     await candidatePage.goto(applicationLink)

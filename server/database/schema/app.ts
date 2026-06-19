@@ -64,6 +64,7 @@ export const job = pgTable('job', {
   /** Experience level required for this role */
   experienceLevel: experienceLevelEnum('experience_level'),
   // ── Application form settings ──
+  phoneRequirement: text('phone_requirement').$type<'hidden' | 'optional' | 'required'>().notNull().default('optional'),
   requireResume: boolean('require_resume').notNull().default(false),
   requireCoverLetter: boolean('require_cover_letter').notNull().default(false),
   // ── AI scoring settings ──

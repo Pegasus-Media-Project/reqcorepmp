@@ -178,11 +178,25 @@ export default defineEventHandler(async (event) => {
 
   const existingJob = await db.query.job.findFirst({
     where: and(eq(job.slug, slug), eq(job.status, 'open')),
-    columns: { id: true, organizationId: true, requireResume: true, requireCoverLetter: true, autoScoreOnApply: true },
+    columns: {
+      id: true,
+      organizationId: true,
+      phoneRequirement: true,
+      requireResume: true,
+      requireCoverLetter: true,
+      autoScoreOnApply: true,
+    },
   })
 
   if (!existingJob) {
     throw createError({ statusCode: 404, statusMessage: 'Job not found or not accepting applications' })
+  }
+
+  if (existingJob.phoneRequirement === 'required' && !phone?.trim()) {
+    throw createError({ statusCode: 422, statusMessage: 'Phone number is required for this position' })
+  }
+  if (existingJob.phoneRequirement === 'hidden') {
+    phone = undefined
   }
 
   // Validate required resume

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FileText, Link2, ClipboardCopy, Check, Plus, Copy, CheckCircle2, XCircle, ToggleLeft, ToggleRight, Trash2, Radio, ChevronDown, X, ExternalLink } from 'lucide-vue-next'
+import { Link2, ClipboardCopy, Plus, Copy, CheckCircle2, XCircle, ToggleLeft, ToggleRight, Trash2, Radio, ChevronDown, X } from 'lucide-vue-next'
 
 definePageMeta({
   layout: 'dashboard',
@@ -43,35 +43,66 @@ async function copyApplicationLink() {
 }
 
 // ─────────────────────────────────────────────
-// Application requirements (resume / cover letter)
+// Live application builder — shared with the create-job wizard.
+// Every edit persists immediately via the operations below.
 // ─────────────────────────────────────────────
 
-const requireResume = ref(false)
-const requireCoverLetter = ref(false)
-const isSavingRequirements = ref(false)
-const requirementsSaved = ref(false)
-const requirementsError = ref<string | null>(null)
+const {
+  questions: jobQuestions,
+  addQuestion,
+  updateQuestion,
+  deleteQuestion,
+  reorderQuestions,
+} = useJobQuestions(jobId)
 
-// Sync with fetched job data
+type QuestionType =
+  | 'short_text' | 'long_text' | 'single_select' | 'multi_select'
+  | 'number' | 'date' | 'url' | 'checkbox' | 'file_upload'
+
+type BuilderQuestion = {
+  id: string
+  label: string
+  type: QuestionType
+  description?: string | null
+  required: boolean
+  options?: string[] | null
+}
+
+const builderModel = ref<{
+  phoneRequirement: 'hidden' | 'optional' | 'required'
+  requireResume: boolean
+  requireCoverLetter: boolean
+  questions: BuilderQuestion[]
+}>({ phoneRequirement: 'optional', requireResume: false, requireCoverLetter: false, questions: [] })
+
+// Keep the builder model in sync with server state.
 watch(job, (j) => {
   if (j) {
-    requireResume.value = j.requireResume ?? false
-    requireCoverLetter.value = j.requireCoverLetter ?? false
+    builderModel.value.phoneRequirement = j.phoneRequirement ?? 'optional'
+    builderModel.value.requireResume = j.requireResume ?? false
+    builderModel.value.requireCoverLetter = j.requireCoverLetter ?? false
   }
 }, { immediate: true })
 
-async function saveRequirements() {
-  isSavingRequirements.value = true
-  requirementsError.value = null
-  try {
-    await updateJob({ requireResume: requireResume.value, requireCoverLetter: requireCoverLetter.value })
-    requirementsSaved.value = true
-    setTimeout(() => { requirementsSaved.value = false }, 2000)
-  } catch (err: any) {
-    requirementsError.value = err?.data?.statusMessage ?? 'Failed to save requirements.'
-  } finally {
-    isSavingRequirements.value = false
-  }
+watch(jobQuestions, (qs) => {
+  builderModel.value.questions = (qs ?? []).map((q: any) => ({
+    id: q.id,
+    label: q.label,
+    type: q.type as QuestionType,
+    description: q.description ?? null,
+    required: q.required,
+    options: q.options ?? null,
+  }))
+}, { immediate: true })
+
+const builderOperations = {
+  addQuestion: (data: any) => addQuestion({ ...data, displayOrder: jobQuestions.value?.length ?? 0 }),
+  updateQuestion: (id: string, data: any) => updateQuestion(id, data),
+  deleteQuestion: (id: string) => deleteQuestion(id),
+  reorderQuestions: (order: { id: string; displayOrder: number }[]) => reorderQuestions(order),
+  setPhoneRequirement: (value: 'hidden' | 'optional' | 'required') => updateJob({ phoneRequirement: value }),
+  setRequireResume: (value: boolean) => updateJob({ requireResume: value }),
+  setRequireCoverLetter: (value: boolean) => updateJob({ requireCoverLetter: value }),
 }
 
 // ─────────────────────────────────────────────
@@ -173,7 +204,7 @@ async function copyTrackingUrl(code: string) {
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl">
+  <div class="mx-auto max-w-6xl">
     <JobSubNavActions :job-id="jobId" />
 
     <!-- Loading -->
@@ -229,67 +260,13 @@ async function copyTrackingUrl(code: string) {
         The application link will be available when this job is published (status: <strong>open</strong>).
       </div>
 
-      <!-- Application Requirements -->
+      <!-- Application builder: controls + live candidate preview -->
       <div class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5 mb-6">
-        <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-1">Application requirements</h2>
-        <p class="text-xs text-surface-400 dark:text-surface-500 mb-4">
-          Choose what candidates must provide when applying.
-        </p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-          <button
-            type="button"
-            class="relative flex items-center gap-3 p-4 rounded-xl border text-left transition-colors"
-            :class="requireResume
-              ? 'border-brand-300 dark:border-brand-700 bg-brand-50/70 dark:bg-brand-950/30'
-              : 'border-surface-200 dark:border-surface-800 hover:bg-surface-50 dark:hover:bg-surface-800/50'"
-            :aria-pressed="requireResume"
-            @click="requireResume = !requireResume"
-          >
-            <span
-              v-if="requireResume"
-              class="absolute top-3 right-3 inline-flex items-center justify-center size-5 rounded-full bg-brand-600 text-white"
-              aria-hidden="true"
-            >
-              <Check class="size-3" />
-            </span>
-            <div>
-              <span class="block text-sm font-medium text-surface-900 dark:text-surface-100">Require resume/CV</span>
-              <span class="text-xs text-surface-500">Candidates must upload a file.</span>
-            </div>
-          </button>
-          <button
-            type="button"
-            class="relative flex items-center gap-3 p-4 rounded-xl border text-left transition-colors"
-            :class="requireCoverLetter
-              ? 'border-brand-300 dark:border-brand-700 bg-brand-50/70 dark:bg-brand-950/30'
-              : 'border-surface-200 dark:border-surface-800 hover:bg-surface-50 dark:hover:bg-surface-800/50'"
-            :aria-pressed="requireCoverLetter"
-            @click="requireCoverLetter = !requireCoverLetter"
-          >
-            <span
-              v-if="requireCoverLetter"
-              class="absolute top-3 right-3 inline-flex items-center justify-center size-5 rounded-full bg-brand-600 text-white"
-              aria-hidden="true"
-            >
-              <Check class="size-3" />
-            </span>
-            <div>
-              <span class="block text-sm font-medium text-surface-900 dark:text-surface-100">Ask for cover letter</span>
-              <span class="text-xs text-surface-500">Candidates can write a cover letter.</span>
-            </div>
-          </button>
-        </div>
-        <button
-          type="button"
-          :disabled="isSavingRequirements"
-          class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
-          @click="saveRequirements"
-        >
-          {{ requirementsSaved ? 'Saved!' : isSavingRequirements ? 'Saving…' : 'Save requirements' }}
-        </button>
-        <p v-if="requirementsError" class="mt-2 text-xs text-danger-600 dark:text-danger-400">
-          {{ requirementsError }}
-        </p>
+        <ApplicationBuilder
+          v-model="builderModel"
+          :job-title="job.title"
+          :operations="builderOperations"
+        />
       </div>
 
       <!-- Tracking Links for this Job -->
@@ -393,17 +370,6 @@ async function copyTrackingUrl(code: string) {
         </div>
       </div>
 
-      <!-- Application Form Questions -->
-      <div class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
-        <div class="flex items-center gap-2 mb-3">
-          <FileText class="size-4 text-surface-500 dark:text-surface-400" />
-          <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-300">Custom Questions</h2>
-        </div>
-        <p class="text-xs text-surface-400 dark:text-surface-500 mb-4">
-          Customize the questions applicants must answer when applying. All applications include name, email, and phone by default.
-        </p>
-        <JobQuestions :job-id="jobId" />
-      </div>
     </template>
 
     <!-- ═══════════════════════════════════════ -->
