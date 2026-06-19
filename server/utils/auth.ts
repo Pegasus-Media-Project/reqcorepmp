@@ -247,7 +247,9 @@ function getAuth(): Auth {
       // Disabled in CI/test (GITHUB_ACTIONS or NODE_ENV !== 'production')
       // to prevent E2E test flakiness.
       rateLimit: {
-        enabled: !process.env.CI && !process.env.GITHUB_ACTIONS,
+        enabled: process.env.NODE_ENV === "production"
+          && !process.env.CI
+          && !process.env.GITHUB_ACTIONS,
         window: 60,
         max: 100,        // 100 requests per minute per IP — stops bots, not humans
         storage: "database",
