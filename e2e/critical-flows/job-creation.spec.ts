@@ -59,11 +59,11 @@ test.describe('Job Creation Flow', () => {
     await page.locator('form').getByRole('button', { name: 'Save & continue' }).click()
     await page.locator('form').getByRole('button', { name: 'Save & continue' }).click()
 
-    await page.locator('form button').filter({ hasText: /^Save as draft/ }).click()
     let createRequests = 0
     page.on('request', (request) => {
       if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/jobs') createRequests++
     })
+    await page.locator('form button').filter({ hasText: /^Save as draft/ }).click()
 
     await page.locator('form').evaluate((form: HTMLFormElement) => {
       form.requestSubmit()

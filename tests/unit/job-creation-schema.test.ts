@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createJobSchema, createJobWizardSchema } from '../../server/utils/schemas/job'
-import { createQuestionSchema } from '../../server/utils/schemas/jobQuestion'
+import { createQuestionSchema, questionStateSchema } from '../../server/utils/schemas/jobQuestion'
 
 describe('job creation validation', () => {
   it('rejects whitespace-only titles and trims valid text fields', () => {
@@ -25,6 +25,23 @@ describe('job creation validation', () => {
     })
 
     expect(result.success).toBe(false)
+  })
+
+  it('rejects invalid select question state after applying a partial update', () => {
+    expect(questionStateSchema.safeParse({
+      type: 'single_select',
+      options: null,
+    }).success).toBe(false)
+
+    expect(questionStateSchema.safeParse({
+      type: 'multi_select',
+      options: ['Playwright', ' playwright '],
+    }).success).toBe(false)
+
+    expect(questionStateSchema.safeParse({
+      type: 'single_select',
+      options: ['Playwright'],
+    }).success).toBe(true)
   })
 
   it('rejects impossible automatic-scoring and duplicate-criterion payloads', () => {
