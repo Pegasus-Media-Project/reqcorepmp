@@ -165,9 +165,10 @@ jobs:
         id: db_migrations
         run: |
           set -euo pipefail
-          if ! docker compose logs app | grep -q "Database migrations applied successfully"; then
+          logs="$(docker compose logs app)"
+          if ! grep -q "Database migrations applied successfully" <<<"$logs"; then
             echo "❌ Migration success message not found in app logs"
-            docker compose logs app
+            printf '%s\n' "$logs"
             exit 1
           fi
           echo "✅ Migrations applied successfully"
@@ -176,9 +177,10 @@ jobs:
         id: s3_bucket
         run: |
           set -euo pipefail
-          if ! docker compose logs app | grep -q 'S3 bucket "reqcore" is ready'; then
+          logs="$(docker compose logs app)"
+          if ! grep -q 'S3 bucket "reqcore" is ready' <<<"$logs"; then
             echo "❌ S3 bucket ready message not found in app logs"
-            docker compose logs app
+            printf '%s\n' "$logs"
             exit 1
           fi
           echo "✅ S3 bucket is ready"
