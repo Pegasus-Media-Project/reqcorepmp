@@ -20,6 +20,60 @@ const QUESTION_LABEL = 'Which testing framework do you know best?'
 const UPDATED_QUESTION_LABEL = 'Which browser testing framework do you know best?'
 
 test.describe('Job Creation Flow', () => {
+  test('wizard rejects malformed drafts, invalid questions, and duplicate submissions', async ({ authenticatedPage }) => {
+    const page = authenticatedPage
+
+    await page.evaluate(() => {
+      localStorage.setItem('reqcore-job-draft', JSON.stringify({
+        form: { title: '   ' },
+        applicationForm: { questions: 'not-an-array' },
+        scoringCriteria: [{ key: '__invalid__' }],
+        currentStep: 99,
+      }))
+    })
+    await page.goto('/dashboard/jobs/new')
+    await page.waitForLoadState('networkidle')
+
+    const title = page.getByLabel('Job title')
+    await expect(title).toBeVisible()
+    await expect(title).toHaveValue('')
+    await title.fill('   ')
+    await expect(page.locator('form').getByRole('button', { name: 'Save & continue' })).toBeDisabled()
+
+    await title.fill('Robustness Test Engineer')
+    const continueButton = page.locator('form').getByRole('button', { name: 'Save & continue' })
+    await expect(continueButton).toBeEnabled()
+    await continueButton.click()
+
+    await page.getByRole('button', { name: 'Add a question', exact: true }).click()
+    await page.getByLabel('Question').fill('Preferred test framework?')
+    await page.getByLabel('Field Type').selectOption('single_select')
+    await page.getByPlaceholder('Option 1').fill('Playwright')
+    await page.getByRole('button', { name: 'Add option' }).click()
+    await page.getByPlaceholder('Option 2').fill(' playwright ')
+    await page.getByRole('button', { name: 'Add Question', exact: true }).click()
+    await expect(page.getByText('Options must be unique')).toBeVisible()
+
+    await page.getByPlaceholder('Option 2').fill('Cypress')
+    await page.getByRole('button', { name: 'Add Question', exact: true }).click()
+    await page.locator('form').getByRole('button', { name: 'Save & continue' }).click()
+    await page.locator('form').getByRole('button', { name: 'Save & continue' }).click()
+
+    await page.locator('form button').filter({ hasText: /^Save as draft/ }).click()
+    let createRequests = 0
+    page.on('request', (request) => {
+      if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/jobs') createRequests++
+    })
+
+    await page.locator('form').evaluate((form: HTMLFormElement) => {
+      form.requestSubmit()
+      form.requestSubmit()
+    })
+
+    await page.waitForURL(/\/dashboard\/jobs(?:\?|$)/)
+    expect(createRequests).toBe(1)
+  })
+
   test('recruiter can configure the application form and publish a job', async ({ authenticatedPage }) => {
     const page = authenticatedPage
     const dismissFeedbackSurvey = async () => {

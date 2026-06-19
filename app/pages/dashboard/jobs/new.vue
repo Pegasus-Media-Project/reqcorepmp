@@ -242,22 +242,29 @@ async function generateAiCriteria() {
 
 function addCustomCriterion() {
   const f = customCriterionForm.value
-  if (!f.key || !f.name) return
-
-  const keyExists = scoringCriteria.value.some(c => c.key === f.key)
-  if (keyExists) {
-    toast.warning('Duplicate criterion', `A criterion with key "${f.key}" already exists.`)
+  if (scoringCriteria.value.length >= 20) {
+    toast.warning('Criteria limit reached', 'You can add up to 20 scoring criteria.')
     return
   }
 
-  scoringCriteria.value.push({
-    key: f.key,
-    name: f.name,
-    description: f.description,
-    category: f.category,
-    maxScore: f.maxScore,
-    weight: f.weight,
+  const parsed = scoringCriterionDraftSchema.safeParse({
+    ...f,
+    key: f.key.trim(),
+    name: f.name.trim(),
+    description: f.description.trim(),
   })
+  if (!parsed.success) {
+    toast.warning('Invalid criterion', parsed.error.issues[0]?.message ?? 'Check the criterion fields and try again.')
+    return
+  }
+
+  const keyExists = scoringCriteria.value.some(c => c.key === parsed.data.key)
+  if (keyExists) {
+    toast.warning('Duplicate criterion', `A criterion with key "${parsed.data.key}" already exists.`)
+    return
+  }
+
+  scoringCriteria.value.push(parsed.data)
   customCriterionForm.value = { key: '', name: '', description: '', category: 'custom', maxScore: 10, weight: 50 }
   showCustomForm.value = false
   if (scoringMode.value === 'none') scoringMode.value = 'custom'
@@ -277,6 +284,40 @@ function autoGenerateKey(name: string): string {
 const isSubmitting = ref(false)
 const errors = ref<Record<string, string>>({})
 const linkCopied = ref(false)
+
+const formSchema = z.object({
+  title: z.string().trim().min(1, 'Title is required').max(200, 'Title must be 200 characters or less'),
+  description: z.string().trim().max(100_000, 'Description is too long'),
+  location: z.string().trim().max(500, 'Location must be 500 characters or less'),
+  type: z.enum(['full_time', 'part_time', 'contract', 'internship']),
+  experienceLevel: z.enum(['junior', 'mid', 'senior', 'lead']),
+  remoteStatus: z.enum(['remote', 'hybrid', 'onsite']).optional(),
+})
+
+const draftQuestionSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().trim().min(1).max(500),
+  type: z.enum(['short_text', 'long_text', 'single_select', 'multi_select', 'number', 'date', 'url', 'checkbox', 'file_upload']),
+  description: z.string().trim().max(1000).nullish(),
+  required: z.boolean(),
+  options: z.array(z.string().trim().min(1).max(200)).max(50).nullish(),
+})
+
+const applicationFormSchema = z.object({
+  phoneRequirement: z.enum(['hidden', 'optional', 'required']),
+  requireResume: z.boolean(),
+  requireCoverLetter: z.boolean(),
+  questions: z.array(draftQuestionSchema).max(50),
+})
+
+const scoringCriterionDraftSchema = z.object({
+  key: z.string().trim().min(1).max(100).regex(/^[a-z][a-z0-9_]*$/),
+  name: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(1000),
+  category: z.enum(['technical', 'experience', 'soft_skills', 'education', 'culture', 'custom']),
+  maxScore: z.number().int().min(1).max(100),
+  weight: z.number().int().min(0).max(100),
+})
 
 // Check if at least one AI provider is configured with a valid API key.
 // /api/ai-config returns an array of configurations now (multi-config era).
@@ -314,13 +355,37 @@ function restoreFormFromStorage() {
   try {
     const raw = localStorage.getItem(AUTO_SAVE_KEY)
     if (!raw) return
-    const data = JSON.parse(raw)
-    if (data.form) Object.assign(form.value, data.form)
-    if (data.applicationForm) Object.assign(applicationForm.value, data.applicationForm)
-    if (data.scoringCriteria) scoringCriteria.value = data.scoringCriteria
-    if (data.scoringMode) scoringMode.value = data.scoringMode
-    if (data.autoScoreOnApply != null) autoScoreOnApply.value = data.autoScoreOnApply
-    if (data.currentStep) currentStep.value = data.currentStep
+    const data = z.object({
+      form: z.unknown().optional(),
+      applicationForm: z.unknown().optional(),
+      scoringCriteria: z.unknown().optional(),
+      scoringMode: z.unknown().optional(),
+      autoScoreOnApply: z.unknown().optional(),
+      currentStep: z.unknown().optional(),
+    }).parse(JSON.parse(raw))
+
+    const storedForm = formSchema.safeParse(data.form)
+    if (storedForm.success) {
+      form.value = {
+        ...storedForm.data,
+        remoteStatus: storedForm.data.remoteStatus,
+      }
+    }
+
+    const storedApplicationForm = applicationFormSchema.safeParse(data.applicationForm)
+    if (storedApplicationForm.success) applicationForm.value = storedApplicationForm.data
+
+    const storedCriteria = z.array(scoringCriterionDraftSchema).max(20).safeParse(data.scoringCriteria)
+    if (storedCriteria.success) scoringCriteria.value = storedCriteria.data
+
+    const storedMode = z.enum(['none', 'premade', 'ai', 'custom']).safeParse(data.scoringMode)
+    if (storedMode.success) scoringMode.value = storedMode.data
+
+    const storedAutoScore = z.boolean().safeParse(data.autoScoreOnApply)
+    if (storedAutoScore.success) autoScoreOnApply.value = storedAutoScore.data
+
+    const storedStep = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]).safeParse(data.currentStep)
+    currentStep.value = storedStep.success && storedForm.success ? storedStep.data : 1
   } catch { /* corrupted data, ignore */ }
 }
 
@@ -508,17 +573,6 @@ async function copyCustomBoardLink(index: number) {
   }
 }
 
-// Validation (only Step 1 is required to submit)
-const formSchema = z.object({
-  title: z
-    .string()
-    .min(1, 'Title is required')
-    .max(200, 'Title must be 200 characters or less'),
-  description: z.string().optional(),
-  location: z.string().optional(),
-  type: z.enum(['full_time', 'part_time', 'contract', 'internship']),
-})
-
 function validateStep1(): boolean {
   const result = formSchema.safeParse(form.value)
   if (!result.success) {
@@ -595,76 +649,51 @@ async function copyApplicationLink() {
 }
 
 async function handleSubmit(mode: 'publish' | 'draft' = publishChoice.value) {
+  if (isSubmitting.value) return
+
   // Ensure step 1 is valid before submit
   if (!validateStep1()) {
     currentStep.value = 1
     return
   }
 
+  const normalizedForm = formSchema.parse(form.value)
   isSubmitting.value = true
   try {
     const created = await createJob({
-      title: form.value.title,
-      description: form.value.description || undefined,
-      location: form.value.location || undefined,
-      type: form.value.type,
-      experienceLevel: form.value.experienceLevel || undefined,
-      remoteStatus: form.value.remoteStatus || undefined,
+      title: normalizedForm.title,
+      description: normalizedForm.description || undefined,
+      location: normalizedForm.location || undefined,
+      type: normalizedForm.type,
+      experienceLevel: normalizedForm.experienceLevel,
+      remoteStatus: normalizedForm.remoteStatus,
       phoneRequirement: applicationForm.value.phoneRequirement,
       requireResume: applicationForm.value.requireResume,
       requireCoverLetter: applicationForm.value.requireCoverLetter,
-      autoScoreOnApply: autoScoreOnApply.value,
+      autoScoreOnApply: scoringCriteria.value.length > 0 && autoScoreOnApply.value,
+      status: mode === 'publish' ? 'open' : 'draft',
+      questions: applicationForm.value.questions.map((question, index) => ({
+        label: question.label,
+        type: question.type,
+        description: question.description || undefined,
+        required: question.required,
+        options: question.options || undefined,
+        displayOrder: index,
+      })),
+      criteria: scoringCriteria.value.map((criterion, index) => ({
+        key: criterion.key,
+        name: criterion.name,
+        description: criterion.description || undefined,
+        category: criterion.category,
+        maxScore: criterion.maxScore,
+        weight: criterion.weight,
+        displayOrder: index,
+      })),
     })
 
     track('job_created')
 
-    if (applicationForm.value.questions.length > 0 && created?.id) {
-      await Promise.all(
-        applicationForm.value.questions.map((question, index) => (
-          $fetch(`/api/jobs/${created.id}/questions`, {
-            method: 'POST',
-            body: {
-              label: question.label,
-              type: question.type,
-              description: question.description || undefined,
-              required: question.required,
-              options: question.options || undefined,
-              displayOrder: index,
-            },
-          })
-        )),
-      )
-    }
-
-    // Save scoring criteria if any were configured
-    if (scoringCriteria.value.length > 0 && created?.id) {
-      try {
-        await $fetch(`/api/jobs/${created.id}/criteria`, {
-          method: 'POST',
-          body: {
-            criteria: scoringCriteria.value.map((c, i) => ({
-              key: c.key,
-              name: c.name,
-              description: c.description || undefined,
-              category: c.category,
-              maxScore: c.maxScore,
-              weight: c.weight,
-              displayOrder: i,
-            })),
-          },
-        })
-      } catch {
-        // Non-blocking: criteria can be added later from job settings
-      }
-    }
-
     if (mode === 'publish' && created?.id) {
-      // Publish the job immediately
-      await $fetch(`/api/jobs/${created.id}`, {
-        method: 'PATCH',
-        body: { status: 'open' },
-      })
-
       // Build the real application link
       const base = `${requestUrl.protocol}//${requestUrl.host}`
       const slug = created.slug || created.id
@@ -817,6 +846,7 @@ const typeOptions = [
                   id="title"
                   v-model="form.title"
                   type="text"
+                  maxlength="200"
                   placeholder="e.g. Senior Frontend Engineer"
                   class="w-full rounded-lg border px-3 py-2.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
                   :class="errors.title ? 'border-danger-300 ring-1 ring-danger-100' : 'border-surface-300 dark:border-surface-700'"
@@ -835,6 +865,7 @@ const typeOptions = [
                     id="location"
                     v-model="form.location"
                     type="text"
+                    maxlength="500"
                     placeholder="e.g. New York, NY"
                     class="w-full rounded-lg border px-3 py-2.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors border-surface-300 dark:border-surface-700"
                   />
@@ -1217,6 +1248,7 @@ const typeOptions = [
                         v-model="customCriterionForm.name"
                         @input="customCriterionForm.key = autoGenerateKey(customCriterionForm.name)"
                         type="text"
+                        maxlength="200"
                         placeholder="e.g. React Expertise"
                         class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
                       />
@@ -1236,6 +1268,7 @@ const typeOptions = [
                     <textarea
                       v-model="customCriterionForm.description"
                       rows="2"
+                      maxlength="1000"
                       placeholder="Describe what the AI should evaluate for this criterion..."
                       class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
                     />

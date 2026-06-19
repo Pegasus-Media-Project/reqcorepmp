@@ -34,6 +34,24 @@ export function useJobs(options?: {
     requireResume?: boolean
     requireCoverLetter?: boolean
     autoScoreOnApply?: boolean
+    status?: 'draft' | 'open'
+    questions?: Array<{
+      label: string
+      type: 'short_text' | 'long_text' | 'single_select' | 'multi_select' | 'number' | 'date' | 'url' | 'checkbox' | 'file_upload'
+      description?: string
+      required: boolean
+      options?: string[]
+      displayOrder: number
+    }>
+    criteria?: Array<{
+      key: string
+      name: string
+      description?: string
+      category: 'technical' | 'experience' | 'soft_skills' | 'education' | 'culture' | 'custom'
+      maxScore: number
+      weight: number
+      displayOrder: number
+    }>
   }) {
     try {
       const created = await $fetch('/api/jobs', {

@@ -8,30 +8,44 @@ const questionTypes = ['short_text', 'long_text', 'single_select', 'multi_select
 
 /** Schema for creating a new custom question */
 export const createQuestionSchema = z.object({
-  label: z.string().min(1, 'Label is required').max(500),
+  label: z.string().trim().min(1, 'Label is required').max(500),
   type: z.enum(questionTypes).default('short_text'),
-  description: z.string().max(1000).optional(),
+  description: z.string().trim().max(1000).optional(),
   required: z.boolean().default(false),
-  options: z.array(z.string().min(1).max(200)).min(1).optional(),
+  options: z.array(z.string().trim().min(1).max(200)).min(1).max(50).optional(),
   displayOrder: z.number().int().min(0).default(0),
-}).refine(
-  (data) => {
+}).superRefine(
+  (data, ctx) => {
     // options required for select types
     if (data.type === 'single_select' || data.type === 'multi_select') {
-      return data.options && data.options.length >= 1
+      if (!data.options?.length) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Options are required for select-type questions',
+          path: ['options'],
+        })
+        return
+      }
+
+      const normalized = data.options.map(option => option.toLocaleLowerCase())
+      if (new Set(normalized).size !== normalized.length) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Options must be unique',
+          path: ['options'],
+        })
+      }
     }
-    return true
   },
-  { message: 'Options are required for select-type questions', path: ['options'] },
 )
 
 /** Schema for updating an existing question (all fields optional) */
 export const updateQuestionSchema = z.object({
-  label: z.string().min(1).max(500).optional(),
+  label: z.string().trim().min(1).max(500).optional(),
   type: z.enum(questionTypes).optional(),
-  description: z.string().max(1000).nullish(),
+  description: z.string().trim().max(1000).nullish(),
   required: z.boolean().optional(),
-  options: z.array(z.string().min(1).max(200)).min(1).nullish(),
+  options: z.array(z.string().trim().min(1).max(200)).min(1).max(50).nullish(),
   displayOrder: z.number().int().min(0).optional(),
 })
 

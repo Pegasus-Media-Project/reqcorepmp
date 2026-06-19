@@ -93,9 +93,6 @@ const metadata = computed(() => {
         <p class="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500">
           Live candidate preview
         </p>
-        <p class="truncate text-sm font-medium text-surface-700 dark:text-surface-300">
-          {{ jobDetails?.title || 'Untitled job' }}
-        </p>
       </div>
 
       <div
