@@ -307,6 +307,31 @@ async function handleSubmit() {
         @clear-error="(key) => delete errors[key]"
         @submit="handleSubmit"
       />
+
+      <!-- GDPR privacy notice (org-configurable) -->
+      <p
+        v-if="job.privacyPolicyText || job.privacyPolicyUrl || job.privacyContactEmail"
+        class="mt-6 text-xs leading-relaxed text-surface-400 dark:text-surface-500"
+      >
+        <template v-if="job.privacyPolicyText">{{ job.privacyPolicyText }} </template>
+        <template v-else>
+          By applying, you consent to {{ job.organizationName || 'this organization' }} processing your
+          application data to evaluate your candidacy. Your data is retained only as long as necessary and
+          then deleted.
+        </template>
+        <a
+          v-if="job.privacyPolicyUrl"
+          :href="job.privacyPolicyUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-brand-600 hover:underline"
+        >Privacy policy</a><template v-if="job.privacyPolicyUrl && job.privacyContactEmail"> · </template>
+        <a
+          v-if="job.privacyContactEmail"
+          :href="`mailto:${job.privacyContactEmail}`"
+          class="text-brand-600 hover:underline"
+        >Contact: {{ job.privacyContactEmail }}</a>
+      </p>
     </template>
   </div>
 </template>

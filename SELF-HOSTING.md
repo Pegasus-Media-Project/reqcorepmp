@@ -341,6 +341,22 @@ The Settings → Updates page automatically checks whether a new version is avai
 
 ---
 
+## Data Retention & GDPR
+
+Reqcore includes automated GDPR data retention and candidate erasure (free, no
+plan gating). To enable the automated cleanup on a self-hosted instance, set a
+`CRON_SECRET` (min 16 chars) and schedule a daily POST to the cleanup endpoint:
+
+```cron
+# Daily GDPR retention sweep at 3 AM
+0 3 * * * curl -fsS -X POST http://localhost:3000/api/admin/retention-cleanup \
+  -H "x-cron-secret: $CRON_SECRET" -H "content-type: application/json" -d '{}'
+```
+
+Configure the policy under **Settings → Privacy & Retention**. After restoring a
+database backup, re-run the sweep so erased candidates are not resurrected. Full
+details in [DATA-RETENTION.md](DATA-RETENTION.md).
+
 ## Backups & Data Safety
 
 ### Automatic Pre-Update Backups

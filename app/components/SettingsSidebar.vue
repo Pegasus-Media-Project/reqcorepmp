@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {
-  Building2, Users, UserCircle, ChevronLeft, Settings, Plug, Brain, ShieldCheck, Globe,
+  Building2, Users, UserCircle, ChevronLeft, Settings, Plug, Brain, ShieldCheck, Globe, ShieldAlert,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -40,6 +40,13 @@ const settingsNav = [
     description: 'Models & API keys',
     to: '/dashboard/settings/ai',
     icon: Brain,
+    exact: true,
+  },
+  {
+    label: 'Privacy & Retention',
+    description: 'GDPR & data deletion',
+    to: '/dashboard/settings/retention',
+    icon: ShieldAlert,
     exact: true,
   },
   {

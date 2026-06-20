@@ -1,5 +1,5 @@
 import { eq, and, asc } from 'drizzle-orm'
-import { job, organization } from '../../../database/schema'
+import { job, organization, orgSettings } from '../../../database/schema'
 import { publicJobSlugSchema } from '../../../utils/schemas/publicApplication'
 
 /**
@@ -15,6 +15,7 @@ export default defineEventHandler(async (event) => {
     where: and(eq(job.slug, slug), eq(job.status, 'open')),
     columns: {
       id: true,
+      organizationId: true,
       title: true,
       slug: true,
       description: true,
@@ -59,11 +60,20 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Job not found' })
   }
 
+  // Org-configured privacy notice shown on the application form.
+  const settings = await db.query.orgSettings.findFirst({
+    where: eq(orgSettings.organizationId, result.organizationId),
+    columns: { privacyPolicyUrl: true, privacyPolicyText: true, privacyContactEmail: true },
+  })
+
   // Flatten organization name into the response for SEO consumers
-  const { organization: org, ...jobData } = result
+  const { organization: org, organizationId: _orgId, ...jobData } = result
   return {
     ...jobData,
     organizationName: org?.name ?? null,
     organizationLogo: org?.logo ?? null,
+    privacyPolicyUrl: settings?.privacyPolicyUrl ?? null,
+    privacyPolicyText: settings?.privacyPolicyText ?? null,
+    privacyContactEmail: settings?.privacyContactEmail ?? null,
   }
 })
