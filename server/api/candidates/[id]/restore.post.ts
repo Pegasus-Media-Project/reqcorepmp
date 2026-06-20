@@ -34,6 +34,14 @@ export default defineEventHandler(async (event) => {
   }
 
   await recordRetentionAudit(orgId, id, 'restored', 'success', session.user.id, {})
+  await recordActivity({
+    organizationId: orgId,
+    actorId: session.user.id,
+    action: 'updated',
+    resourceType: 'candidate',
+    resourceId: id,
+    metadata: { retentionAction: 'restored_from_quarantine' },
+  })
 
   return { id, restored: true }
 })

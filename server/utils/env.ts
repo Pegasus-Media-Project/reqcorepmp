@@ -150,6 +150,15 @@ export const envSchema = z
     AUTH_MICROSOFT_TENANT_ID: emptyToUndefined.pipe(z.string().min(1)).optional().default('common'),
     /** Shared secret for authenticating cron/scheduled job requests (e.g., webhook renewal). */
     CRON_SECRET: emptyToUndefined.pipe(z.string().min(16)).optional(),
+    /**
+     * Instance-wide emergency switch for automated GDPR retention processing.
+     * Organization-level retention settings still control opt-in; this switch can
+     * pause every scheduled/manual sweep without changing customer policy data.
+     */
+    GDPR_CLEANUP_ENABLED: z.preprocess(
+      val => val === undefined || val === '' ? true : val === true || val === 'true',
+      z.boolean().default(true),
+    ),
     /** OIDC client ID for SSO authentication (e.g., Keycloak, Authentik, Authelia, Okta). */
     OIDC_CLIENT_ID: emptyToUndefined.pipe(z.string().min(1)).optional(),
     /** OIDC client secret for SSO authentication. */

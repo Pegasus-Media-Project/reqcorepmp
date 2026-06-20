@@ -50,6 +50,17 @@ export default defineEventHandler(async (event) => {
   }
 
   await recordRetentionAudit(orgId, id, exemptUntil ? 'exempted' : 'unexempted', 'success', session.user.id, {})
+  await recordActivity({
+    organizationId: orgId,
+    actorId: session.user.id,
+    action: 'updated',
+    resourceType: 'candidate',
+    resourceId: id,
+    metadata: {
+      retentionAction: exemptUntil ? 'legal_hold_added' : 'legal_hold_removed',
+      ...(exemptUntil ? { exemptUntil: exemptUntil.toISOString() } : {}),
+    },
+  })
 
   return { id, exemptUntil }
 })

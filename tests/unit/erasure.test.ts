@@ -10,16 +10,29 @@ interface MockOpts {
   id?: string
   candidateExists?: boolean
   documents?: string[]
+  applications?: string[]
+  interviews?: string[]
   comments?: unknown[]
   properties?: unknown[]
   activityLogs?: unknown[]
+  /** Retention fields returned by the candidate findFirst (for purge-guard tests). */
+  quarantinedAt?: Date | null
+  scheduledPurgeAt?: Date | null
+  retentionExemptUntil?: Date | null
+  /** When false, the atomic candidate delete matches 0 rows (simulates a mid-sweep reapplication). */
+  candidateDeleted?: boolean
 }
 
 function makeDb(opts: MockOpts) {
   const selectResults = [opts.comments ?? [], opts.properties ?? [], opts.activityLogs ?? []]
   let selectIdx = 0
   const inserts: Record<string, unknown>[] = []
-  const txDelete = vi.fn(() => ({ where: vi.fn(() => Promise.resolve()) }))
+  const deletedRows = opts.candidateDeleted === false ? [] : [{ id: opts.id ?? 'c1' }]
+  const txDelete = vi.fn(() => ({
+    where: vi.fn(() => Object.assign(Promise.resolve(deletedRows), {
+      returning: vi.fn(() => Promise.resolve(deletedRows)),
+    })),
+  }))
   const transaction = vi.fn(async (cb: (tx: unknown) => unknown) => cb({ delete: txDelete }))
   const insert = vi.fn(() => ({
     values: vi.fn((v: Record<string, unknown>) => { inserts.push(v); return Promise.resolve() }),
@@ -27,8 +40,23 @@ function makeDb(opts: MockOpts) {
 
   const db = {
     query: {
-      candidate: { findFirst: vi.fn(async () => (opts.candidateExists ? { id: opts.id ?? 'c1' } : undefined)) },
-      document: { findMany: vi.fn(async () => (opts.documents ?? []).map(k => ({ storageKey: k }))) },
+      candidate: {
+        findFirst: vi.fn(async () => (opts.candidateExists
+          ? {
+              id: opts.id ?? 'c1',
+              quarantinedAt: opts.quarantinedAt ?? null,
+              scheduledPurgeAt: opts.scheduledPurgeAt ?? null,
+              retentionExemptUntil: opts.retentionExemptUntil ?? null,
+            }
+          : undefined)),
+      },
+      document: {
+        findMany: vi.fn(async () =>
+          (opts.documents ?? []).map((storageKey, index) => ({ id: `d${index + 1}`, storageKey })),
+        ),
+      },
+      application: { findMany: vi.fn(async () => (opts.applications ?? []).map(id => ({ id }))) },
+      interview: { findMany: vi.fn(async () => (opts.interviews ?? []).map(id => ({ id }))) },
     },
     select: vi.fn(() => ({
       from: vi.fn(() => ({ where: vi.fn(() => Promise.resolve(selectResults[selectIdx++])) })),
@@ -80,7 +108,14 @@ describe('eraseCandidates', () => {
   })
 
   it('deletes S3 objects BEFORE the DB graph, then erases', async () => {
-    const m = makeDb({ candidateExists: true, documents: ['k1', 'k2'], comments: [{}, {}], properties: [{}] })
+    const m = makeDb({
+      candidateExists: true,
+      documents: ['k1', 'k2'],
+      applications: ['a1'],
+      interviews: ['i1'],
+      comments: [{}, {}],
+      properties: [{}],
+    })
     vi.stubGlobal('db', m.db)
 
     const report = await eraseCandidates('org1', ['c1'], { actorId: 'u1' })
@@ -90,6 +125,8 @@ describe('eraseCandidates', () => {
     expect(m.transaction).toHaveBeenCalledTimes(1)
     // 4 polymorphic/graph deletes inside the transaction.
     expect(m.txDelete).toHaveBeenCalledTimes(4)
+    expect(m.db.query.application.findMany).toHaveBeenCalledTimes(1)
+    expect(m.db.query.interview.findMany).toHaveBeenCalledTimes(1)
     // S3 deletion happens before the DB transaction.
     expect(deleteFromS3.mock.invocationCallOrder[0])
       .toBeLessThan(m.transaction.mock.invocationCallOrder[0])
@@ -144,6 +181,80 @@ describe('eraseCandidates', () => {
     expect(report.results[0].status).toBe('erased')
     expect(report.results[0].auditFailed).toBe(true)
     expect((globalThis as Record<string, unknown>).logError).toHaveBeenCalled()
+  })
+
+  describe('requirePurgeEligible (reapplication race guard)', () => {
+    const PAST = new Date('2026-01-01T00:00:00Z')
+    const FUTURE = new Date('2999-01-01T00:00:00Z')
+    const NOW = new Date('2026-06-20T00:00:00Z')
+
+    it('skips (pre-check) when the candidate is no longer quarantined — touches nothing', async () => {
+      // A reapplication cleared quarantinedAt before the sweep reached this candidate.
+      const m = makeDb({ candidateExists: true, documents: ['k1'], quarantinedAt: null })
+      vi.stubGlobal('db', m.db)
+
+      const report = await eraseCandidates('org1', ['c1'], { requirePurgeEligible: true, now: NOW })
+
+      expect(report.results[0].status).toBe('skipped_not_eligible')
+      expect(report.skipped).toBe(1)
+      expect(report.erased).toBe(0)
+      expect(deleteFromS3).not.toHaveBeenCalled()
+      expect(m.transaction).not.toHaveBeenCalled()
+    })
+
+    it('skips (pre-check) when the candidate is under an active legal hold', async () => {
+      const m = makeDb({
+        candidateExists: true,
+        documents: ['k1'],
+        quarantinedAt: PAST,
+        scheduledPurgeAt: PAST,
+        retentionExemptUntil: FUTURE,
+      })
+      vi.stubGlobal('db', m.db)
+
+      const report = await eraseCandidates('org1', ['c1'], { requirePurgeEligible: true, now: NOW })
+
+      expect(report.results[0].status).toBe('skipped_not_eligible')
+      expect(deleteFromS3).not.toHaveBeenCalled()
+      expect(m.transaction).not.toHaveBeenCalled()
+    })
+
+    it('rolls back the transaction when the atomic delete matches 0 rows (race lost mid-sweep)', async () => {
+      // Pre-check passes, but a reapplication restores the candidate before the
+      // transaction; the guarded candidate delete matches nothing and we roll back.
+      const m = makeDb({
+        candidateExists: true,
+        documents: ['k1'],
+        comments: [{}],
+        quarantinedAt: PAST,
+        scheduledPurgeAt: PAST,
+        candidateDeleted: false,
+      })
+      vi.stubGlobal('db', m.db)
+
+      const report = await eraseCandidates('org1', ['c1'], { requirePurgeEligible: true, now: NOW })
+
+      expect(report.results[0].status).toBe('skipped_not_eligible')
+      expect(m.transaction).toHaveBeenCalledTimes(1)
+      // No success audit row written for a rolled-back erasure.
+      expect(m.inserts).toHaveLength(0)
+    })
+
+    it('erases when still quarantined and past purge', async () => {
+      const m = makeDb({
+        candidateExists: true,
+        documents: ['k1'],
+        quarantinedAt: PAST,
+        scheduledPurgeAt: PAST,
+      })
+      vi.stubGlobal('db', m.db)
+
+      const report = await eraseCandidates('org1', ['c1'], { requirePurgeEligible: true, now: NOW })
+
+      expect(report.results[0].status).toBe('erased')
+      expect(m.transaction).toHaveBeenCalledTimes(1)
+      expect(m.inserts[0]?.result).toBe('success')
+    })
   })
 
   it('aggregates a multi-candidate report', async () => {

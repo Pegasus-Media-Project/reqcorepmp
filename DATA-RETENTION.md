@@ -16,6 +16,10 @@ self-hosted deployments. No paid plan, license key, or quota gates any of it.
   **latest recruitment process** — not their upload date.
 - **Quarantine window**: expired candidates first enter a recoverable quarantine
   (default **30 days**) before permanent erasure, protecting against mistakes.
+  Quarantined candidates are hidden from normal candidate lists and cannot be
+  edited, receive internal applications, or receive new uploads. A fresh public
+  application counts as renewed engagement: it restores the candidate and resets
+  the retention clock before creating the application.
 - **Erasure**: a single erasure service removes the candidate's data graph in the
   live system — DB records, applications, documents, **S3 objects**, AI results,
   interviews, responses, custom properties, comments, and activity-log entries.
@@ -51,7 +55,8 @@ stored), so it self-heals when a candidate gets a new application or status chan
 
 ## Running the cleanup job
 
-Erasure runs through an authenticated endpoint:
+Reqcore includes a Nitro scheduled task that runs every day at **03:00 UTC**.
+The task and the authenticated endpoint below call the same cleanup service:
 
 ```
 POST /api/admin/retention-cleanup
@@ -59,8 +64,12 @@ Header: x-cron-secret: <CRON_SECRET>
 Body (optional): { "dryRun": true, "batchSize": 200 }
 ```
 
-Set the `CRON_SECRET` environment variable (min 16 chars). The same endpoint can
-be triggered interactively by an owner/admin (candidate:delete permission).
+The endpoint can be triggered interactively by an owner/admin
+(`candidate:delete` permission). Set `CRON_SECRET` (min 16 chars) only when an
+external scheduler needs to call it.
+
+Set `GDPR_CLEANUP_ENABLED=false` to pause all cleanup runs at instance level
+without changing any organization's stored retention policy.
 
 - **Dry run**: `{ "dryRun": true }` reports what would be quarantined/erased and
   mutates nothing.
@@ -70,13 +79,14 @@ be triggered interactively by an owner/admin (candidate:delete permission).
 
 ### Hosted (Railway)
 
-Schedule a daily cron that POSTs to `/api/admin/retention-cleanup` with the
-`x-cron-secret` header.
+The built-in Nitro task runs while the application process is continuously
+running. If the service can sleep or scheduled Nitro tasks are unsupported,
+configure a Railway cron that POSTs to `/api/admin/retention-cleanup`.
 
 ### Self-hosted
 
-Point any scheduler (system `cron`, a CI scheduler, an uptime monitor, etc.) at
-the endpoint once a day. Example crontab entry:
+The built-in task is sufficient for continuously running Node deployments.
+Alternatively, point any scheduler at the endpoint once a day:
 
 ```cron
 0 3 * * * curl -fsS -X POST https://your-host/api/admin/retention-cleanup \

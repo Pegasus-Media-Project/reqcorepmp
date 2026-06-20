@@ -69,6 +69,7 @@ export default defineEventHandler(async (event) => {
   .filter(i => i.status !== 'active')
 
   return {
+    cleanupEnabled: env.GDPR_CLEANUP_ENABLED,
     retentionEnabled: settings?.retentionEnabled ?? false,
     retentionMonths,
     count: items.length,

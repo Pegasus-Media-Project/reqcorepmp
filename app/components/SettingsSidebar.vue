@@ -5,6 +5,7 @@ import {
 
 const route = useRoute()
 const localePath = useLocalePath()
+const { t } = useI18n()
 
 const settingsNav = [
   {
@@ -43,8 +44,8 @@ const settingsNav = [
     exact: true,
   },
   {
-    label: 'Privacy & Retention',
-    description: 'GDPR & data deletion',
+    label: t('retention.title'),
+    description: t('retention.policy.title'),
     to: '/dashboard/settings/retention',
     icon: ShieldAlert,
     exact: true,

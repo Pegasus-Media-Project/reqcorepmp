@@ -76,6 +76,25 @@ export default defineEventHandler(async (event) => {
   }
 
   logApiRequest(event, session, 'org_settings.updated', {})
+  if (
+    body.retentionEnabled !== undefined
+    || body.retentionMonths !== undefined
+    || body.quarantineDays !== undefined
+  ) {
+    await recordActivity({
+      organizationId: orgId,
+      actorId: session.user.id,
+      action: 'updated',
+      resourceType: 'organization',
+      resourceId: orgId,
+      metadata: {
+        settingsArea: 'retention',
+        retentionEnabled: result.retentionEnabled,
+        retentionMonths: result.retentionMonths,
+        quarantineDays: result.quarantineDays,
+      },
+    })
+  }
 
   return result
 })

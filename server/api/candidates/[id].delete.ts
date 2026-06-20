@@ -33,7 +33,10 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const report = await eraseCandidates(orgId, [id], { actorId: session.user.id })
+  const report = await eraseCandidates(orgId, [id], {
+    actorId: session.user.id,
+    auditMetadata: override ? { legalHoldOverride: 'true' } : undefined,
+  })
   const result = report.results[0]
 
   if (!result || result.status === 'not_found') {
@@ -44,6 +47,13 @@ export default defineEventHandler(async (event) => {
     // Storage objects couldn't be removed — refuse to leave a partially-erased
     // record. The candidate is untouched and can be retried.
     throw createError({ statusCode: 502, statusMessage: 'Storage deletion failed; candidate not erased' })
+  }
+  if (result.auditFailed) {
+    logError('retention.manual_erasure_audit_failed', {
+      org_id: orgId,
+      candidate_id: id,
+      actor_id: session.user.id,
+    })
   }
 
   recordActivity({

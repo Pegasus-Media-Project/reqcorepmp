@@ -181,23 +181,23 @@ test.describe('Privacy, retention, and GDPR critical flows', () => {
     const eraseRow = page.getByRole('listitem').filter({
       hasText: `${eraseCandidate.firstName} ${eraseCandidate.lastName}`,
     })
-    await expect(restoreRow.getByText('expired', { exact: true })).toBeVisible()
-    await expect(eraseRow.getByText('expired', { exact: true })).toBeVisible()
+    await expect(restoreRow.getByText('Expired', { exact: true })).toBeVisible()
+    await expect(eraseRow.getByText('Expired', { exact: true })).toBeVisible()
 
     page.once('dialog', async (dialog) => {
       expect(dialog.type()).toBe('prompt')
       await dialog.accept('Active legal dispute')
     })
-    await restoreRow.getByRole('button', { name: 'Exempt (legal hold)' }).click()
-    await expect(restoreRow.getByText('exempt', { exact: true })).toBeVisible()
+    await restoreRow.getByRole('button', { name: 'Add legal hold' }).click()
+    await expect(restoreRow.getByText('Exempt', { exact: true })).toBeVisible()
     await expect(restoreRow.getByText(/Active legal dispute/)).toBeVisible()
 
     const blockedDeletion = await page.request.delete(`/api/candidates/${restoreCandidate.id}`)
     expect(blockedDeletion.status()).toBe(409)
     expect(await blockedDeletion.text()).toContain('legal hold')
 
-    await restoreRow.getByRole('button', { name: 'Clear exemption' }).click()
-    await expect(restoreRow.getByText('expired', { exact: true })).toBeVisible()
+    await restoreRow.getByRole('button', { name: 'Clear legal hold' }).click()
+    await expect(restoreRow.getByText('Expired', { exact: true })).toBeVisible()
 
     const cleanupResponse = await page.request.post('/api/admin/retention-cleanup', {
       data: { dryRun: false, batchSize: 10 },
@@ -207,8 +207,8 @@ test.describe('Privacy, retention, and GDPR critical flows', () => {
     expect(cleanup.quarantined).toBeGreaterThanOrEqual(2)
 
     await page.reload()
-    await expect(restoreRow.getByText('quarantined', { exact: true })).toBeVisible()
-    await expect(eraseRow.getByText('quarantined', { exact: true })).toBeVisible()
+    await expect(restoreRow.getByText('Quarantined', { exact: true })).toBeVisible()
+    await expect(eraseRow.getByText('Quarantined', { exact: true })).toBeVisible()
 
     const downloadPromise = page.waitForEvent('download')
     await restoreRow.getByRole('button', { name: 'Export data' }).click()

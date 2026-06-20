@@ -8,6 +8,7 @@ definePageMeta({
 const route = useRoute()
 const jobSlug = route.params.slug as string
 const { track } = useTrack()
+const { t } = useI18n()
 
 // Capture source tracking params from the URL
 const sourceRef = (route.query.ref as string) || undefined
@@ -315,9 +316,7 @@ async function handleSubmit() {
       >
         <template v-if="job.privacyPolicyText">{{ job.privacyPolicyText }} </template>
         <template v-else>
-          By applying, you consent to {{ job.organizationName || 'this organization' }} processing your
-          application data to evaluate your candidacy. Your data is retained only as long as necessary and
-          then deleted.
+          {{ t('retention.privacy.defaultNotice', { organization: job.organizationName || t('retention.privacy.thisOrganization') }) }}
         </template>
         <a
           v-if="job.privacyPolicyUrl"
@@ -325,12 +324,12 @@ async function handleSubmit() {
           target="_blank"
           rel="noopener noreferrer"
           class="text-brand-600 hover:underline"
-        >Privacy policy</a><template v-if="job.privacyPolicyUrl && job.privacyContactEmail"> · </template>
+        >{{ t('retention.privacy.policyLink') }}</a><template v-if="job.privacyPolicyUrl && job.privacyContactEmail"> · </template>
         <a
           v-if="job.privacyContactEmail"
           :href="`mailto:${job.privacyContactEmail}`"
           class="text-brand-600 hover:underline"
-        >Contact: {{ job.privacyContactEmail }}</a>
+        >{{ t('retention.privacy.contactLabel') }}: {{ job.privacyContactEmail }}</a>
       </p>
     </template>
   </div>
