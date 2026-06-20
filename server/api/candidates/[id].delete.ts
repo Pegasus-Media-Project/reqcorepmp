@@ -1,27 +1,37 @@
-import { eq, and } from 'drizzle-orm'
-import { candidate } from '../../database/schema'
+import { eq, and, isNull } from 'drizzle-orm'
+import { candidate, orgSettings } from '../../database/schema'
 import { candidateIdParamSchema } from '../../utils/schemas/candidate'
-import { eraseCandidates } from '../../utils/erasure'
+import { eraseCandidates, recordRetentionAudit } from '../../utils/erasure'
+import type { H3Event } from 'h3'
 
 /**
  * DELETE /api/candidates/:id
  *
- * Full GDPR erasure of a candidate — DB graph + S3 objects + polymorphic rows.
- * Shares the exact erasure path used by automated retention, so manual and
- * scheduled deletion produce identical results.
+ * Two modes, so an everyday click can never irreversibly destroy data:
  *
- * Legal holds: a candidate with an active retention exemption (legal hold) is
- * protected from deletion. To delete anyway, the caller must pass `?override=true`
- * — an explicit, audited acknowledgement that the hold is being lifted.
+ *  - Default (SOFT delete): the candidate is quarantined — hidden from lists but
+ *    fully recoverable from Settings → Privacy & Retention. Nothing is erased.
+ *    This is what the recruiter "Delete" button does.
+ *
+ *  - ?permanent=true (HARD erase): permanent GDPR erasure — DB graph + S3 objects
+ *    + polymorphic rows, via the shared erasure path. Irreversible. Only the
+ *    retention review screen triggers this, behind a type-the-name confirmation.
+ *    Blocked for candidates on an active legal hold unless ?override=true.
  */
 export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { candidate: ['delete'] })
   const orgId = session.session.activeOrganizationId
 
   const { id } = await getValidatedRouterParams(event, candidateIdParamSchema.parse)
-  const override = getQuery(event).override === 'true'
+  const query = getQuery(event)
 
-  // Block deletion of candidates on an active legal hold unless explicitly overridden.
+  if (query.permanent !== 'true') {
+    return softDeleteCandidate(event, orgId, id, session.user.id)
+  }
+
+  const override = query.override === 'true'
+
+  // Block permanent erasure of candidates on an active legal hold unless overridden.
   const existing = await db.query.candidate.findFirst({
     where: and(eq(candidate.id, id), eq(candidate.organizationId, orgId)),
     columns: { retentionExemptUntil: true },
@@ -67,3 +77,70 @@ export default defineEventHandler(async (event) => {
   setResponseStatus(event, 204)
   return null
 })
+
+/**
+ * Quarantine the candidate instead of erasing it. Recoverable via the restore
+ * endpoint / retention review screen. Idempotent: an already-quarantined
+ * candidate succeeds without changes.
+ */
+async function softDeleteCandidate(
+  event: H3Event,
+  orgId: string,
+  id: string,
+  actorId: string,
+) {
+  const existing = await db.query.candidate.findFirst({
+    where: and(eq(candidate.id, id), eq(candidate.organizationId, orgId)),
+    columns: { id: true, quarantinedAt: true },
+  })
+  if (!existing) {
+    throw createError({ statusCode: 404, statusMessage: 'Not found' })
+  }
+  if (existing.quarantinedAt) {
+    return { id, status: 'quarantined' as const }
+  }
+
+  // Mirror the org's configured quarantine window so a manual delete behaves like
+  // retention quarantine: recoverable now, and swept by the retention job later
+  // (only if the org has automated cleanup enabled — otherwise it stays forever).
+  const settings = await db.query.orgSettings.findFirst({
+    where: eq(orgSettings.organizationId, orgId),
+    columns: { quarantineDays: true },
+  })
+  const quarantineDays = settings?.quarantineDays ?? 30
+  const now = new Date()
+  const purgeAt = new Date(now.getTime() + quarantineDays * 24 * 60 * 60 * 1000)
+
+  const [updated] = await db.update(candidate)
+    .set({ quarantinedAt: now, scheduledPurgeAt: purgeAt, updatedAt: now })
+    .where(and(
+      eq(candidate.id, id),
+      eq(candidate.organizationId, orgId),
+      isNull(candidate.quarantinedAt),
+    ))
+    .returning({ id: candidate.id })
+  // Lost a race to a concurrent quarantine — still the desired end state.
+  if (!updated) {
+    return { id, status: 'quarantined' as const }
+  }
+
+  const audited = await recordRetentionAudit(orgId, id, 'quarantined', 'success', actorId, {
+    source: 'manual',
+  })
+  if (!audited) {
+    logError('retention.manual_soft_delete_audit_failed', {
+      org_id: orgId,
+      candidate_id: id,
+      actor_id: actorId,
+    })
+  }
+  recordActivity({
+    organizationId: orgId,
+    actorId,
+    action: 'deleted',
+    resourceType: 'candidate',
+    resourceId: id,
+  })
+
+  return { id, status: 'quarantined' as const }
+}

@@ -99,14 +99,15 @@
       "clearHold": "Fjern juridisk sperre",
       "erase": "Slett nå",
       "holdPrompt": "Begrunnelse for juridisk sperre (for eksempel en pågående tvist):",
-      "eraseConfirm": "Slette {name} og alle tilhørende data permanent? Dette kan ikke angres."
+      "eraseConfirm": "Dette sletter {name} og alle tilhørende data permanent, og kan ikke angres. Skriv kandidatens fulle navn for å bekrefte:"
     },
     "errors": {
       "save": "Kunne ikke lagre innstillingene",
       "restore": "Kunne ikke gjenopprette kandidaten",
       "hold": "Kunne ikke legge til juridisk sperre",
       "clearHold": "Kunne ikke fjerne juridisk sperre",
-      "erase": "Kunne ikke slette kandidaten"
+      "erase": "Kunne ikke slette kandidaten",
+      "eraseNameMismatch": "Navnet stemte ikke. Kandidaten ble ikke slettet."
     }
   }
 }

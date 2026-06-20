@@ -360,8 +360,11 @@ Configure the policy under **Settings → Privacy & Retention**. After restoring
 database backup, re-run the sweep so erased candidates are not resurrected. Full
 details in [DATA-RETENTION.md](DATA-RETENTION.md).
 
-Set `GDPR_CLEANUP_ENABLED=false` as an emergency instance-wide pause. This does
-not alter organization policies and can be safely turned back on after review.
+Automated cleanup is **off by default** (`GDPR_CLEANUP_ENABLED` defaults to
+`false`). No candidate is ever quarantined or erased until you explicitly set
+`GDPR_CLEANUP_ENABLED=true` *and* enable retention for the organization. Setting
+it back to `false` is the instance-wide emergency pause and does not alter any
+organization's stored policy.
 
 ## Backups & Data Safety
 

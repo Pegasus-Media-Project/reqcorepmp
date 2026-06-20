@@ -20,16 +20,23 @@ self-hosted deployments. No paid plan, license key, or quota gates any of it.
   edited, receive internal applications, or receive new uploads. A fresh public
   application counts as renewed engagement: it restores the candidate and resets
   the retention clock before creating the application.
+- **Recruiter "Delete" is a soft delete**: deleting a candidate from the candidate
+  page quarantines them — they are hidden from lists but **nothing is erased** and
+  they can be restored from *Settings → Privacy & Retention*. This makes an
+  accidental click harmless; permanent erasure is a separate, deliberate step.
 - **Erasure**: a single erasure service removes the candidate's data graph in the
   live system — DB records, applications, documents, **S3 objects**, AI results,
   interviews, responses, custom properties, comments, and activity-log entries.
-  Manual deletion and automated retention use the **same** path, so they produce
-  identical results. (Backups are handled separately — see below.)
+  Permanent erasure is triggered explicitly from the retention review screen
+  (behind a type-the-name confirmation) and by the automated retention sweep; both
+  use the **same** path, so they produce identical results. (Backups are handled
+  separately — see below.)
 - **Exemptions / legal holds**: candidates can be placed on a documented legal
   hold (future expiry + required reason) that suppresses automated erasure *and*
-  blocks manual deletion. Manual deletion of a held candidate requires an explicit
-  `override=true` to lift the hold. Restoring a candidate from quarantine resets
-  its retention clock, so it is not immediately re-quarantined on the next sweep.
+  blocks permanent manual erasure. Permanently erasing a held candidate requires an
+  explicit `override=true` to lift the hold. Restoring a candidate from quarantine
+  resets its retention clock, so it is not immediately re-quarantined on the next
+  sweep.
 - **Data-subject support**: per-candidate JSON export (Art. 15 / 20) covering the
   candidate, applications, responses, interviews, scores, AI analysis runs,
   comments, custom properties, and activity log; uploaded-file *contents* are
@@ -68,8 +75,10 @@ The endpoint can be triggered interactively by an owner/admin
 (`candidate:delete` permission). Set `CRON_SECRET` (min 16 chars) only when an
 external scheduler needs to call it.
 
-Set `GDPR_CLEANUP_ENABLED=false` to pause all cleanup runs at instance level
-without changing any organization's stored retention policy.
+Automated cleanup is **off by default**: `GDPR_CLEANUP_ENABLED` is fail-closed
+and must be explicitly set to `true` for any sweep to run. Leaving it unset or
+`false` guarantees no automatic deletion and pauses all cleanup runs at the
+instance level without changing any organization's stored retention policy.
 
 - **Dry run**: `{ "dryRun": true }` reports what would be quarantined/erased and
   mutates nothing.

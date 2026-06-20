@@ -99,14 +99,15 @@
       "clearHold": "Gỡ lệnh lưu giữ pháp lý",
       "erase": "Xóa ngay",
       "holdPrompt": "Lý do lưu giữ pháp lý (ví dụ: tranh chấp đang diễn ra):",
-      "eraseConfirm": "Xóa vĩnh viễn {name} và toàn bộ dữ liệu của họ? Không thể hoàn tác thao tác này."
+      "eraseConfirm": "Thao tác này xóa vĩnh viễn {name} và toàn bộ dữ liệu của họ, và không thể hoàn tác. Nhập đầy đủ họ tên ứng viên để xác nhận:"
     },
     "errors": {
       "save": "Không thể lưu cài đặt",
       "restore": "Không thể khôi phục ứng viên",
       "hold": "Không thể thêm lệnh lưu giữ pháp lý",
       "clearHold": "Không thể gỡ lệnh lưu giữ pháp lý",
-      "erase": "Không thể xóa ứng viên"
+      "erase": "Không thể xóa ứng viên",
+      "eraseNameMismatch": "Tên không khớp. Ứng viên chưa bị xóa."
     }
   }
 }

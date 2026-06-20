@@ -157,9 +157,16 @@ async function clearExemption(id: string) {
 
 async function eraseNow(id: string, name: string) {
   actionError.value = ''
-  if (!window.confirm(t('retention.actions.eraseConfirm', { name }))) return
+  // Permanent erasure is irreversible — require the operator to type the exact
+  // name so it can never happen on a stray click.
+  const typed = window.prompt(t('retention.actions.eraseConfirm', { name }))
+  if (typed === null) return
+  if (typed.trim() !== name.trim()) {
+    actionError.value = t('retention.errors.eraseNameMismatch')
+    return
+  }
   try {
-    await $fetch(`/api/candidates/${id}`, { method: 'DELETE' })
+    await $fetch(`/api/candidates/${id}?permanent=true`, { method: 'DELETE' })
     await refreshReview()
   }
   catch (err: unknown) {

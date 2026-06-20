@@ -151,13 +151,16 @@ export const envSchema = z
     /** Shared secret for authenticating cron/scheduled job requests (e.g., webhook renewal). */
     CRON_SECRET: emptyToUndefined.pipe(z.string().min(16)).optional(),
     /**
-     * Instance-wide emergency switch for automated GDPR retention processing.
-     * Organization-level retention settings still control opt-in; this switch can
-     * pause every scheduled/manual sweep without changing customer policy data.
+     * Instance-wide master switch for automated GDPR retention processing.
+     * Fail-closed: defaults to OFF so an irreversible erasure sweep never runs
+     * unless an operator explicitly opts in with GDPR_CLEANUP_ENABLED=true.
+     * Organization-level `retentionEnabled` is a second, independent guard — both
+     * must be on for any candidate to be quarantined or erased. Setting this to
+     * false also serves as the instance-wide emergency pause.
      */
     GDPR_CLEANUP_ENABLED: z.preprocess(
-      val => val === undefined || val === '' ? true : val === true || val === 'true',
-      z.boolean().default(true),
+      val => val === undefined || val === '' ? false : val === true || val === 'true',
+      z.boolean().default(false),
     ),
     /** OIDC client ID for SSO authentication (e.g., Keycloak, Authentik, Authelia, Okta). */
     OIDC_CLIENT_ID: emptyToUndefined.pipe(z.string().min(1)).optional(),

@@ -99,14 +99,15 @@
       "clearHold": "Lever le gel juridique",
       "erase": "Effacer maintenant",
       "holdPrompt": "Motif du gel juridique (par exemple, un litige en cours) :",
-      "eraseConfirm": "Effacer définitivement {name} et toutes ses données ? Cette action est irréversible."
+      "eraseConfirm": "Cette action efface définitivement {name} et toutes ses données, et est irréversible. Saisissez le nom complet du candidat pour confirmer :"
     },
     "errors": {
       "save": "Impossible d'enregistrer les paramètres",
       "restore": "Impossible de restaurer le candidat",
       "hold": "Impossible d'ajouter le gel juridique",
       "clearHold": "Impossible de lever le gel juridique",
-      "erase": "Impossible d'effacer le candidat"
+      "erase": "Impossible d'effacer le candidat",
+      "eraseNameMismatch": "Le nom ne correspond pas. Le candidat n'a pas été effacé."
     }
   }
 }

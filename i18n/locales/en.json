@@ -99,14 +99,15 @@
       "clearHold": "Clear legal hold",
       "erase": "Erase now",
       "holdPrompt": "Reason for the legal hold (for example, an active dispute):",
-      "eraseConfirm": "Permanently erase {name} and all their data? This cannot be undone."
+      "eraseConfirm": "This permanently erases {name} and all their data, and cannot be undone. Type the candidate's full name to confirm:"
     },
     "errors": {
       "save": "Failed to save settings",
       "restore": "Failed to restore candidate",
       "hold": "Failed to add legal hold",
       "clearHold": "Failed to clear legal hold",
-      "erase": "Failed to erase candidate"
+      "erase": "Failed to erase candidate",
+      "eraseNameMismatch": "The name didn't match. The candidate was not erased."
     }
   }
 }

@@ -99,14 +99,15 @@
       "clearHold": "Quitar retención legal",
       "erase": "Eliminar ahora",
       "holdPrompt": "Motivo de la retención legal (por ejemplo, un litigio activo):",
-      "eraseConfirm": "¿Eliminar definitivamente a {name} y todos sus datos? Esta acción no se puede deshacer."
+      "eraseConfirm": "Esto elimina definitivamente a {name} y todos sus datos, y no se puede deshacer. Escribe el nombre completo del candidato para confirmar:"
     },
     "errors": {
       "save": "No se pudo guardar la configuración",
       "restore": "No se pudo restaurar el candidato",
       "hold": "No se pudo añadir la retención legal",
       "clearHold": "No se pudo quitar la retención legal",
-      "erase": "No se pudo eliminar el candidato"
+      "erase": "No se pudo eliminar el candidato",
+      "eraseNameMismatch": "El nombre no coincide. No se eliminó el candidato."
     }
   }
 }
