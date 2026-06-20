@@ -229,8 +229,8 @@ test.describe('Privacy, retention, and GDPR critical flows', () => {
     expect((await page.request.get(`/api/candidates/${restoreCandidate.id}`)).status()).toBe(200)
 
     page.once('dialog', async (dialog) => {
-      expect(dialog.type()).toBe('confirm')
-      await dialog.accept()
+      expect(dialog.type()).toBe('prompt')
+      await dialog.accept(`${eraseCandidate.firstName} ${eraseCandidate.lastName}`)
     })
     const erasureResponse = page.waitForResponse(response =>
       response.request().method() === 'DELETE'

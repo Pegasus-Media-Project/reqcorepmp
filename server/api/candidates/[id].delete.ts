@@ -16,7 +16,8 @@ import type { H3Event } from 'h3'
  *  - ?permanent=true (HARD erase): permanent GDPR erasure — DB graph + S3 objects
  *    + polymorphic rows, via the shared erasure path. Irreversible. Only the
  *    retention review screen triggers this, behind a type-the-name confirmation.
- *    Blocked for candidates on an active legal hold unless ?override=true.
+ * Both modes are blocked for candidates on an active legal hold. Permanent
+ * erasure can be explicitly forced with ?override=true for exceptional cases.
  */
 export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { candidate: ['delete'] })
@@ -24,14 +25,12 @@ export default defineEventHandler(async (event) => {
 
   const { id } = await getValidatedRouterParams(event, candidateIdParamSchema.parse)
   const query = getQuery(event)
+  const permanent = query.permanent === 'true'
+  const override = permanent && query.override === 'true'
 
-  if (query.permanent !== 'true') {
-    return softDeleteCandidate(event, orgId, id, session.user.id)
-  }
-
-  const override = query.override === 'true'
-
-  // Block permanent erasure of candidates on an active legal hold unless overridden.
+  // A legal hold prevents both quarantine and permanent erasure. The explicit
+  // override is intentionally limited to permanent erasure so an ordinary
+  // recruiter delete can never sidestep the hold.
   const existing = await db.query.candidate.findFirst({
     where: and(eq(candidate.id, id), eq(candidate.organizationId, orgId)),
     columns: { retentionExemptUntil: true },
@@ -39,8 +38,12 @@ export default defineEventHandler(async (event) => {
   if (existing?.retentionExemptUntil && existing.retentionExemptUntil > new Date() && !override) {
     throw createError({
       statusCode: 409,
-      statusMessage: 'Candidate is under a legal hold; pass override=true to delete anyway',
+      statusMessage: 'Candidate is under a legal hold and cannot be deleted',
     })
+  }
+
+  if (!permanent) {
+    return softDeleteCandidate(event, orgId, id, session.user.id)
   }
 
   const report = await eraseCandidates(orgId, [id], {
