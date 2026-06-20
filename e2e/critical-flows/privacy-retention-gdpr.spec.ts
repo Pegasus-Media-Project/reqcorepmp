@@ -204,6 +204,7 @@ test.describe('Privacy, retention, and GDPR critical flows', () => {
     })
     expect(cleanupResponse.status()).toBe(200)
     const cleanup = await cleanupResponse.json()
+    expect(cleanup.enabled).toBe(true)
     expect(cleanup.quarantined).toBeGreaterThanOrEqual(2)
 
     await page.reload()

@@ -47,6 +47,9 @@ jobs:
       S3_BUCKET: reqcore
       S3_REGION: us-east-1
       S3_FORCE_PATH_STYLE: "true"
+      # Required for the GDPR retention critical flow. Production remains
+      # fail-closed unless an operator explicitly enables the cleanup sweep.
+      GDPR_CLEANUP_ENABLED: "true"
 
     steps:
       - name: Checkout
