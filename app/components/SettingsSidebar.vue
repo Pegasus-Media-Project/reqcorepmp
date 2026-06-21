@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import {
-  Building2, Users, UserCircle, ChevronLeft, Settings, Plug, Brain, ShieldCheck, Globe,
+  Building2, Users, UserCircle, ChevronLeft, Settings, Plug, Brain, ShieldCheck, Globe, ShieldAlert,
 } from 'lucide-vue-next'
 
 const route = useRoute()
 const localePath = useLocalePath()
+const { t } = useI18n()
 
 const settingsNav = [
   {
@@ -40,6 +41,13 @@ const settingsNav = [
     description: 'Models & API keys',
     to: '/dashboard/settings/ai',
     icon: Brain,
+    exact: true,
+  },
+  {
+    label: t('retention.title'),
+    description: t('retention.policy.title'),
+    to: '/dashboard/settings/retention',
+    icon: ShieldAlert,
     exact: true,
   },
   {

@@ -12,6 +12,7 @@ import {
   MIME_TO_EXTENSION,
   sanitizeFilename,
 } from '../../../../utils/schemas/document'
+import { restoreCandidateForPublicApplication } from '../../../../utils/candidate-retention'
 
 /** Rate limit: max 5 applications per IP per 15 minutes */
 const applyRateLimit = createRateLimiter({
@@ -351,12 +352,20 @@ export default defineEventHandler(async (event) => {
       eq(candidate.organizationId, orgId),
       eq(candidate.email, email.toLowerCase()),
     ),
-    columns: { id: true, firstName: true, lastName: true, phone: true },
+    columns: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      phone: true,
+      quarantinedAt: true,
+    },
   })
 
   let candidateId: string
+  let restoreFromQuarantine = false
 
   if (existingCandidate) {
+    restoreFromQuarantine = existingCandidate.quarantinedAt !== null
     const updates: Record<string, unknown> = { updatedAt: new Date() }
     if (!existingCandidate.firstName) updates.firstName = firstName
     if (!existingCandidate.lastName) updates.lastName = lastName
@@ -398,6 +407,10 @@ export default defineEventHandler(async (event) => {
       statusCode: 409,
       statusMessage: 'You have already applied to this position',
     })
+  }
+
+  if (restoreFromQuarantine) {
+    await restoreCandidateForPublicApplication(orgId, candidateId)
   }
 
   // ─────────────────────────────────────────────

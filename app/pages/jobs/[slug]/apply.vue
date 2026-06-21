@@ -8,6 +8,7 @@ definePageMeta({
 const route = useRoute()
 const jobSlug = route.params.slug as string
 const { track } = useTrack()
+const { t } = useI18n()
 
 // Capture source tracking params from the URL
 const sourceRef = (route.query.ref as string) || undefined
@@ -307,6 +308,29 @@ async function handleSubmit() {
         @clear-error="(key) => delete errors[key]"
         @submit="handleSubmit"
       />
+
+      <!-- GDPR privacy notice (org-configurable) -->
+      <p
+        v-if="job.privacyPolicyText || job.privacyPolicyUrl || job.privacyContactEmail"
+        class="mt-6 text-xs leading-relaxed text-surface-400 dark:text-surface-500"
+      >
+        <template v-if="job.privacyPolicyText">{{ job.privacyPolicyText }} </template>
+        <template v-else>
+          {{ t('retention.privacy.defaultNotice', { organization: job.organizationName || t('retention.privacy.thisOrganization') }) }}
+        </template>
+        <a
+          v-if="job.privacyPolicyUrl"
+          :href="job.privacyPolicyUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-brand-600 hover:underline"
+        >{{ t('retention.privacy.policyLink') }}</a><template v-if="job.privacyPolicyUrl && job.privacyContactEmail"> · </template>
+        <a
+          v-if="job.privacyContactEmail"
+          :href="`mailto:${job.privacyContactEmail}`"
+          class="text-brand-600 hover:underline"
+        >{{ t('retention.privacy.contactLabel') }}: {{ job.privacyContactEmail }}</a>
+      </p>
     </template>
   </div>
 </template>

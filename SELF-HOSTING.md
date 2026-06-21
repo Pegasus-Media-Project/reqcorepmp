@@ -341,6 +341,31 @@ The Settings → Updates page automatically checks whether a new version is avai
 
 ---
 
+## Data Retention & GDPR
+
+Reqcore includes automated GDPR data retention and candidate erasure (free, no
+plan gating). A built-in Nitro task runs daily at 03:00 UTC on continuously
+running Node deployments.
+
+For platforms that sleep or do not execute Nitro task timers, set a
+`CRON_SECRET` (min 16 chars) and schedule a daily POST to the cleanup endpoint:
+
+```cron
+# Daily GDPR retention sweep at 3 AM
+0 3 * * * curl -fsS -X POST http://localhost:3000/api/admin/retention-cleanup \
+  -H "x-cron-secret: $CRON_SECRET" -H "content-type: application/json" -d '{}'
+```
+
+Configure the policy under **Settings → Privacy & Retention**. After restoring a
+database backup, re-run the sweep so erased candidates are not resurrected. Full
+details in [DATA-RETENTION.md](DATA-RETENTION.md).
+
+Automated cleanup is **off by default** (`GDPR_CLEANUP_ENABLED` defaults to
+`false`). No candidate is ever quarantined or erased until you explicitly set
+`GDPR_CLEANUP_ENABLED=true` *and* enable retention for the organization. Setting
+it back to `false` is the instance-wide emergency pause and does not alter any
+organization's stored policy.
+
 ## Backups & Data Safety
 
 ### Automatic Pre-Update Backups

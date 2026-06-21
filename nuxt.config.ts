@@ -268,6 +268,14 @@ export default defineNuxtConfig({
   },
 
   nitro: {
+    experimental: {
+      tasks: true,
+    },
+    scheduledTasks: {
+      // Daily at 03:00 UTC. External cron remains supported for platforms that
+      // suspend long-running processes or do not execute Nitro task timers.
+      "0 3 * * *": ["retention-cleanup"],
+    },
     routeRules: {
       "/**": {
         headers: {

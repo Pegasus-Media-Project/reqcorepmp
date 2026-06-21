@@ -19,7 +19,7 @@ const emit = defineEmits<{
 const { handlePreviewReadOnlyError } = usePreviewReadOnly()
 const toast = useToast()
 const { track } = useTrack()
-const { formatCandidateName } = useOrgSettings()
+const { formatCandidateName, formatDateTime } = useOrgSettings()
 
 // Detect if the job sub-nav bar is visible (adds 40px / 2.5rem)
 const route = useRoute()
@@ -635,6 +635,19 @@ function formatInterviewDate(dateStr: string) {
                   <dt class="text-xs font-medium text-surface-400 dark:text-surface-500 mb-1">Phone</dt>
                   <dd class="text-surface-800 dark:text-surface-200 font-medium">
                     {{ application.candidate.phone }}
+                  </dd>
+                </div>
+                <div v-if="candidateData?.retention?.enabled">
+                  <dt class="text-xs font-medium text-surface-400 dark:text-surface-500 mb-1">
+                    Data retention
+                  </dt>
+                  <dd class="text-surface-800 dark:text-surface-200 font-medium">
+                    <template v-if="candidateData.retention.quarantinedAt">
+                      Quarantined · purge {{ formatDateTime(candidateData.retention.scheduledPurgeAt) }}
+                    </template>
+                    <template v-else>
+                      {{ candidateData.retention.status }} · {{ formatDateTime(candidateData.retention.expiresAt) }}
+                    </template>
                   </dd>
                 </div>
               </dl>

@@ -10,6 +10,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com). Categories: **Add
 
 ### Added
 
+* **GDPR retention:** add a shared candidate-retention runner with a daily Nitro task, external cron endpoint, instance-wide emergency switch, quarantine restoration on renewed public engagement, localized administration UI, and computed expiry visibility.
+* **GDPR erasure:** remove application-linked comments, custom properties, and activity records in addition to the candidate database graph and S3 objects.
 * **blog:** add Cluster 8 career page articles — pillar (career-page-that-converts) and two supporting articles (career-page-seo, google-for-jobs-structured-data)
 * **blog:** add incoming links to career page content from how-applicant-tracking-systems-work, open-source-applicant-tracking-system, and self-hosted-vs-cloud-ats
 
