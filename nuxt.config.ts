@@ -60,7 +60,7 @@ const localizedPricingRedirectRules = Object.fromEntries(
     ]),
 );
 
-// Allow search-engine indexing for localized job board pages
+// Allow search-engine indexing for localized public marketing pages
 const localizedJobsRobotsRules = Object.fromEntries(
   i18nLocales
     .filter((locale) => locale.code !== i18nDefaultLocale)
@@ -268,7 +268,7 @@ export default defineNuxtConfig({
   },
 
   // ─────────────────────────────────────────────
-  // Route rules — ISR for public job pages
+  // Route rules — ISR for public marketing pages
   // ─────────────────────────────────────────────
   routeRules: {
     // ── PostHog reverse proxy ──
@@ -310,7 +310,7 @@ export default defineNuxtConfig({
           "X-Robots-Tag": "noindex, nofollow",
         },
       },
-      // Public job board pages — allow indexing
+      // Public marketing pages — allow indexing
       "/pricing": {
         headers: {
           "X-Robots-Tag": "index, follow",
@@ -326,7 +326,7 @@ export default defineNuxtConfig({
           "X-Robots-Tag": "index, follow",
         },
       },
-      // Localized job board pages — allow indexing
+      // Localized public marketing pages — allow indexing
       ...localizedJobsRobotsRules,
       // Allow same-origin framing for inline PDF preview in the sidebar iframe
       "/api/documents/*/preview": {
