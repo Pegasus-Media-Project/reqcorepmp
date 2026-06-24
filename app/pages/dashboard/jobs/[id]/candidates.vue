@@ -210,11 +210,28 @@ function scoreClass(score: number) {
 // Row selection → sidebar
 // ─────────────────────────────────────────────
 
-const selectedAppId = ref<string | null>(null)
+const showcaseApplicationId = typeof route.query.application === 'string'
+  ? route.query.application
+  : null
+const selectedAppId = ref<string | null>(showcaseApplicationId)
 const sidebarOpen = computed(() => Boolean(selectedAppId.value))
+const sidebarInitialTab = computed(() =>
+  selectedAppId.value === showcaseApplicationId && route.query.tab === 'ai_analysis'
+    ? 'ai_analysis' as const
+    : 'overview' as const,
+)
 
 function selectRow(appId: string) {
   selectedAppId.value = appId
+  if (route.query.application || route.query.tab) {
+    navigateTo({
+      query: {
+        ...route.query,
+        application: undefined,
+        tab: undefined,
+      },
+    }, { replace: true })
+  }
 }
 
 function closeSidebar() {
@@ -548,6 +565,7 @@ const isLoading = computed(() => jobFetchStatus.value === 'pending' || appFetchS
       v-if="selectedAppId"
       :application-id="selectedAppId"
       :open="sidebarOpen"
+      :initial-tab="sidebarInitialTab"
       @close="closeSidebar"
       @updated="handleSidebarUpdated"
     />

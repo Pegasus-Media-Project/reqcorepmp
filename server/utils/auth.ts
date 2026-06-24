@@ -2,10 +2,63 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization, genericOAuth } from "better-auth/plugins";
 import { sso } from "@better-auth/sso";
-import { eq } from "drizzle-orm";
+import { stripe as stripePlugin } from "@better-auth/stripe";
+import Stripe from "stripe";
+import { and, eq } from "drizzle-orm";
 import { ac, owner, admin, member } from "~~/shared/permissions";
+import { isBillingActionAllowed } from "~~/shared/billing";
 import { sendOrgInvitationEmail, sendPasswordResetEmail } from "./email";
 import * as schema from "../database/schema";
+
+/**
+ * Build the Stripe subscription plan list from env price ids.
+ * Plan `name` MUST match the canonical ids in shared/billing.ts (they are the
+ * value persisted in subscription.plan and passed to subscription.upgrade()).
+ */
+function buildStripePlans() {
+  return [
+    {
+      name: "cloud-pro",
+      priceId: env.STRIPE_PRICE_CLOUD_PRO_MONTHLY,
+      annualDiscountPriceId: env.STRIPE_PRICE_CLOUD_PRO_ANNUAL,
+    },
+    {
+      name: "business",
+      priceId: env.STRIPE_PRICE_BUSINESS_MONTHLY,
+      annualDiscountPriceId: env.STRIPE_PRICE_BUSINESS_ANNUAL,
+    },
+  ];
+}
+
+/**
+ * Authorization guard for org-scoped billing. Subscriptions are referenced by
+ * organization id; this verifies the acting user actually belongs to that org
+ * (and, for any mutating action, is an owner/admin). Without this, a user could
+ * start/cancel checkout for an organization they don't control.
+ */
+async function authorizeOrgBilling({
+  userId,
+  referenceId,
+  action,
+}: {
+  userId: string;
+  referenceId: string;
+  action: string;
+}): Promise<boolean> {
+  const [membership] = await db
+    .select({ role: schema.member.role })
+    .from(schema.member)
+    .where(
+      and(
+        eq(schema.member.userId, userId),
+        eq(schema.member.organizationId, referenceId),
+      ),
+    )
+    .limit(1);
+
+  // Decision (member? reading vs. mutating) lives in a pure, unit-tested helper.
+  return isBillingActionAllowed(membership?.role, action);
+}
 
 type Auth = ReturnType<typeof betterAuth>;
 let _auth: Auth | undefined;
@@ -381,6 +434,38 @@ function getAuth(): Auth {
             }
           },
         }),
+
+        // ── Stripe Billing (org-scoped subscriptions) ───────────────────
+        // Enabled only when STRIPE_SECRET_KEY is set (env.ts enforces that the
+        // webhook secret + all price ids are present alongside it). Provides
+        // Stripe-hosted Checkout, the Customer Portal, and signature-verified
+        // webhooks at /api/auth/stripe/webhook (handled by the auth catch-all).
+        ...(env.STRIPE_SECRET_KEY
+          ? [
+              stripePlugin({
+                stripeClient: new Stripe(env.STRIPE_SECRET_KEY),
+                // env.ts guarantees these are present whenever STRIPE_SECRET_KEY is set.
+                stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET!,
+                // Customer is created lazily at first checkout, not on sign-up.
+                createCustomerOnSignUp: false,
+                // Bill the organization, not the individual member, so billing
+                // survives membership changes.
+                organization: { enabled: true },
+                subscription: {
+                  enabled: true,
+                  plans: buildStripePlans(),
+                  // Subscriptions are referenced by organization id; only
+                  // members (owner/admin for mutations) of that org may act.
+                  authorizeReference: async ({ user, referenceId, action }) =>
+                    authorizeOrgBilling({
+                      userId: user.id,
+                      referenceId,
+                      action,
+                    }),
+                },
+              }),
+            ]
+          : []),
       ],
     }) as unknown as Auth;
   }

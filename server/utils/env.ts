@@ -178,6 +178,23 @@ export const envSchema = z
       .pipe(z.string().min(1))
       .optional()
       .default("SSO"),
+
+    // ── Stripe Billing (optional) ───────────────────────────
+    // When STRIPE_SECRET_KEY is set, self-serve subscription checkout is enabled.
+    // All Stripe vars are all-or-none (enforced in superRefine below): leaving
+    // STRIPE_SECRET_KEY unset disables billing entirely (self-hosters unaffected).
+    /** Stripe secret API key (sk_test_… / sk_live_…). Enables the billing feature when set. */
+    STRIPE_SECRET_KEY: emptyToUndefined.pipe(z.string().min(1)).optional(),
+    /** Stripe webhook signing secret (whsec_…). Verifies authenticity of webhook events. */
+    STRIPE_WEBHOOK_SECRET: emptyToUndefined.pipe(z.string().min(1)).optional(),
+    /** Stripe recurring price id for Cloud Pro, monthly billing. */
+    STRIPE_PRICE_CLOUD_PRO_MONTHLY: emptyToUndefined.pipe(z.string().min(1)).optional(),
+    /** Stripe recurring price id for Cloud Pro, annual billing. */
+    STRIPE_PRICE_CLOUD_PRO_ANNUAL: emptyToUndefined.pipe(z.string().min(1)).optional(),
+    /** Stripe recurring price id for Business, monthly billing. */
+    STRIPE_PRICE_BUSINESS_MONTHLY: emptyToUndefined.pipe(z.string().min(1)).optional(),
+    /** Stripe recurring price id for Business, annual billing. */
+    STRIPE_PRICE_BUSINESS_ANNUAL: emptyToUndefined.pipe(z.string().min(1)).optional(),
   })
   .superRefine((data, ctx) => {
     // BETTER_AUTH_URL can be derived at runtime from RAILWAY_PUBLIC_DOMAIN,
@@ -216,6 +233,29 @@ export const envSchema = z
           path: [name],
           message: `${name} is required when OIDC SSO is partially configured. Set all three OIDC variables (OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_DISCOVERY_URL) or none.`,
         });
+      }
+    }
+
+    // Stripe billing: all-or-none. Enabling the feature (STRIPE_SECRET_KEY)
+    // without the webhook secret or every price id is a misconfiguration that
+    // would let checkout start but never reconcile (no verified webhooks) or
+    // fail mid-checkout (missing price id).
+    if (data.STRIPE_SECRET_KEY) {
+      const requiredWithStripe = [
+        ["STRIPE_WEBHOOK_SECRET", data.STRIPE_WEBHOOK_SECRET],
+        ["STRIPE_PRICE_CLOUD_PRO_MONTHLY", data.STRIPE_PRICE_CLOUD_PRO_MONTHLY],
+        ["STRIPE_PRICE_CLOUD_PRO_ANNUAL", data.STRIPE_PRICE_CLOUD_PRO_ANNUAL],
+        ["STRIPE_PRICE_BUSINESS_MONTHLY", data.STRIPE_PRICE_BUSINESS_MONTHLY],
+        ["STRIPE_PRICE_BUSINESS_ANNUAL", data.STRIPE_PRICE_BUSINESS_ANNUAL],
+      ] as const;
+      for (const [name, value] of requiredWithStripe) {
+        if (!value) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [name],
+            message: `${name} is required when STRIPE_SECRET_KEY is set. Provide the webhook secret and all four price ids, or unset STRIPE_SECRET_KEY to disable billing.`,
+          });
+        }
       }
     }
   });

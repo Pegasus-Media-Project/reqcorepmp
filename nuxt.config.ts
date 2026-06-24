@@ -45,8 +45,18 @@ const localizedPublicRouteRules = Object.fromEntries(
   i18nLocales
     .filter((locale) => locale.code !== i18nDefaultLocale)
     .flatMap((locale) => [
+      [`/${locale.code}/pricing`, { isr: 3600 }],
       [`/${locale.code}/jobs`, { isr: 3600 }],
       [`/${locale.code}/jobs/**`, { isr: 3600 }],
+    ]),
+);
+
+const localizedPricingRedirectRules = Object.fromEntries(
+  i18nLocales
+    .filter((locale) => locale.code !== i18nDefaultLocale)
+    .map((locale) => [
+      `/${locale.code}/pricing-v5`,
+      { redirect: { to: `/${locale.code}/pricing`, statusCode: 301 } },
     ]),
 );
 
@@ -55,6 +65,10 @@ const localizedJobsRobotsRules = Object.fromEntries(
   i18nLocales
     .filter((locale) => locale.code !== i18nDefaultLocale)
     .flatMap((locale) => [
+      [
+        `/${locale.code}/pricing`,
+        { headers: { "X-Robots-Tag": "index, follow" } },
+      ],
       [
         `/${locale.code}/jobs`,
         { headers: { "X-Robots-Tag": "index, follow" } },
@@ -262,6 +276,9 @@ export default defineNuxtConfig({
     // to eu-assets.i.posthog.com and everything else to eu.i.posthog.com).
     // Defining routeRules here would be shadowed by the server route, so we
     // intentionally do not declare them.
+    "/pricing-v5": { redirect: { to: "/pricing", statusCode: 301 } },
+    ...localizedPricingRedirectRules,
+    "/pricing": { isr: 3600 },
     "/jobs": { isr: 3600 },
     "/jobs/**": { isr: 3600 },
     ...localizedPublicRouteRules,
@@ -294,6 +311,11 @@ export default defineNuxtConfig({
         },
       },
       // Public job board pages — allow indexing
+      "/pricing": {
+        headers: {
+          "X-Robots-Tag": "index, follow",
+        },
+      },
       "/jobs/**": {
         headers: {
           "X-Robots-Tag": "index, follow",
