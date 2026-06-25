@@ -51,10 +51,10 @@ definePageMeta({ layout: false })
           </NuxtLink>
           <template v-else>
             <NuxtLink
-              :to="localePath('/auth/sign-in')"
+              :to="localePath('/auth/sign-in?live=1')"
               class="group flex items-center gap-2 rounded-lg bg-surface-900 dark:bg-white px-6 py-3 text-[14px] font-semibold text-white dark:text-[#09090b] transition hover:bg-surface-800 dark:hover:bg-white/90"
             >
-              {{ $t('home.hero.signIn') }}
+              {{ $t('home.hero.ctaDemo') }}
               <ArrowRight class="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </NuxtLink>
             <NuxtLink
