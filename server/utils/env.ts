@@ -236,29 +236,36 @@ export const envSchema = z
       }
     }
 
-    // Stripe billing: all-or-none. Enabling the feature (STRIPE_SECRET_KEY)
-    // without the webhook secret or every price id is a misconfiguration that
-    // would let checkout start but never reconcile (no verified webhooks) or
-    // fail mid-checkout (missing price id).
-    if (data.STRIPE_SECRET_KEY) {
-      const requiredWithStripe = [
-        ["STRIPE_WEBHOOK_SECRET", data.STRIPE_WEBHOOK_SECRET],
-        ["STRIPE_PRICE_CLOUD_PRO_MONTHLY", data.STRIPE_PRICE_CLOUD_PRO_MONTHLY],
-        ["STRIPE_PRICE_CLOUD_PRO_ANNUAL", data.STRIPE_PRICE_CLOUD_PRO_ANNUAL],
-        ["STRIPE_PRICE_BUSINESS_MONTHLY", data.STRIPE_PRICE_BUSINESS_MONTHLY],
-        ["STRIPE_PRICE_BUSINESS_ANNUAL", data.STRIPE_PRICE_BUSINESS_ANNUAL],
-      ] as const;
-      for (const [name, value] of requiredWithStripe) {
-        if (!value) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: [name],
-            message: `${name} is required when STRIPE_SECRET_KEY is set. Provide the webhook secret and all four price ids, or unset STRIPE_SECRET_KEY to disable billing.`,
-          });
-        }
-      }
-    }
   });
+
+export const STRIPE_BILLING_ENV_KEYS = [
+  "STRIPE_SECRET_KEY",
+  "STRIPE_WEBHOOK_SECRET",
+  "STRIPE_PRICE_CLOUD_PRO_MONTHLY",
+  "STRIPE_PRICE_CLOUD_PRO_ANNUAL",
+  "STRIPE_PRICE_BUSINESS_MONTHLY",
+  "STRIPE_PRICE_BUSINESS_ANNUAL",
+] as const;
+
+type StripeBillingEnv = Partial<
+  Record<(typeof STRIPE_BILLING_ENV_KEYS)[number], string | undefined>
+>;
+
+export function getMissingStripeBillingVars(config: StripeBillingEnv): string[] {
+  const configuredCount = STRIPE_BILLING_ENV_KEYS.filter((key) =>
+    Boolean(config[key]),
+  ).length;
+
+  if (configuredCount === 0 || configuredCount === STRIPE_BILLING_ENV_KEYS.length) {
+    return [];
+  }
+
+  return STRIPE_BILLING_ENV_KEYS.filter((key) => !config[key]);
+}
+
+export function isStripeBillingConfigured(config: StripeBillingEnv): boolean {
+  return STRIPE_BILLING_ENV_KEYS.every((key) => Boolean(config[key]));
+}
 
 /**
  * Validated environment variables. Uses lazy initialization so the schema

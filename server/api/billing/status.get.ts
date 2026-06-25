@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { subscription as subscriptionTable } from '../../database/schema'
+import { isStripeBillingConfigured } from '../../utils/env'
 
 /**
  * Billing status for the active organization.
@@ -17,7 +18,7 @@ export default defineEventHandler(async (event) => {
   const session = await requireAuth(event)
   const orgId = session.session.activeOrganizationId
 
-  const enabled = Boolean(env.STRIPE_SECRET_KEY)
+  const enabled = isStripeBillingConfigured(env)
   if (!enabled) {
     return { enabled: false, subscription: null }
   }

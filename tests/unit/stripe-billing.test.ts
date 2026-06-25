@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { envSchema } from '../../server/utils/env'
+import { envSchema, getMissingStripeBillingVars, isStripeBillingConfigured } from '../../server/utils/env'
 import { isBillingActionAllowed, getBillingPlan, BILLING_PLAN_IDS } from '../../shared/billing'
 
 /**
  * Stripe billing tests.
  *
  * Covers the two security/correctness-critical pure layers:
- *  1. Env validation — billing config is all-or-none.
+ *  1. Env helpers — billing is enabled only when every Stripe var is present.
  *  2. Org-scoped authorization decision used by the Stripe plugin's
  *     `authorizeReference` callback.
  */
@@ -30,33 +30,29 @@ const fullStripe = {
   STRIPE_PRICE_BUSINESS_ANNUAL: 'price_biz_y',
 }
 
-describe('Stripe env validation (all-or-none)', () => {
+describe('Stripe env helpers', () => {
   it('accepts a config with no Stripe vars (billing disabled)', () => {
     const result = envSchema.safeParse(baseEnv)
     expect(result.success).toBe(true)
+    expect(isStripeBillingConfigured(result.success ? result.data : {})).toBe(false)
+    expect(getMissingStripeBillingVars(result.success ? result.data : {})).toEqual([])
   })
 
   it('accepts a fully-specified Stripe config', () => {
     const result = envSchema.safeParse({ ...baseEnv, ...fullStripe })
     expect(result.success).toBe(true)
+    expect(isStripeBillingConfigured(result.success ? result.data : {})).toBe(true)
+    expect(getMissingStripeBillingVars(result.success ? result.data : {})).toEqual([])
   })
 
-  it('rejects STRIPE_SECRET_KEY without the webhook secret', () => {
+  it('accepts partial Stripe env but reports billing as disabled', () => {
     const { STRIPE_WEBHOOK_SECRET, ...partial } = fullStripe
     const result = envSchema.safeParse({ ...baseEnv, ...partial })
-    expect(result.success).toBe(false)
-    if (!result.success) {
-      expect(result.error.issues.some(i => i.path.includes('STRIPE_WEBHOOK_SECRET'))).toBe(true)
-    }
-  })
-
-  it('rejects STRIPE_SECRET_KEY when any price id is missing', () => {
-    const { STRIPE_PRICE_BUSINESS_ANNUAL, ...partial } = fullStripe
-    const result = envSchema.safeParse({ ...baseEnv, ...partial })
-    expect(result.success).toBe(false)
-    if (!result.success) {
-      expect(result.error.issues.some(i => i.path.includes('STRIPE_PRICE_BUSINESS_ANNUAL'))).toBe(true)
-    }
+    expect(result.success).toBe(true)
+    expect(isStripeBillingConfigured(result.success ? result.data : {})).toBe(false)
+    expect(getMissingStripeBillingVars(result.success ? result.data : {})).toEqual([
+      'STRIPE_WEBHOOK_SECRET',
+    ])
   })
 })
 

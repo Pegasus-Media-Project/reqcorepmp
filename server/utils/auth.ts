@@ -8,6 +8,7 @@ import { and, eq } from "drizzle-orm";
 import { ac, owner, admin, member } from "~~/shared/permissions";
 import { isBillingActionAllowed } from "~~/shared/billing";
 import { sendOrgInvitationEmail, sendPasswordResetEmail } from "./email";
+import { getMissingStripeBillingVars, isStripeBillingConfigured } from "./env";
 import * as schema from "../database/schema";
 
 /**
@@ -19,13 +20,13 @@ function buildStripePlans() {
   return [
     {
       name: "cloud-pro",
-      priceId: env.STRIPE_PRICE_CLOUD_PRO_MONTHLY,
-      annualDiscountPriceId: env.STRIPE_PRICE_CLOUD_PRO_ANNUAL,
+      priceId: env.STRIPE_PRICE_CLOUD_PRO_MONTHLY!,
+      annualDiscountPriceId: env.STRIPE_PRICE_CLOUD_PRO_ANNUAL!,
     },
     {
       name: "business",
-      priceId: env.STRIPE_PRICE_BUSINESS_MONTHLY,
-      annualDiscountPriceId: env.STRIPE_PRICE_BUSINESS_ANNUAL,
+      priceId: env.STRIPE_PRICE_BUSINESS_MONTHLY!,
+      annualDiscountPriceId: env.STRIPE_PRICE_BUSINESS_ANNUAL!,
     },
   ];
 }
@@ -254,6 +255,15 @@ function resolveBetterAuthUrl(): string {
 function getAuth(): Auth {
   if (!_auth) {
     const baseURL = resolveBetterAuthUrl();
+    const stripeBillingConfigured = isStripeBillingConfigured(env);
+    const missingStripeBillingVars = getMissingStripeBillingVars(env);
+
+    if (missingStripeBillingVars.length > 0) {
+      console.warn(
+        `[Reqcore] Stripe billing disabled: missing ${missingStripeBillingVars.join(", ")}. ` +
+          "Set all Stripe billing variables to enable checkout, or unset the partial Stripe variables.",
+      );
+    }
 
     _auth = betterAuth({
       baseURL,
@@ -436,15 +446,13 @@ function getAuth(): Auth {
         }),
 
         // ── Stripe Billing (org-scoped subscriptions) ───────────────────
-        // Enabled only when STRIPE_SECRET_KEY is set (env.ts enforces that the
-        // webhook secret + all price ids are present alongside it). Provides
+        // Enabled only when all Stripe billing env vars are set. Provides
         // Stripe-hosted Checkout, the Customer Portal, and signature-verified
         // webhooks at /api/auth/stripe/webhook (handled by the auth catch-all).
-        ...(env.STRIPE_SECRET_KEY
+        ...(stripeBillingConfigured
           ? [
               stripePlugin({
-                stripeClient: new Stripe(env.STRIPE_SECRET_KEY),
-                // env.ts guarantees these are present whenever STRIPE_SECRET_KEY is set.
+                stripeClient: new Stripe(env.STRIPE_SECRET_KEY!),
                 stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET!,
                 // Customer is created lazily at first checkout, not on sign-up.
                 createCustomerOnSignUp: false,
