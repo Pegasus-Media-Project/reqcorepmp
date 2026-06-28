@@ -17,35 +17,35 @@
       "logIn": "Log in",
       "signUp": "Sign up"
     },
-    "badge": "Open Source ATS for Developer Teams",
+    "badge": "Hosted ATS for modern hiring teams",
     "hero": {
-      "titleLine1": "Your hiring.",
-      "titleHighlight": "Your infrastructure.",
-      "subtitle": "Open-source applicant tracking built for teams that self-host.",
+      "titleLine1": "Hiring software",
+      "titleHighlight": "that starts free.",
+      "subtitle": "Track your first role in Reqcore with 1 active job and 300 applicants free. Upgrade only when your hiring pipeline grows.",
       "goToDashboard": "Go to Dashboard",
       "signIn": "Sign in",
       "createAccount": "Create account",
       "ctaDemo": "Try live demo",
-      "ctaStart": "View on GitHub",
-      "hint": "Early open-source release — try the demo with sample data, no sign-up needed"
+      "ctaStart": "Start free",
+      "hint": "Try the demo with sample data, no sign-up needed"
     },
     "pillars": {
       "yourData": {
-        "label": "Your data",
-        "desc": "Postgres + MinIO on your infrastructure. Nothing leaves your network."
+        "label": "One free active job",
+        "desc": "Run a real hiring process before you pay. No credit card needed."
       },
       "auditable": {
-        "label": "Fully auditable",
-        "desc": "Open source — every line of matching logic is visible and overridable."
+        "label": "300 applicants included",
+        "desc": "Enough room to test sourcing, screening, and pipeline flow on a real role."
       },
       "unlimitedSeats": {
         "label": "Unlimited seats",
-        "desc": "Add your whole hiring team. No per-seat pricing, ever."
+        "desc": "Add your hiring team without turning every collaborator into another seat charge."
       }
     },
     "footer": {
-      "source": "Source",
-      "tagline": "Reqcore — open-source applicant tracking"
+      "source": "Pricing",
+      "tagline": "Reqcore — applicant tracking that starts free"
     }
   },
   "retention": {

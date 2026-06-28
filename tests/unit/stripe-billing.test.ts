@@ -24,10 +24,12 @@ const baseEnv = {
 const fullStripe = {
   STRIPE_SECRET_KEY: 'sk_test_123',
   STRIPE_WEBHOOK_SECRET: 'whsec_123',
-  STRIPE_PRICE_CLOUD_PRO_MONTHLY: 'price_pro_m',
-  STRIPE_PRICE_CLOUD_PRO_ANNUAL: 'price_pro_y',
-  STRIPE_PRICE_BUSINESS_MONTHLY: 'price_biz_m',
-  STRIPE_PRICE_BUSINESS_ANNUAL: 'price_biz_y',
+  STRIPE_PRICE_SOLO_MONTHLY: 'price_solo_m',
+  STRIPE_PRICE_SOLO_ANNUAL: 'price_solo_y',
+  STRIPE_PRICE_TEAM_MONTHLY: 'price_team_m',
+  STRIPE_PRICE_TEAM_ANNUAL: 'price_team_y',
+  STRIPE_PRICE_SCALE_MONTHLY: 'price_scale_m',
+  STRIPE_PRICE_SCALE_ANNUAL: 'price_scale_y',
 }
 
 describe('Stripe env helpers', () => {
@@ -85,13 +87,14 @@ describe('isBillingActionAllowed (org-scoped authorization)', () => {
 })
 
 describe('billing plan config', () => {
-  it('exposes exactly the two self-serve plans', () => {
-    expect(BILLING_PLAN_IDS).toEqual(['cloud-pro', 'business'])
+  it('exposes exactly the three self-serve plans', () => {
+    expect(BILLING_PLAN_IDS).toEqual(['solo', 'team', 'scale'])
   })
 
   it('resolves plans by id and returns undefined for unknown ids', () => {
-    expect(getBillingPlan('cloud-pro')?.name).toBe('Cloud Pro')
-    expect(getBillingPlan('business')?.name).toBe('Business')
+    expect(getBillingPlan('solo')?.name).toBe('Solo')
+    expect(getBillingPlan('team')?.name).toBe('Team')
+    expect(getBillingPlan('scale')?.name).toBe('Scale')
     expect(getBillingPlan('enterprise')).toBeUndefined()
   })
 })

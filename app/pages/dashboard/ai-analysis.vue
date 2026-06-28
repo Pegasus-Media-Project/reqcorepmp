@@ -175,14 +175,6 @@ function statusBadgeClass(status: string): string {
 
     <!-- ─── Dashboard content ─── -->
     <template v-else>
-      <!-- ─── Header ─── -->
-      <div class="flex items-center justify-between mb-10">
-        <div>
-          <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50 tracking-tight">AI Analysis</h1>
-          <p class="text-sm text-surface-400 dark:text-surface-500 mt-1">Overview of AI scoring runs and token usage</p>
-        </div>
-      </div>
-
       <!-- ─── Stat cards ─── -->
       <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
         <!-- Total Runs -->

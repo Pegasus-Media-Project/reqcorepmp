@@ -270,23 +270,6 @@ const selectedCandidateId = ref<string | null>(null)
 
 <template>
   <div class="mx-auto max-w-6xl">
-    <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50">Candidates</h1>
-        <p class="text-sm text-surface-500 dark:text-surface-400 mt-1">
-          Manage your candidate pool and track applicants.
-        </p>
-      </div>
-      <NuxtLink
-        :to="$localePath('/dashboard/candidates/new')"
-        class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
-      >
-        <Plus class="size-4" />
-        Add Candidate
-      </NuxtLink>
-    </div>
-
     <!-- Search + Views + Filters -->
     <div class="flex items-center gap-2 mb-4">
       <div class="relative flex-1">
@@ -344,6 +327,13 @@ const selectedCandidateId = ref<string | null>(null)
         <Maximize2 v-if="!isFullscreen" class="size-4" />
         <Minimize2 v-else class="size-4" />
       </button>
+      <NuxtLink
+        :to="$localePath('/dashboard/candidates/new')"
+        class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
+      >
+        <Plus class="size-4" />
+        Add Candidate
+      </NuxtLink>
     </div>
 
     <!-- Filter drawer -->

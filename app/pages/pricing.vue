@@ -3,11 +3,10 @@ import {
   ArrowRight,
   Check,
   Cloud,
-  Github,
   LifeBuoy,
-  Server,
   ShieldCheck,
   Sparkles,
+  TrendingUp,
 } from 'lucide-vue-next'
 import { BILLING_PLANS, type BillingPlan, type BillingPlanId } from '~~/shared/billing'
 
@@ -17,6 +16,7 @@ type PlanCard = {
   tagline: string
   price: string
   cadence: string
+  featuresHeading: string
   features: string[]
   icon: typeof Cloud
   ctaLabel: string
@@ -30,8 +30,52 @@ const { data: session } = await authClient.useSession(useFetch)
 const annual = ref(false)
 
 const paidPlanIcons: Record<BillingPlanId, typeof Sparkles> = {
-  'cloud-pro': Sparkles,
-  'business': ShieldCheck,
+  solo: Sparkles,
+  team: TrendingUp,
+  scale: ShieldCheck,
+}
+
+// Concrete, real feature lists shown on each plan card. Paid plans inherit the
+// tier below them (Breezy-style "Everything in X, plus:"), so each list below
+// holds only what that tier *adds*. Defined here, on the pricing page, rather
+// than in shared/billing.ts because this is marketing copy for the public page.
+const paidPlanFeatures: Record<BillingPlanId, { heading: string; features: string[] }> = {
+  solo: {
+    heading: 'Everything in Free, plus:',
+    features: [
+      'Up to 2 active roles',
+      'Unlimited AI shortlists on every role',
+      'Unlimited hires per role',
+      'Full shortlist workflow',
+      'Custom scoring criteria',
+      'Saved views and filters',
+      'Share and export shortlists',
+      'Email support',
+    ],
+  },
+  team: {
+    heading: 'Everything in Solo, plus:',
+    features: [
+      'Up to 8 active roles',
+      'Deeper analysis on every shortlisted application',
+      'Your own domain, no Reqcore branding',
+      'Email and calendar integrations',
+      'Recruiting pipelines',
+      'Interview scheduling and templates',
+      'Priority support',
+    ],
+  },
+  scale: {
+    heading: 'Everything in Team, plus:',
+    features: [
+      'Up to 24 active roles',
+      'SSO, SAML and SCIM',
+      'Audit log and retention controls',
+      'DPA and SLA',
+      'Bring your own AI key (BYOK)',
+      'Dedicated onboarding',
+    ],
+  },
 }
 
 const primaryCta = computed(() => session.value?.user
@@ -40,7 +84,7 @@ const primaryCta = computed(() => session.value?.user
 
 function paidPlanPrice(plan: BillingPlan): { price: string; cadence: string } {
   if (annual.value && plan.annualPrice != null) {
-    return { price: `$${plan.annualPrice.toLocaleString('en-US')}`, cadence: '/year' }
+    return { price: `$${Math.round(plan.annualPrice / 12).toLocaleString('en-US')}`, cadence: '/month, billed yearly' }
   }
 
   return { price: `$${plan.monthlyPrice}`, cadence: '/month' }
@@ -48,35 +92,25 @@ function paidPlanPrice(plan: BillingPlan): { price: string; cadence: string } {
 
 const plans = computed<PlanCard[]>(() => [
   {
-    id: 'community',
-    name: 'Community',
-    tagline: 'Self-host Reqcore on your own infrastructure.',
+    id: 'free',
+    name: 'Free',
+    tagline: 'Rank your whole pile on one real role.',
     price: '$0',
-    cadence: 'forever',
-    icon: Server,
-    ctaLabel: 'View source',
-    ctaHref: 'https://github.com/reqcore-inc/reqcore',
-    features: [
-      'Open-source ATS core',
-      'Unlimited jobs and candidates',
-      'Unlimited team members',
-      'Postgres and object storage',
-    ],
-  },
-  {
-    id: 'cloud-free',
-    name: 'Cloud Free',
-    tagline: 'Hosted Reqcore for small teams getting started.',
-    price: '$0',
-    cadence: '/month',
+    cadence: '',
     icon: Cloud,
     ctaLabel: 'Start free',
     ctaTo: localePath('/auth/sign-up'),
+    featuresHeading: 'Includes:',
     features: [
-      'Managed hosting',
-      'Reqcore branding',
-      'Core hiring pipeline',
-      'No credit card required',
+      '1 active role',
+      'Unlimited applicants',
+      'Unlimited team members',
+      'AI shortlist ranking',
+      'Your first AI shortlist free, no card',
+      'Branded application forms',
+      'Resume parsing and candidate profiles',
+      'Source tracking',
+      'Multi-language support',
     ],
   },
   ...BILLING_PLANS.map((plan) => {
@@ -91,33 +125,35 @@ const plans = computed<PlanCard[]>(() => [
       icon: paidPlanIcons[plan.id],
       ctaLabel: `Choose ${plan.name}`,
       ctaTo: localePath('/auth/sign-up'),
-      featured: plan.id === 'cloud-pro',
-      features: plan.features,
+      featured: plan.id === 'team',
+      featuresHeading: paidPlanFeatures[plan.id].heading,
+      features: paidPlanFeatures[plan.id].features,
     }
   }),
   {
-    id: 'enterprise',
-    name: 'Enterprise',
-    tagline: 'Custom support, procurement, and security review.',
+    id: 'agency',
+    name: 'Agency',
+    tagline: 'For staffing-scale volume.',
     price: 'Custom',
     cadence: '',
     icon: LifeBuoy,
     ctaLabel: 'Contact us',
-    ctaHref: 'mailto:hello@reqcore.com',
+    ctaHref: 'mailto:sales@reqcore.com',
+    featuresHeading: 'Everything in Scale, plus:',
     features: [
-      'Custom deployment guidance',
+      'Unlimited active roles',
+      'Custom contract and invoicing',
       'Security and legal review',
       'Dedicated support channel',
-      'Roadmap and migration planning',
     ],
   },
 ])
 
 useSeoMeta({
   title: 'Pricing',
-  description: 'Simple, flat Reqcore pricing for self-hosted and cloud teams.',
+  description: 'Unlimited applicants on every plan. Priced by the roles you keep open, never by your volume. Free until your first AI shortlist — no card.',
   ogTitle: 'Reqcore Pricing',
-  ogDescription: 'Self-host for free, start on cloud for free, or upgrade to flat org-wide plans.',
+  ogDescription: 'Unlimited applicants on every plan, priced by active roles. Start free on one role — no card.',
 })
 
 definePageMeta({ layout: false })
@@ -125,9 +161,9 @@ definePageMeta({ layout: false })
 
 <template>
   <div class="min-h-screen bg-white text-surface-900 dark:bg-[#09090b] dark:text-white">
-    <PublicNavBar active-page="pricing" />
+    <PublicNavBar active-page="pricing" compact />
 
-    <main class="mx-auto max-w-6xl px-4 pb-20 pt-28 sm:px-6 sm:pt-32">
+    <main class="mx-auto max-w-6xl px-4 pb-20 pt-24 sm:px-6 sm:pt-28">
       <section class="grid gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(320px,0.55fr)] lg:items-end">
         <div>
           <div class="inline-flex items-center gap-2 rounded-lg border border-surface-200 bg-surface-50 px-3 py-1.5 text-xs font-medium text-surface-600 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-surface-300">
@@ -138,13 +174,13 @@ definePageMeta({ layout: false })
               height="18"
               class="size-4.5 object-contain"
             />
-            Flat pricing, no per-seat math
+            Free until your first AI shortlist
           </div>
           <h1 class="mt-6 max-w-3xl text-4xl font-bold leading-tight text-surface-950 dark:text-white sm:text-5xl lg:text-6xl">
-            Pricing
+            Unlimited applicants. One price per role.
           </h1>
           <p class="mt-5 max-w-2xl text-base leading-7 text-surface-600 dark:text-surface-300 sm:text-lg">
-            Start with the open-source build, use the hosted free tier, or upgrade when your team needs branding, integrations, SSO, and compliance controls.
+            Reqcore ranks every applicant — 500 or 50,000 — and hands you a shortlist you can trust. Priced by the roles you keep open, never by your volume. Start free on one role, no card.
           </p>
           <div class="mt-8 flex flex-wrap items-center gap-3">
             <NuxtLink
@@ -154,15 +190,12 @@ definePageMeta({ layout: false })
               {{ primaryCta.label }}
               <ArrowRight class="size-4" />
             </NuxtLink>
-            <a
-              href="https://github.com/reqcore-inc/reqcore"
-              target="_blank"
-              rel="noopener noreferrer"
+            <NuxtLink
+              :to="localePath('/auth/sign-in?live=1')"
               class="inline-flex items-center gap-2 rounded-lg border border-surface-200 bg-white px-5 py-3 text-sm font-semibold text-surface-700 transition hover:bg-surface-50 dark:border-white/[0.1] dark:bg-white/[0.03] dark:text-surface-200 dark:hover:bg-white/[0.06]"
             >
-              <Github class="size-4" />
-              GitHub
-            </a>
+              View demo
+            </NuxtLink>
           </div>
         </div>
 
@@ -185,12 +218,12 @@ definePageMeta({ layout: false })
             </button>
           </div>
           <p class="mt-3 text-sm leading-6 text-surface-500 dark:text-surface-400">
-            Annual plans show the display price used in the billing dashboard. Stripe remains the source of truth at checkout.
+            Annual plans show the monthly equivalent. Stripe remains the source of truth at checkout.
           </p>
         </div>
       </section>
 
-      <section class="mt-14 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <section class="mt-14 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <article
           v-for="plan in plans"
           :key="plan.id"
@@ -213,7 +246,8 @@ definePageMeta({ layout: false })
           </div>
           <p class="mt-3 min-h-12 text-sm leading-6 text-surface-500 dark:text-surface-400">{{ plan.tagline }}</p>
 
-          <ul class="mt-5 flex-1 space-y-3">
+          <p class="mt-5 text-xs font-semibold uppercase tracking-wide text-surface-400 dark:text-surface-500">{{ plan.featuresHeading }}</p>
+          <ul class="mt-3 flex-1 space-y-3">
             <li
               v-for="feature in plan.features"
               :key="feature"
@@ -251,12 +285,12 @@ definePageMeta({ layout: false })
             Invite the whole hiring team without turning collaboration into a billable event.
           </p>
           <p>
-            <strong class="text-surface-950 dark:text-white">Self-hosting stays free.</strong>
-            The community build remains open source for teams that want full control.
+            <strong class="text-surface-950 dark:text-white">Unlimited applicants, always.</strong>
+            500 or 50,000, the price is the same — we never charge more when you get more applicants.
           </p>
           <p>
-            <strong class="text-surface-950 dark:text-white">Cloud is optional.</strong>
-            Hosted plans add managed operations, branding, integrations, and compliance features.
+            <strong class="text-surface-950 dark:text-white">Priced by active roles.</strong>
+            Pay for how many roles you keep open at once — plus custom branding, integrations, and compliance as you grow.
           </p>
         </div>
       </section>

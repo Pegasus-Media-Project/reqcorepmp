@@ -17,35 +17,35 @@
       "logIn": "Iniciar sesión",
       "signUp": "Registrarse"
     },
-    "badge": "ATS de código abierto para equipos de desarrollo",
+    "badge": "Hosted ATS for modern hiring teams",
     "hero": {
-      "titleLine1": "Tu contratación.",
-      "titleHighlight": "Tu infraestructura.",
-      "subtitle": "Seguimiento de candidatos de código abierto para equipos que alojan en sus propios servidores.",
+      "titleLine1": "Hiring software",
+      "titleHighlight": "that starts free.",
+      "subtitle": "Track your first role in Reqcore with 1 active job and 300 applicants free. Upgrade only when your hiring pipeline grows.",
       "goToDashboard": "Ir al panel",
       "signIn": "Iniciar sesión",
       "createAccount": "Crear cuenta",
       "ctaDemo": "Probar demo en vivo",
-      "ctaStart": "Ver en GitHub",
-      "hint": "Versión temprana de código abierto — prueba la demo con datos de ejemplo, sin registro"
+      "ctaStart": "Start free",
+      "hint": "Try the demo with sample data, no sign-up needed"
     },
     "pillars": {
       "yourData": {
-        "label": "Tus datos",
-        "desc": "Postgres + MinIO en tu infraestructura. Nada sale de tu red."
+        "label": "One free active job",
+        "desc": "Run a real hiring process before you pay. No credit card needed."
       },
       "auditable": {
-        "label": "Totalmente auditable",
-        "desc": "Código abierto — cada línea de lógica de matching es visible y personalizable."
+        "label": "300 applicants included",
+        "desc": "Enough room to test sourcing, screening, and pipeline flow on a real role."
       },
       "unlimitedSeats": {
         "label": "Puestos ilimitados",
-        "desc": "Agrega a todo tu equipo de contratación. Sin precio por puesto, nunca."
+        "desc": "Add your hiring team without turning every collaborator into another seat charge."
       }
     },
     "footer": {
-      "source": "Código fuente",
-      "tagline": "Reqcore — seguimiento de candidatos de código abierto"
+      "source": "Pricing",
+      "tagline": "Reqcore — applicant tracking that starts free"
     }
   },
   "retention": {

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { Github, Menu, Moon, Sun, X } from 'lucide-vue-next'
+import { Menu, Moon, Sun, X } from 'lucide-vue-next'
 
 defineProps<{
   activePage?: 'home' | 'features' | 'pricing' | 'jobs' | 'roadmap' | 'blog' | 'docs'
+  compact?: boolean
 }>()
 
 const { t } = useI18n()
@@ -24,7 +25,10 @@ watch(() => route.fullPath, () => {
 
 <template>
   <nav class="fixed inset-x-0 top-0 z-50 border-b border-surface-200/80 dark:border-white/[0.06] bg-white/90 dark:bg-[#09090b]/90 backdrop-blur-xl">
-    <div class="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
+    <div
+      class="mx-auto flex max-w-6xl items-center justify-between px-4 sm:px-6"
+      :class="compact ? 'h-12' : 'h-14'"
+    >
       <NuxtLink
         :to="localePath('/')"
         class="flex items-center gap-2.5 text-[15px] font-semibold tracking-tight text-surface-900 dark:text-white"
@@ -52,15 +56,6 @@ watch(() => route.fullPath, () => {
         >
           {{ link.label }}
         </NuxtLink>
-        <a
-          href="https://github.com/reqcore-inc/reqcore"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium text-surface-500 dark:text-surface-400 transition hover:text-surface-900 dark:hover:text-white"
-        >
-          <Github class="h-3.5 w-3.5" />
-          {{ t('home.nav.github') }}
-        </a>
       </div>
 
       <!-- Right: session actions + language switcher -->
@@ -128,15 +123,6 @@ watch(() => route.fullPath, () => {
         >
           {{ link.label }}
         </NuxtLink>
-        <a
-          href="https://github.com/reqcore-inc/reqcore"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-surface-600 transition hover:bg-surface-100 hover:text-surface-900 dark:text-surface-300 dark:hover:bg-white/[0.06] dark:hover:text-white"
-        >
-          <Github class="h-4 w-4" />
-          {{ t('home.nav.github') }}
-        </a>
       </div>
     </div>
   </nav>

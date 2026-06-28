@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { Github, Shield, Database, Users, Briefcase, ArrowRight } from 'lucide-vue-next'
+import { ArrowRight, Briefcase, CheckCircle2, Sparkles, Users } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const localePath = useLocalePath()
 const { data: session } = await authClient.useSession(useFetch)
 
 const pillars = computed(() => [
-  { icon: Database, label: t('home.pillars.yourData.label'), desc: t('home.pillars.yourData.desc') },
-  { icon: Shield, label: t('home.pillars.auditable.label'), desc: t('home.pillars.auditable.desc') },
+  { icon: Briefcase, label: t('home.pillars.yourData.label'), desc: t('home.pillars.yourData.desc') },
+  { icon: Sparkles, label: t('home.pillars.auditable.label'), desc: t('home.pillars.auditable.desc') },
   { icon: Users, label: t('home.pillars.unlimitedSeats.label'), desc: t('home.pillars.unlimitedSeats.desc') },
 ])
 
@@ -40,7 +40,22 @@ definePageMeta({ layout: false })
           {{ $t('home.hero.subtitle') }}
         </p>
 
-        <div class="hero-animate hero-delay-3 mt-10 flex flex-wrap items-center justify-center gap-3">
+        <div class="hero-animate hero-delay-3 mt-6 grid w-full max-w-xl grid-cols-3 overflow-hidden rounded-lg border border-surface-200 bg-surface-50 text-left dark:border-white/[0.08] dark:bg-white/[0.03]">
+          <div class="border-r border-surface-200 px-4 py-3 dark:border-white/[0.08]">
+            <p class="text-2xl font-bold text-surface-900 dark:text-white">1</p>
+            <p class="mt-0.5 text-xs leading-5 text-surface-500 dark:text-surface-400">active job free</p>
+          </div>
+          <div class="border-r border-surface-200 px-4 py-3 dark:border-white/[0.08]">
+            <p class="text-2xl font-bold text-surface-900 dark:text-white">300</p>
+            <p class="mt-0.5 text-xs leading-5 text-surface-500 dark:text-surface-400">applicants included</p>
+          </div>
+          <div class="px-4 py-3">
+            <p class="text-2xl font-bold text-surface-900 dark:text-white">$0</p>
+            <p class="mt-0.5 text-xs leading-5 text-surface-500 dark:text-surface-400">no card needed</p>
+          </div>
+        </div>
+
+        <div class="hero-animate hero-delay-4 mt-10 flex flex-wrap items-center justify-center gap-3">
           <NuxtLink
             v-if="session?.user"
             :to="localePath('/dashboard')"
@@ -68,7 +83,7 @@ definePageMeta({ layout: false })
       </div>
 
       <!-- ── Pillars ── -->
-      <div class="hero-animate hero-delay-4 mx-auto mt-28 grid max-w-3xl gap-4 sm:grid-cols-3">
+      <div class="hero-animate hero-delay-5 mx-auto mt-28 grid max-w-3xl gap-4 sm:grid-cols-3">
         <div
           v-for="pillar in pillars"
           :key="pillar.label"
@@ -83,15 +98,13 @@ definePageMeta({ layout: false })
       <!-- ── Footer ── -->
       <footer class="hero-animate hero-delay-5 mt-28 flex flex-col items-center gap-4 text-center">
         <div class="flex items-center gap-5">
-          <a
-            href="https://github.com/reqcore-inc/reqcore"
-            target="_blank"
-            rel="noopener noreferrer"
+          <NuxtLink
+            :to="localePath('/pricing')"
             class="flex items-center gap-1.5 text-[13px] text-surface-500 transition hover:text-surface-700 dark:hover:text-surface-300"
           >
-            <Github class="h-4 w-4" />
+            <CheckCircle2 class="h-4 w-4" />
             {{ $t('home.footer.source') }}
-          </a>
+          </NuxtLink>
           <NuxtLink
             :to="localePath('/jobs')"
             class="flex items-center gap-1.5 text-[13px] text-surface-500 transition hover:text-surface-700 dark:hover:text-surface-300"

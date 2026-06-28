@@ -263,6 +263,7 @@ export default defineEventHandler(async (event) => {
     messages: modelMessages,
     tools,
     stopWhen: stepCountIs(8),
+    maxOutputTokens: Math.max(config.maxTokens, 2048),
     temperature: agentTemperature ?? 0.2,
     ...(body.thinking
       ? { providerOptions: { anthropic: { thinking: { type: 'enabled', budgetTokens: 4000 } } } }

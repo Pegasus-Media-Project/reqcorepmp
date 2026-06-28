@@ -63,6 +63,12 @@ export default defineEventHandler(async (event) => {
       .select({
         totalPromptTokens: sum(analysisRun.promptTokens).as('total_prompt_tokens'),
         totalCompletionTokens: sum(analysisRun.completionTokens).as('total_completion_tokens'),
+        // Frozen actual cost (µ$) recorded at run time — the source of truth,
+        // independent of any later edits to per-config pricing.
+        totalCostUsdMicros: sum(analysisRun.costUsdMicros).as('total_cost_usd_micros'),
+        platformCostUsdMicros: sum(
+          sql`CASE WHEN ${analysisRun.billingMode} = 'platform' THEN ${analysisRun.costUsdMicros} ELSE 0 END`,
+        ).as('platform_cost_usd_micros'),
       })
       .from(analysisRun)
       .where(eq(analysisRun.organizationId, orgId)),
@@ -138,6 +144,10 @@ export default defineEventHandler(async (event) => {
       totalPromptTokens: Number(usage?.totalPromptTokens ?? 0),
       totalCompletionTokens: Number(usage?.totalCompletionTokens ?? 0),
       totalTokens: Number(usage?.totalPromptTokens ?? 0) + Number(usage?.totalCompletionTokens ?? 0),
+      // Actual recorded cost in USD (frozen at run time). `platform` is the
+      // slice we pay for; the rest is BYOK (the customer's own bill).
+      totalCostUsd: Number(usage?.totalCostUsdMicros ?? 0) / 1_000_000,
+      platformCostUsd: Number(usage?.platformCostUsdMicros ?? 0) / 1_000_000,
     },
     dailyRuns: dailyRuns.map(d => ({
       date: d.date,

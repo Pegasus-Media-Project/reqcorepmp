@@ -350,16 +350,6 @@ const selectedApplicationId = ref<string | null>(null)
 
 <template>
   <div class="mx-auto max-w-6xl">
-    <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50">Applications</h1>
-        <p class="text-sm text-surface-500 dark:text-surface-400 mt-1">
-          Track candidates through your hiring pipeline.
-        </p>
-      </div>
-    </div>
-
     <!-- Search + Views + Filters -->
     <div class="flex items-center gap-2 mb-4">
       <div class="relative flex-1">

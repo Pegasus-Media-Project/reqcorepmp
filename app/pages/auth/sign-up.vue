@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { getBillingPlan } from '~~/shared/billing'
+
 definePageMeta({
     layout: "auth",
     middleware: ["guest"],
@@ -40,6 +42,36 @@ onMounted(() => track("signup_page_viewed"));
 const pendingInvitation = computed(
     () => route.query.invitation as string | undefined,
 );
+const pendingCheckoutIntent = computed(() => parseBillingCheckoutIntent(route.query));
+const hasFreePlanSelected = computed(() => hasFreePlanIntent(route.query));
+const selectedPaidPlan = computed(() =>
+    pendingCheckoutIntent.value
+        ? getBillingPlan(pendingCheckoutIntent.value.planId)
+        : null,
+);
+const selectedBillingLabel = computed(() =>
+    pendingCheckoutIntent.value?.cadence === "annual"
+        ? "yearly"
+        : "monthly",
+);
+const onboardingQuery = computed(() => {
+    if (pendingCheckoutIntent.value) {
+        return buildBillingCheckoutQuery(pendingCheckoutIntent.value);
+    }
+    if (hasFreePlanSelected.value) {
+        return { plan: "free" };
+    }
+    return undefined;
+});
+
+function onboardingCreateOrgPath() {
+    return onboardingQuery.value
+        ? localePath({
+            path: "/onboarding/create-org",
+            query: onboardingQuery.value,
+        })
+        : localePath("/onboarding/create-org");
+}
 
 async function handleSignUp() {
     error.value = "";
@@ -94,7 +126,7 @@ async function handleSignUp() {
             localePath(`/auth/accept-invitation/${pendingInvitation.value}`),
         );
     } else {
-        await navigateTo(localePath("/onboarding/create-org"));
+        await navigateTo(onboardingCreateOrgPath());
     }
 }
 
@@ -103,7 +135,7 @@ async function handleSsoSignUp() {
     error.value = "";
     const callbackURL = pendingInvitation.value
         ? localePath(`/auth/accept-invitation/${pendingInvitation.value}`)
-        : localePath("/dashboard");
+        : onboardingCreateOrgPath();
     try {
         await authClient.signIn.oauth2({
             providerId: "oidc",
@@ -128,7 +160,7 @@ async function handleSocialSignUp(providerId: string) {
     error.value = "";
     const callbackURL = pendingInvitation.value
         ? localePath(`/auth/accept-invitation/${pendingInvitation.value}`)
-        : localePath("/onboarding/create-org");
+        : onboardingCreateOrgPath();
     try {
         await authClient.signIn.social({
             provider: providerId as "google" | "github" | "microsoft",
@@ -157,6 +189,13 @@ async function handleSocialSignUp(providerId: string) {
             class="rounded-md border border-danger-200 dark:border-danger-800 bg-danger-50 dark:bg-danger-950 p-3 text-sm text-danger-700 dark:text-danger-400"
         >
             {{ error }}
+        </div>
+
+        <div
+            v-if="selectedPaidPlan"
+            class="rounded-md border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-950/40 p-3 text-sm text-brand-700 dark:text-brand-300"
+        >
+            {{ selectedPaidPlan.name }} selected. Create your account, then you'll go straight to secure {{ selectedBillingLabel }} checkout.
         </div>
 
         <!-- Social sign-up providers (Google, GitHub, Microsoft) -->

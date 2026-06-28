@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { CreditCard, Check, Loader2, ExternalLink, Sparkles, ShieldCheck } from 'lucide-vue-next'
+import { CreditCard, Check, Loader2, ExternalLink, Sparkles, ShieldCheck, TrendingUp } from 'lucide-vue-next'
+import type { BillingCadence } from '~/composables/useBillingCheckout'
 import { BILLING_PLANS, getBillingPlan, type BillingPlanId } from '~~/shared/billing'
 
 useSeoMeta({
@@ -9,33 +10,23 @@ useSeoMeta({
 
 // Only owners/admins can change the plan (server enforces this too via
 // authorizeReference). Members see a read-only view.
-const { allowed: canManage } = usePermission({ organization: ['update'] })
+const { allowed: canManage, isLoading: isPermissionLoading } = usePermission({ organization: ['update'] })
 const { activeOrg } = useCurrentOrg()
 const orgId = computed(() => activeOrg.value?.id ?? null)
+const { startBillingCheckout } = useBillingCheckout()
 
 const route = useRoute()
 const checkoutResult = computed(() => route.query.checkout as string | undefined)
+const pendingCheckoutIntent = computed(() => parseBillingCheckoutIntent(route.query))
 
 // Plan icons (kept here, not in shared/, since they're presentational only).
 const planIcons: Record<BillingPlanId, typeof Sparkles> = {
-  'cloud-pro': Sparkles,
-  'business': ShieldCheck,
+  solo: Sparkles,
+  team: TrendingUp,
+  scale: ShieldCheck,
 }
 
-interface BillingStatus {
-  enabled: boolean
-  subscription: null | {
-    plan: string
-    status: string
-    periodEnd: string | null
-    cancelAtPeriodEnd: boolean
-    billingInterval: string | null
-  }
-}
-
-const { data: status, refresh, status: fetchStatus } = await useFetch<BillingStatus>('/api/billing/status', {
-  headers: useRequestHeaders(['cookie']),
-})
+const { data: status, refresh, status: fetchStatus } = await useBillingStatus()
 
 const billingAnnual = ref(false)
 const isProcessing = ref<string | null>(null) // holds the plan id (or 'portal') being processed
@@ -45,6 +36,9 @@ const current = computed(() => status.value?.subscription ?? null)
 const hasActivePlan = computed(() =>
   !!current.value && ['active', 'trialing', 'past_due'].includes(current.value.status),
 )
+
+// Usage meters + upsell card are only relevant for orgs still on the free tier.
+const freeUsage = computed(() => freePlanUsage(status.value))
 const currentPlanName = computed(() => {
   if (!hasActivePlan.value || !current.value) return 'Free'
   return getBillingPlan(current.value.plan)?.name ?? current.value.plan
@@ -69,7 +63,7 @@ function formatDate(iso: string | null): string {
 function priceLabel(planId: BillingPlanId): { amount: string; cadence: string } {
   const plan = getBillingPlan(planId)!
   if (billingAnnual.value && plan.annualPrice != null) {
-    return { amount: `$${plan.annualPrice.toLocaleString('en-US')}`, cadence: '/year' }
+    return { amount: `$${Math.round(plan.annualPrice / 12).toLocaleString('en-US')}`, cadence: '/month, billed yearly' }
   }
   return { amount: `$${plan.monthlyPrice}`, cadence: '/month' }
 }
@@ -78,26 +72,27 @@ function isCurrent(planId: BillingPlanId): boolean {
   return hasActivePlan.value && current.value?.plan === planId
 }
 
-async function choosePlan(planId: BillingPlanId) {
+async function choosePlan(planId: BillingPlanId, cadence: BillingCadence = billingAnnual.value ? 'annual' : 'monthly') {
   if (!canManage.value || !orgId.value) return
   errorMsg.value = ''
+  billingAnnual.value = cadence === 'annual'
   isProcessing.value = planId
   try {
-    const res = await authClient.subscription.upgrade({
-      plan: planId,
-      annual: billingAnnual.value,
-      referenceId: orgId.value,
-      customerType: 'organization',
-      successUrl: '/dashboard/settings/billing?checkout=success',
-      cancelUrl: '/dashboard/settings/billing?checkout=cancelled',
-    })
-    if (res?.error) {
-      errorMsg.value = res.error.message || 'Could not start checkout. Please try again.'
+    const subscriptionId = hasActivePlan.value
+      ? current.value?.stripeSubscriptionId ?? undefined
+      : undefined
+    if (hasActivePlan.value && !subscriptionId) {
+      errorMsg.value = 'Could not switch plans because the current Stripe subscription was not found. Please open the billing portal or contact support.'
       return
     }
-    // Stripe-hosted Checkout: redirect the browser to complete payment.
-    if (res?.data && 'url' in res.data && res.data.url) {
-      window.location.href = res.data.url as string
+    const res = await startBillingCheckout({
+      planId,
+      cadence,
+      orgId: orgId.value,
+      subscriptionId,
+    })
+    if (!res.ok) {
+      errorMsg.value = res.error || 'Could not start checkout. Please try again.'
     }
   }
   catch (err: unknown) {
@@ -107,6 +102,40 @@ async function choosePlan(planId: BillingPlanId) {
     isProcessing.value = null
   }
 }
+
+const autoCheckoutStarted = ref(false)
+
+watch(
+  [pendingCheckoutIntent, orgId, () => status.value, fetchStatus, canManage, isPermissionLoading],
+  async ([intent, activeOrgId, billingStatus, loadState, allowed, permissionLoading]) => {
+    if (
+      autoCheckoutStarted.value
+      || checkoutResult.value
+      || !intent
+      || !activeOrgId
+      || !billingStatus
+      || loadState === 'pending'
+      || permissionLoading
+    ) {
+      return
+    }
+
+    billingAnnual.value = intent.cadence === 'annual'
+
+    if (!billingStatus.enabled) return
+
+    if (!allowed) {
+      errorMsg.value = 'Only organization owners and admins can change the plan.'
+      return
+    }
+
+    if (isCurrent(intent.planId)) return
+
+    autoCheckoutStarted.value = true
+    await choosePlan(intent.planId, intent.cadence)
+  },
+  { immediate: true },
+)
 
 async function manageBilling() {
   if (!canManage.value || !orgId.value) return
@@ -136,7 +165,7 @@ async function manageBilling() {
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl space-y-6">
+  <div class="mx-auto max-w-5xl space-y-6">
     <div class="mb-2">
       <h1 class="text-lg font-semibold text-surface-900 dark:text-surface-50">Billing &amp; Plans</h1>
       <p class="text-sm text-surface-500 dark:text-surface-400 mt-0.5">
@@ -214,6 +243,16 @@ async function manageBilling() {
         </div>
       </section>
 
+      <!-- Free-plan usage + upsell -->
+      <FreePlanUpsellCard
+        v-if="freeUsage"
+        :active-roles="freeUsage.activeRoles"
+        :ai-analysis="freeUsage.aiAnalysis"
+        :can-manage="canManage"
+        :processing="isProcessing === 'solo'"
+        @upgrade="choosePlan('solo')"
+      />
+
       <!-- Cadence toggle -->
       <div class="flex items-center justify-center">
         <div class="inline-flex rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 p-0.5 text-sm">
@@ -235,7 +274,7 @@ async function manageBilling() {
       </div>
 
       <!-- Plan cards -->
-      <div class="grid gap-4 sm:grid-cols-2">
+      <div class="grid gap-4 md:grid-cols-3">
         <section
           v-for="plan in BILLING_PLANS"
           :key="plan.id"

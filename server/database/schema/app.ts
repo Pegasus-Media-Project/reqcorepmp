@@ -550,6 +550,11 @@ export const analysisRunStatusEnum = pgEnum('analysis_run_status', [
   'completed', 'failed', 'partial',
 ])
 
+/** Who pays for an analysis run — see analysisRun.billingMode. */
+export const analysisBillingModeEnum = pgEnum('analysis_billing_mode', [
+  'platform', 'byok',
+])
+
 /**
  * Immutable audit trail for all significant actions within an organization.
  * Append-only — no UPDATE or DELETE allowed via the API.
@@ -759,6 +764,18 @@ export const analysisRun = pgTable('analysis_run', {
   /** Token usage for cost tracking */
   promptTokens: integer('prompt_tokens'),
   completionTokens: integer('completion_tokens'),
+  /**
+   * Frozen cost of this run in micro-dollars (1e-6 USD), computed at write time
+   * from the central price table (utils/ai/pricing.ts). Null when the model is
+   * unpriced. Summed by the budget gate; never recomputed from mutable config.
+   */
+  costUsdMicros: integer('cost_usd_micros'),
+  /**
+   * Who pays for this run: `platform` = our OpenRouter key (counts against the
+   * org's monthly budget + the global daily kill-switch); `byok` = the org's own
+   * API key (never budget-capped — it's their bill, we only track it).
+   */
+  billingMode: analysisBillingModeEnum('billing_mode').notNull().default('byok'),
   /** Raw LLM response for debugging (sanitized — no PII stored) */
   rawResponse: jsonb('raw_response'),
   errorMessage: text('error_message'),

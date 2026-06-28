@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Eye, X, Github, Rocket, Cloud } from 'lucide-vue-next'
+import { Eye, X, ArrowRight, Cloud, Sparkles } from 'lucide-vue-next'
 
 const emit = defineEmits<{
   (e: 'close'): void
@@ -38,11 +38,10 @@ function closeModal() {
           </p>
 
           <p class="text-sm text-surface-500 dark:text-surface-400">
-            Get full read &amp; write access — choose the option that works best for you:
+            Get full read &amp; write access with a hosted workspace:
           </p>
 
           <div class="space-y-2">
-            <!-- Cloud hosted option -->
             <NuxtLink
               :to="$localePath('/auth/fresh-signup')"
               class="flex items-start gap-3 rounded-xl border border-brand-200 dark:border-brand-800 bg-gradient-to-r from-brand-50 to-violet-50 dark:from-brand-950/30 dark:to-violet-950/30 px-4 py-3 transition-all hover:shadow-md hover:border-brand-300 dark:hover:border-brand-700 no-underline group"
@@ -52,37 +51,33 @@ function closeModal() {
                 <Cloud class="size-4" />
               </div>
               <div>
-                <div class="text-sm font-semibold text-surface-900 dark:text-surface-100 group-hover:text-brand-700 dark:group-hover:text-brand-300 transition-colors">Use Cloud Hosted</div>
-                <div class="text-xs text-surface-500 dark:text-surface-400 mt-0.5">Start free in seconds — we handle hosting, updates &amp; backups</div>
+                <div class="text-sm font-semibold text-surface-900 dark:text-surface-100 group-hover:text-brand-700 dark:group-hover:text-brand-300 transition-colors">Start free</div>
+                <div class="text-xs text-surface-500 dark:text-surface-400 mt-0.5">1 active job and 300 applicants included — no card required</div>
               </div>
             </NuxtLink>
 
-            <!-- Self-host option -->
-            <a
-              href="https://github.com/reqcore-inc/reqcore#quick-start"
-              target="_blank"
-              rel="noopener noreferrer"
+            <NuxtLink
+              :to="$localePath('/pricing')"
               class="flex items-start gap-3 rounded-xl border border-surface-200 dark:border-surface-700 px-4 py-3 transition-all hover:shadow-md hover:border-surface-300 dark:hover:border-surface-600 hover:bg-surface-50/50 dark:hover:bg-surface-800/40 no-underline group"
+              @click="closeModal"
             >
               <div class="flex items-center justify-center size-9 rounded-lg bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400 shrink-0 shadow-sm mt-0.5">
-                <Rocket class="size-4" />
+                <Sparkles class="size-4" />
               </div>
               <div>
-                <div class="text-sm font-semibold text-surface-900 dark:text-surface-100 group-hover:text-surface-700 dark:group-hover:text-surface-200 transition-colors">Self-Host (Free &amp; Open Source)</div>
-                <div class="text-xs text-surface-500 dark:text-surface-400 mt-0.5">Deploy on your own infrastructure — full control over your data</div>
+                <div class="text-sm font-semibold text-surface-900 dark:text-surface-100 group-hover:text-surface-700 dark:group-hover:text-surface-200 transition-colors">Compare plans</div>
+                <div class="text-xs text-surface-500 dark:text-surface-400 mt-0.5">Upgrade when you need more roles, branding, or integrations</div>
               </div>
-            </a>
+            </NuxtLink>
           </div>
 
-          <a
-            href="https://github.com/reqcore-inc/reqcore"
-            target="_blank"
-            rel="noopener noreferrer"
+          <NuxtLink
+            :to="$localePath('/pricing')"
             class="inline-flex items-center gap-1.5 text-xs text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors no-underline"
           >
-            <Github class="size-3.5" />
-            View on GitHub
-          </a>
+            <ArrowRight class="size-3.5" />
+            See pricing
+          </NuxtLink>
         </div>
       </div>
     </div>

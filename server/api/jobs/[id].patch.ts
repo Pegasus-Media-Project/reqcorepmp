@@ -28,6 +28,11 @@ export default defineEventHandler(async (event) => {
         statusMessage: `Cannot transition from '${existing.status}' to '${body.status}'`,
       })
     }
+
+    // Re-opening a role counts against the plan's active-role limit.
+    if (body.status === 'open' && existing.status !== 'open') {
+      await assertActiveRoleLimit(orgId)
+    }
   }
 
   // Regenerate slug when title or custom slug changes

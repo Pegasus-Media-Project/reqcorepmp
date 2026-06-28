@@ -48,6 +48,15 @@ const { createJob } = useJobs()
 const { track } = useTrack()
 const toast = useToast()
 
+// Only owners/admins can change billing — drives the upgrade CTA in the
+// active-role limit upsell modal (server enforces this too).
+const { allowed: canManageBilling } = usePermission({ organization: ['update'] })
+
+// Shown when a free org hits its active-role cap on publish. `limitUpsellMax`
+// is the org's current open-role allowance, surfaced by the 402 from the API.
+const showLimitUpsell = ref(false)
+const limitUpsellMax = ref(1)
+
 type QuestionType =
   | 'short_text'
   | 'long_text'
@@ -719,6 +728,15 @@ async function handleSubmit(mode: 'publish' | 'draft' = publishChoice.value) {
     }
     clearFormStorage()
   } catch (err: any) {
+    // Free org tried to open a role past its active-role cap — pitch an upgrade
+    // instead of a dead-end toast. Their work is auto-saved, so they can upgrade
+    // (returns here post-checkout) or save as draft without losing anything.
+    if (err?.data?.data?.code === 'ACTIVE_ROLE_LIMIT') {
+      limitUpsellMax.value = err.data.data.limit ?? 1
+      showLimitUpsell.value = true
+      track('job_limit_upsell_shown')
+      return
+    }
     const statusMessage = err?.data?.statusMessage ?? 'Something went wrong while creating the job.'
     toast.error('Failed to create job', {
       message: statusMessage,
@@ -727,6 +745,13 @@ async function handleSubmit(mode: 'publish' | 'draft' = publishChoice.value) {
   } finally {
     isSubmitting.value = false
   }
+}
+
+// From the upsell modal: keep the user's work by saving the role as a draft
+// (drafts don't count against the active-role cap) and head to the jobs list.
+async function saveAsDraftFromUpsell() {
+  showLimitUpsell.value = false
+  await handleSubmit('draft')
 }
 
 async function copyFinalLink() {
@@ -1746,6 +1771,15 @@ const typeOptions = [
         />
       </aside>
     </div>
+
+    <JobLimitUpsellModal
+      v-if="showLimitUpsell"
+      :limit="limitUpsellMax"
+      :can-manage="canManageBilling"
+      :saving-draft="isSubmitting"
+      @close="showLimitUpsell = false"
+      @save-draft="saveAsDraftFromUpsell"
+    />
   </div>
 </template>
 

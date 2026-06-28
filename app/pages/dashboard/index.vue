@@ -215,21 +215,6 @@ const isEmpty = computed(() =>
     <!-- ─── Dashboard content ─── -->
     <template v-else>
       <!-- ─── Header ─── -->
-      <div class="flex items-center justify-between mb-6 sm:mb-10">
-        <div>
-          <h1 class="text-xl sm:text-2xl font-bold text-surface-900 dark:text-surface-50 tracking-tight">Dashboard</h1>
-          <p v-if="activeOrg" class="text-sm text-surface-400 dark:text-surface-500 mt-1">
-            {{ activeOrg.name }}
-          </p>
-        </div>
-        <NuxtLink
-          :to="localePath('/dashboard/jobs/new')"
-          class="inline-flex items-center gap-1.5 sm:gap-2 rounded-xl bg-brand-600 px-3 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-white hover:bg-brand-700 shadow-sm shadow-brand-600/15 hover:shadow-md hover:shadow-brand-600/20 transition-all no-underline shrink-0"
-        >
-          <Plus class="size-4" />
-          New Job
-        </NuxtLink>
-      </div>
 
       <!-- ─── Stat cards ─── -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-10">

@@ -6,7 +6,7 @@ import {
   ChevronDown, Menu, X, Users, ChevronLeft,
   LayoutDashboard, Calendar, ArrowUpCircle,
   Cloud, Server, Sparkles, Radio, History,
-  MessageCircle, MoreHorizontal,
+  MessageCircle, Languages,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -21,7 +21,6 @@ const showUserMenu = ref(false)
 const showMobileMenu = ref(false)
 const showGetStartedMenu = ref(false)
 const showMoreNav = ref(false)
-const showMoreActions = ref(false)
 
 const config = useRuntimeConfig()
 const { activeOrg } = useCurrentOrg()
@@ -115,6 +114,7 @@ const jobTabs = computed(() => {
     { label: 'Pipeline', to: base, icon: Kanban, exact: true },
     { label: 'Table', to: `${base}/candidates`, icon: Table2, exact: true },
     { label: 'Application Form', to: `${base}/application-form`, icon: FileText, exact: true },
+    { label: 'Source Tracking', to: `${base}/source-tracking`, icon: Radio, exact: true },
     { label: 'AI Analysis', to: `${base}/ai-analysis`, icon: Sparkles, exact: true },
     { label: 'Settings', to: `${base}/settings`, icon: Settings, exact: true },
   ]
@@ -353,6 +353,11 @@ onUnmounted(() => {
             </Transition>
           </div>
 
+          <!-- Free-plan upgrade pill (hidden in demo, which has its own CTA) -->
+          <ClientOnly>
+            <FreePlanUpgradeMenu v-if="!isDemo" />
+          </ClientOnly>
+
           <!-- New Job button (desktop) -->
           <button
             class="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-sm shadow-brand-600/20 hover:bg-brand-700 hover:shadow-md hover:shadow-brand-600/25 active:bg-brand-800 transition-all duration-200 border-0 cursor-pointer"
@@ -361,74 +366,6 @@ onUnmounted(() => {
             <Plus class="size-3.5" />
             New Job
           </button>
-
-          <!-- Org Switcher -->
-          <div class="hidden lg:block ml-1">
-            <OrgSwitcher />
-          </div>
-
-          <!-- Language Switcher -->
-          <div class="hidden lg:block">
-            <LanguageSwitcher />
-          </div>
-
-          <!-- Color mode toggle -->
-          <button
-            class="inline-flex items-center justify-center size-8 rounded-lg text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-all duration-200 cursor-pointer border-0 bg-transparent"
-            :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
-            @click="toggleColorMode"
-          >
-            <Sun v-if="isDark" class="size-4" />
-            <Moon v-else class="size-4" />
-          </button>
-
-          <!-- More actions dropdown -->
-          <div
-            class="relative hidden sm:block"
-            @mouseenter="showMoreActions = true"
-            @mouseleave="showMoreActions = false"
-          >
-            <button
-              class="inline-flex items-center justify-center size-8 rounded-lg text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-all duration-200 cursor-pointer border-0 bg-transparent"
-              title="More options"
-            >
-              <MoreHorizontal class="size-4" />
-            </button>
-            <Transition
-              enter-active-class="transition duration-150 ease-out"
-              enter-from-class="opacity-0 scale-95 -translate-y-1"
-              enter-to-class="opacity-100 scale-100 translate-y-0"
-              leave-active-class="transition duration-100 ease-in"
-              leave-from-class="opacity-100 scale-100 translate-y-0"
-              leave-to-class="opacity-0 scale-95 -translate-y-1"
-            >
-              <div
-                v-if="showMoreActions"
-                class="absolute right-0 top-full z-50 pt-1.5"
-              >
-                <div class="w-52 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 shadow-xl shadow-surface-900/8 dark:shadow-surface-950/30 overflow-hidden py-1">
-                  <NuxtLink
-                    :to="$localePath('/dashboard/updates')"
-                    class="flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium transition-colors no-underline"
-                    :class="isActiveRoute('/dashboard/updates', false)
-                      ? 'text-brand-700 dark:text-brand-300 bg-brand-50 dark:bg-brand-950/40'
-                      : 'text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100 hover:bg-surface-100 dark:hover:bg-surface-800'"
-                  >
-                    <ArrowUpCircle class="size-4" />
-                    Updates & changelog
-                  </NuxtLink>
-                  <button
-                    v-if="isFeedbackEnabled"
-                    class="flex items-center gap-2.5 w-full px-3 py-2 text-[13px] font-medium text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors cursor-pointer border-0 bg-transparent text-left"
-                    @click="showFeedbackModal = true; showMoreActions = false"
-                  >
-                    <MessageSquarePlus class="size-4" />
-                    Report issue
-                  </button>
-                </div>
-              </div>
-            </Transition>
-          </div>
 
           <!-- Divider -->
           <div class="hidden sm:block w-px h-6 bg-surface-200 dark:bg-surface-700 mx-0.5" />
@@ -487,12 +424,63 @@ onUnmounted(() => {
                   </NuxtLink>
                 </div>
 
-                <!-- Org switcher (mobile) -->
-                <div class="lg:hidden border-b border-surface-100 dark:border-surface-800 p-2">
+                <!-- Org switcher -->
+                <div class="border-b border-surface-100 dark:border-surface-800 p-2">
                   <OrgSwitcher />
                 </div>
 
-                <!-- Actions -->
+                <!-- Preferences -->
+                <div class="border-b border-surface-100 dark:border-surface-800 py-1">
+                  <button
+                    class="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800 hover:text-surface-900 dark:hover:text-surface-100 transition-colors cursor-pointer border-0 bg-transparent text-left"
+                    @click="toggleColorMode"
+                  >
+                    <Sun v-if="isDark" class="size-4" />
+                    <Moon v-else class="size-4" />
+                    {{ isDark ? 'Light mode' : 'Dark mode' }}
+                  </button>
+                  <div class="flex items-center justify-between gap-2 px-4 py-2">
+                    <span class="flex items-center gap-2.5 text-sm text-surface-600 dark:text-surface-400">
+                      <Languages class="size-4" />
+                      Language
+                    </span>
+                    <LanguageSwitcher drop-up />
+                  </div>
+                </div>
+
+                <!-- Links -->
+                <div class="border-b border-surface-100 dark:border-surface-800 py-1">
+                  <NuxtLink
+                    :to="$localePath('/dashboard/settings')"
+                    class="flex items-center gap-2.5 px-4 py-2 text-sm transition-colors no-underline"
+                    :class="isActiveRoute('/dashboard/settings', false)
+                      ? 'text-brand-600 dark:text-brand-400 font-medium'
+                      : 'text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800 hover:text-surface-900 dark:hover:text-surface-100'"
+                  >
+                    <Settings class="size-4" />
+                    Settings
+                  </NuxtLink>
+                  <NuxtLink
+                    :to="$localePath('/dashboard/updates')"
+                    class="flex items-center gap-2.5 px-4 py-2 text-sm transition-colors no-underline"
+                    :class="isActiveRoute('/dashboard/updates', false)
+                      ? 'text-brand-600 dark:text-brand-400 font-medium'
+                      : 'text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800 hover:text-surface-900 dark:hover:text-surface-100'"
+                  >
+                    <ArrowUpCircle class="size-4" />
+                    Updates & changelog
+                  </NuxtLink>
+                  <button
+                    v-if="isFeedbackEnabled"
+                    class="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800 hover:text-surface-900 dark:hover:text-surface-100 transition-colors cursor-pointer border-0 bg-transparent text-left"
+                    @click="showFeedbackModal = true; showUserMenu = false"
+                  >
+                    <MessageSquarePlus class="size-4" />
+                    Report issue
+                  </button>
+                </div>
+
+                <!-- Sign out -->
                 <div class="py-1">
                   <button
                     class="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800 hover:text-surface-900 dark:hover:text-surface-100 transition-colors cursor-pointer border-0 bg-transparent text-left"

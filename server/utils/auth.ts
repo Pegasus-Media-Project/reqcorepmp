@@ -19,14 +19,19 @@ import * as schema from "../database/schema";
 function buildStripePlans() {
   return [
     {
-      name: "cloud-pro",
-      priceId: env.STRIPE_PRICE_CLOUD_PRO_MONTHLY!,
-      annualDiscountPriceId: env.STRIPE_PRICE_CLOUD_PRO_ANNUAL!,
+      name: "solo",
+      priceId: env.STRIPE_PRICE_SOLO_MONTHLY!,
+      annualDiscountPriceId: env.STRIPE_PRICE_SOLO_ANNUAL!,
     },
     {
-      name: "business",
-      priceId: env.STRIPE_PRICE_BUSINESS_MONTHLY!,
-      annualDiscountPriceId: env.STRIPE_PRICE_BUSINESS_ANNUAL!,
+      name: "team",
+      priceId: env.STRIPE_PRICE_TEAM_MONTHLY!,
+      annualDiscountPriceId: env.STRIPE_PRICE_TEAM_ANNUAL!,
+    },
+    {
+      name: "scale",
+      priceId: env.STRIPE_PRICE_SCALE_MONTHLY!,
+      annualDiscountPriceId: env.STRIPE_PRICE_SCALE_ANNUAL!,
     },
   ];
 }

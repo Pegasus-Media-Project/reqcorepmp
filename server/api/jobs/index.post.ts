@@ -7,6 +7,11 @@ export default defineEventHandler(async (event) => {
 
   const body = await readValidatedBody(event, createJobWizardSchema.parse)
 
+  // Opening a role counts against the plan's active-role limit.
+  if (body.status === 'open') {
+    await assertActiveRoleLimit(orgId)
+  }
+
   // Generate a deterministic ID upfront so we can build the slug
   const jobId = crypto.randomUUID()
   const slug = generateJobSlug(body.title, jobId, body.slug)

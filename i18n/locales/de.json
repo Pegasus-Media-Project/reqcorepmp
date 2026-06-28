@@ -17,35 +17,35 @@
       "logIn": "Anmelden",
       "signUp": "Registrieren"
     },
-    "badge": "Open-Source-ATS für Entwicklerteams",
+    "badge": "Hosted ATS for modern hiring teams",
     "hero": {
-      "titleLine1": "Ihr Recruiting.",
-      "titleHighlight": "Ihre Infrastruktur.",
-      "subtitle": "Open-Source-Bewerbermanagement für Teams, die selbst hosten.",
+      "titleLine1": "Hiring software",
+      "titleHighlight": "that starts free.",
+      "subtitle": "Track your first role in Reqcore with 1 active job and 300 applicants free. Upgrade only when your hiring pipeline grows.",
       "goToDashboard": "Zum Dashboard",
       "signIn": "Anmelden",
       "createAccount": "Konto erstellen",
       "ctaDemo": "Live-Demo testen",
-      "ctaStart": "Auf GitHub ansehen",
-      "hint": "Frühe Open-Source-Version — testen Sie die Demo mit Beispieldaten, ohne Registrierung"
+      "ctaStart": "Start free",
+      "hint": "Try the demo with sample data, no sign-up needed"
     },
     "pillars": {
       "yourData": {
-        "label": "Ihre Daten",
-        "desc": "Postgres + MinIO auf Ihrer Infrastruktur. Nichts verlässt Ihr Netzwerk."
+        "label": "One free active job",
+        "desc": "Run a real hiring process before you pay. No credit card needed."
       },
       "auditable": {
-        "label": "Vollständig auditierbar",
-        "desc": "Open Source — jede Zeile der Matching-Logik ist sichtbar und anpassbar."
+        "label": "300 applicants included",
+        "desc": "Enough room to test sourcing, screening, and pipeline flow on a real role."
       },
       "unlimitedSeats": {
         "label": "Unbegrenzte Plätze",
-        "desc": "Fügen Sie Ihr gesamtes Recruiting-Team hinzu. Kein Preis pro Platz, nie."
+        "desc": "Add your hiring team without turning every collaborator into another seat charge."
       }
     },
     "footer": {
-      "source": "Quellcode",
-      "tagline": "Reqcore — Open-Source-Bewerbermanagement"
+      "source": "Pricing",
+      "tagline": "Reqcore — applicant tracking that starts free"
     }
   },
   "retention": {

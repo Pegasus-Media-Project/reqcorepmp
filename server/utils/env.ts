@@ -162,6 +162,19 @@ export const envSchema = z
       val => val === undefined || val === '' ? false : val === true || val === 'true',
       z.boolean().default(false),
     ),
+    // ── Platform AI gateway (optional) ──────────────────────────
+    // When OPENROUTER_API_KEY is set, orgs without their own AI config fall back
+    // to our platform key, routed through OpenRouter for unified billing and
+    // analytics. Platform-paid runs are subject to the budget gate (utils/ai/
+    // budget.ts); BYOK orgs are unaffected. Leave unset to keep BYOK-only.
+    /** OpenRouter API key (sk-or-…). Enables platform-paid AI for orgs without their own key. */
+    OPENROUTER_API_KEY: emptyToUndefined.pipe(z.string().min(1)).optional(),
+    /** Default model for platform-paid runs, OpenRouter-prefixed. Defaults to openai/gpt-4.1-mini. */
+    OPENROUTER_MODEL: emptyToUndefined.pipe(z.string().min(1)).optional().default('openai/gpt-4.1-mini'),
+    /** Global platform-wide daily AI spend cap in USD (runaway-loop kill-switch). Defaults to 25. */
+    AI_DAILY_SPEND_CAP_USD: emptyToUndefined
+      .pipe(z.string().regex(/^\d+(\.\d+)?$/, 'Must be a number'))
+      .optional(),
     /** OIDC client ID for SSO authentication (e.g., Keycloak, Authentik, Authelia, Okta). */
     OIDC_CLIENT_ID: emptyToUndefined.pipe(z.string().min(1)).optional(),
     /** OIDC client secret for SSO authentication. */
@@ -187,14 +200,18 @@ export const envSchema = z
     STRIPE_SECRET_KEY: emptyToUndefined.pipe(z.string().min(1)).optional(),
     /** Stripe webhook signing secret (whsec_…). Verifies authenticity of webhook events. */
     STRIPE_WEBHOOK_SECRET: emptyToUndefined.pipe(z.string().min(1)).optional(),
-    /** Stripe recurring price id for Cloud Pro, monthly billing. */
-    STRIPE_PRICE_CLOUD_PRO_MONTHLY: emptyToUndefined.pipe(z.string().min(1)).optional(),
-    /** Stripe recurring price id for Cloud Pro, annual billing. */
-    STRIPE_PRICE_CLOUD_PRO_ANNUAL: emptyToUndefined.pipe(z.string().min(1)).optional(),
-    /** Stripe recurring price id for Business, monthly billing. */
-    STRIPE_PRICE_BUSINESS_MONTHLY: emptyToUndefined.pipe(z.string().min(1)).optional(),
-    /** Stripe recurring price id for Business, annual billing. */
-    STRIPE_PRICE_BUSINESS_ANNUAL: emptyToUndefined.pipe(z.string().min(1)).optional(),
+    /** Stripe recurring price id for Solo, monthly billing. */
+    STRIPE_PRICE_SOLO_MONTHLY: emptyToUndefined.pipe(z.string().min(1)).optional(),
+    /** Stripe recurring price id for Solo, annual billing. */
+    STRIPE_PRICE_SOLO_ANNUAL: emptyToUndefined.pipe(z.string().min(1)).optional(),
+    /** Stripe recurring price id for Team, monthly billing. */
+    STRIPE_PRICE_TEAM_MONTHLY: emptyToUndefined.pipe(z.string().min(1)).optional(),
+    /** Stripe recurring price id for Team, annual billing. */
+    STRIPE_PRICE_TEAM_ANNUAL: emptyToUndefined.pipe(z.string().min(1)).optional(),
+    /** Stripe recurring price id for Scale, monthly billing. */
+    STRIPE_PRICE_SCALE_MONTHLY: emptyToUndefined.pipe(z.string().min(1)).optional(),
+    /** Stripe recurring price id for Scale, annual billing. */
+    STRIPE_PRICE_SCALE_ANNUAL: emptyToUndefined.pipe(z.string().min(1)).optional(),
   })
   .superRefine((data, ctx) => {
     // BETTER_AUTH_URL can be derived at runtime from RAILWAY_PUBLIC_DOMAIN,
@@ -241,10 +258,12 @@ export const envSchema = z
 export const STRIPE_BILLING_ENV_KEYS = [
   "STRIPE_SECRET_KEY",
   "STRIPE_WEBHOOK_SECRET",
-  "STRIPE_PRICE_CLOUD_PRO_MONTHLY",
-  "STRIPE_PRICE_CLOUD_PRO_ANNUAL",
-  "STRIPE_PRICE_BUSINESS_MONTHLY",
-  "STRIPE_PRICE_BUSINESS_ANNUAL",
+  "STRIPE_PRICE_SOLO_MONTHLY",
+  "STRIPE_PRICE_SOLO_ANNUAL",
+  "STRIPE_PRICE_TEAM_MONTHLY",
+  "STRIPE_PRICE_TEAM_ANNUAL",
+  "STRIPE_PRICE_SCALE_MONTHLY",
+  "STRIPE_PRICE_SCALE_ANNUAL",
 ] as const;
 
 type StripeBillingEnv = Partial<

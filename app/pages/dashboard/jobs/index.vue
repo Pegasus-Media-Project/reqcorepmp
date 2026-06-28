@@ -342,21 +342,6 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
 <template>
   <div class="mx-auto max-w-6xl">
     <!-- ─── Header ─── -->
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50">My Jobs</h1>
-        <p v-if="activeOrg" class="text-sm text-surface-500 dark:text-surface-400 mt-1">
-          {{ activeOrg.name }}
-        </p>
-      </div>
-      <NuxtLink
-        :to="$localePath('/dashboard/jobs/new')"
-        class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors no-underline"
-      >
-        <Plus class="size-4" />
-        New Job
-      </NuxtLink>
-    </div>
 
     <!-- ─── Loading ─── -->
     <div v-if="fetchStatus === 'pending'">
