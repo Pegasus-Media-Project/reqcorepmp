@@ -413,6 +413,7 @@ jobs:
       - name: Upload JUnit XML results
         uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
+        continue-on-error: true
         with:
           name: docker-integration-junit
           path: docker-integration-results.xml
