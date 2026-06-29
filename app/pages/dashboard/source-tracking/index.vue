@@ -48,6 +48,16 @@ const dateFrom = computed(() => {
 // Fetch data
 // ─────────────────────────────────────────────
 
+// The source-attribution dashboard is a Team+ entitlement (mirrors the server
+// gate on /api/source-tracking/stats). Tracking links themselves stay on every
+// plan, so only the analytics view below is gated.
+const { hasFeature, status: billingStatus } = usePlanFeature()
+const canUseAnalytics = computed(() => hasFeature('sourceAnalytics'))
+const analyticsLocked = computed(() => billingStatus.value != null && !canUseAnalytics.value)
+// Only fetch once billing is known AND the org is entitled (hasFeature is
+// optimistically true while billing status is still loading).
+const analyticsReady = computed(() => billingStatus.value != null && canUseAnalytics.value)
+
 const {
   channelBreakdown,
   topLinks,
@@ -62,6 +72,7 @@ const {
 } = useSourceTracking({
   jobId: selectedJobId,
   from: dateFrom,
+  enabled: analyticsReady,
 })
 
 const {
@@ -352,8 +363,25 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
 
 <template>
   <div class="mx-auto max-w-6xl">
-    <!-- ─── Loading skeleton ─── -->
-    <div v-if="statsStatus === 'pending'">
+    <!-- ─── Plan gate (Team+) ─── -->
+    <div v-if="analyticsLocked">
+      <div class="mb-8">
+        <h1 class="text-2xl font-bold tracking-tight text-surface-900 dark:text-surface-50">
+          Source Tracking
+        </h1>
+        <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">
+          See where your applications come from — channels, top links, conversion, and referrers.
+        </p>
+      </div>
+      <FeatureLockCard
+        feature="sourceAnalytics"
+        title="Unlock source attribution"
+        description="Track which channels and links actually produce hires — conversion funnels, top referrers, and attribution across every role."
+      />
+    </div>
+
+    <!-- ─── Loading skeleton (also covers the brief pre-entitlement check) ─── -->
+    <div v-else-if="statsStatus === 'pending' || statsStatus === 'idle'">
       <div class="mb-10">
         <div class="h-8 w-56 bg-surface-200 dark:bg-surface-700 rounded-lg animate-pulse mb-2" />
         <div class="h-4 w-72 bg-surface-200 dark:bg-surface-700 rounded animate-pulse" />

@@ -5,9 +5,10 @@ import {
   Sun, Moon, MessageSquarePlus, Settings,
   ChevronDown, Menu, X, Users, ChevronLeft,
   LayoutDashboard, Calendar, ArrowUpCircle,
-  Cloud, Sparkles, Radio, History,
-  MessageCircle, Languages,
+  Sparkles, Radio, History,
+  MessageCircle, Languages, Lock,
 } from 'lucide-vue-next'
+import type { PlanFeature } from '~~/shared/billing'
 
 const route = useRoute()
 const localePath = useLocalePath()
@@ -20,6 +21,7 @@ const showFeedbackModal = ref(false)
 const showUserMenu = ref(false)
 const showMobileMenu = ref(false)
 const showMoreNav = ref(false)
+const showDemoPlanMenu = ref(false)
 
 const config = useRuntimeConfig()
 const { activeOrg } = useCurrentOrg()
@@ -117,17 +119,24 @@ const jobTabs = computed(() => {
 // Main navigation
 // ─────────────────────────────────────────────
 
-const mainNav: Array<{ label: string; to: string; icon: typeof Briefcase; exact: boolean; comingSoon?: boolean }> = [
+const mainNav: Array<{ label: string; to: string; icon: typeof Briefcase; exact: boolean; comingSoon?: boolean; feature?: PlanFeature }> = [
   { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard, exact: true },
   { label: 'Jobs', to: '/dashboard/jobs', icon: Briefcase, exact: false },
   { label: 'Candidates', to: '/dashboard/candidates', icon: Users, exact: false },
   { label: 'Applications', to: '/dashboard/applications', icon: FileText, exact: false },
   { label: 'Interviews', to: '/dashboard/interviews', icon: Calendar, exact: false },
-  { label: 'Timeline', to: '/dashboard/timeline', icon: History, exact: true },
-  { label: 'Source Tracking', to: '/dashboard/source-tracking', icon: Radio, exact: true },
-  { label: 'AI Analysis', to: '/dashboard/ai-analysis', icon: Sparkles, exact: true },
+  { label: 'Timeline', to: '/dashboard/timeline', icon: History, exact: true, feature: 'activityTimeline' },
+  { label: 'Source Tracking', to: '/dashboard/source-tracking', icon: Radio, exact: true, feature: 'sourceAnalytics' },
+  { label: 'AI Analysis', to: '/dashboard/ai-analysis', icon: Sparkles, exact: true, feature: 'aiAnalytics' },
   { label: 'Settings', to: '/dashboard/settings', icon: Settings, exact: false },
 ]
+
+// Show a lock affordance on nav items the org's plan can't access yet. The
+// link still works — it lands on the page's in-context upgrade card.
+const { hasFeature } = usePlanFeature()
+function isNavLocked(item: { feature?: PlanFeature }): boolean {
+  return item.feature != null && !hasFeature(item.feature)
+}
 
 // Items shown only when their feature flag is enabled. Filtered into mainNav
 // reactively so the gating happens at render time (PostHog flags load async).
@@ -165,6 +174,7 @@ const moreNavItems = computed(() => navItems.value.filter(i => !primaryNavLabels
 watch(() => route.path, () => {
   showUserMenu.value = false
   showMobileMenu.value = false
+  showDemoPlanMenu.value = false
 })
 
 // ─────────────────────────────────────────────
@@ -272,6 +282,10 @@ onUnmounted(() => {
                     >
                       <component :is="item.icon" class="size-4" />
                       {{ item.label }}
+                      <Lock
+                        v-if="isNavLocked(item)"
+                        class="ml-auto size-3 text-surface-400 dark:text-surface-500"
+                      />
                     </NuxtLink>
                   </div>
                 </div>
@@ -283,14 +297,48 @@ onUnmounted(() => {
         <!-- Right: Actions -->
         <div class="flex items-center gap-1 lg:gap-1.5">
           <!-- Get Started CTA (demo mode only) -->
-          <NuxtLink
+          <div
             v-if="isDemo"
-            :to="$localePath('/auth/fresh-signup')"
-            class="group hidden sm:inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-brand-600 to-violet-600 px-4 py-1.5 text-[13px] font-semibold text-white shadow-md shadow-brand-600/25 hover:shadow-lg hover:shadow-brand-600/30 active:shadow-sm transition-all duration-200 no-underline"
+            class="relative hidden sm:block"
+            @mouseenter="showDemoPlanMenu = true"
+            @mouseleave="showDemoPlanMenu = false"
           >
-            <Sparkles class="size-3.5 transition-transform duration-300 group-hover:rotate-12" />
-            Get Started
-          </NuxtLink>
+            <button
+              type="button"
+              class="group inline-flex items-center gap-2 rounded-lg border-0 bg-gradient-to-r from-brand-600 to-violet-600 px-4 py-1.5 text-[13px] font-semibold text-white shadow-md shadow-brand-600/25 transition-all duration-200 hover:-translate-y-px hover:shadow-lg hover:shadow-brand-600/30 active:translate-y-0 active:shadow-sm"
+              :aria-expanded="showDemoPlanMenu"
+              aria-haspopup="menu"
+              @click="showDemoPlanMenu = !showDemoPlanMenu"
+            >
+              <Sparkles class="size-3.5 transition-transform duration-300 group-hover:rotate-12" />
+              Get Started
+              <ChevronDown class="size-3 opacity-70 transition-transform duration-200" :class="showDemoPlanMenu ? 'rotate-180' : ''" />
+            </button>
+
+            <Transition
+              enter-active-class="transition duration-150 ease-out"
+              enter-from-class="opacity-0 scale-95 -translate-y-1"
+              enter-to-class="opacity-100 scale-100 translate-y-0"
+              leave-active-class="transition duration-100 ease-in"
+              leave-from-class="opacity-100 scale-100 translate-y-0"
+              leave-to-class="opacity-0 scale-95 -translate-y-1"
+            >
+              <div
+                v-if="showDemoPlanMenu"
+                class="absolute right-0 top-[calc(100%+6px)] z-50 w-[420px] overflow-hidden rounded-xl border border-surface-200 bg-white shadow-2xl shadow-surface-900/10 dark:border-surface-700 dark:bg-surface-950 dark:shadow-black/40"
+              >
+                <div class="border-b border-surface-100 bg-gradient-to-br from-brand-50 to-violet-50 px-4 py-3 dark:border-surface-800 dark:from-brand-950/30 dark:to-violet-950/30">
+                  <p class="text-sm font-semibold text-surface-950 dark:text-white">Start from the demo</p>
+                  <p class="mt-0.5 text-xs text-surface-500 dark:text-surface-400">
+                    Create a workspace with the plan already selected.
+                  </p>
+                </div>
+                <div class="p-3">
+                  <DemoSignupOptions compact @select="showDemoPlanMenu = false" />
+                </div>
+              </div>
+            </Transition>
+          </div>
 
           <!-- Free-plan upgrade pill (hidden in demo, which has its own CTA) -->
           <ClientOnly>
@@ -360,6 +408,10 @@ onUnmounted(() => {
                     >
                       Soon
                     </span>
+                    <Lock
+                      v-else-if="isNavLocked(item)"
+                      class="ml-auto size-3 text-surface-400 dark:text-surface-500"
+                    />
                   </NuxtLink>
                 </div>
 
@@ -534,6 +586,10 @@ onUnmounted(() => {
             >
               Soon
             </span>
+            <Lock
+              v-else-if="isNavLocked(item)"
+              class="ml-auto size-3.5 text-surface-400 dark:text-surface-500"
+            />
           </NuxtLink>
 
           <button
@@ -548,13 +604,7 @@ onUnmounted(() => {
           <template v-if="isDemo">
             <div class="mt-2 pt-2 border-t border-surface-200 dark:border-surface-700">
               <p class="px-3 mb-1.5 text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wider">Get Started</p>
-              <NuxtLink
-                :to="$localePath('/auth/fresh-signup')"
-                class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-brand-700 dark:text-brand-300 bg-brand-50 dark:bg-brand-950/40 hover:bg-brand-100 dark:hover:bg-brand-950/60 transition-colors no-underline"
-              >
-                <Cloud class="size-4" />
-                Cloud Hosted — Start Free
-              </NuxtLink>
+              <DemoSignupOptions compact @select="showMobileMenu = false" />
             </div>
           </template>
         </nav>

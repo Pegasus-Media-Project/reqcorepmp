@@ -78,6 +78,10 @@ export function useBillingCheckout() {
         customerType: 'organization',
         successUrl: options.successUrl ?? '/dashboard/settings/billing?checkout=success',
         cancelUrl: options.cancelUrl ?? '/dashboard/settings/billing?checkout=cancelled',
+        // For an existing subscription, better-auth switches the plan via the
+        // Stripe Customer Portal and redirects to `returnUrl` (not successUrl)
+        // after the customer confirms — so point it back at the billing page.
+        returnUrl: options.successUrl ?? '/dashboard/settings/billing?checkout=success',
         ...(options.subscriptionId ? { subscriptionId: options.subscriptionId } : {}),
       })
 

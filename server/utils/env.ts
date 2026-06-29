@@ -253,6 +253,31 @@ export const envSchema = z
       }
     }
 
+    // Stripe billing requires all vars or none. Partial config would otherwise
+    // disable billing/webhooks silently, leaving checkout state stale.
+    const stripeVars = [
+      ["STRIPE_SECRET_KEY", data.STRIPE_SECRET_KEY],
+      ["STRIPE_WEBHOOK_SECRET", data.STRIPE_WEBHOOK_SECRET],
+      ["STRIPE_PRICE_SOLO_MONTHLY", data.STRIPE_PRICE_SOLO_MONTHLY],
+      ["STRIPE_PRICE_SOLO_ANNUAL", data.STRIPE_PRICE_SOLO_ANNUAL],
+      ["STRIPE_PRICE_TEAM_MONTHLY", data.STRIPE_PRICE_TEAM_MONTHLY],
+      ["STRIPE_PRICE_TEAM_ANNUAL", data.STRIPE_PRICE_TEAM_ANNUAL],
+      ["STRIPE_PRICE_SCALE_MONTHLY", data.STRIPE_PRICE_SCALE_MONTHLY],
+      ["STRIPE_PRICE_SCALE_ANNUAL", data.STRIPE_PRICE_SCALE_ANNUAL],
+    ] as const;
+    const setStripeVars = stripeVars.filter(([, v]) => v);
+    const missingStripeVars = stripeVars.filter(([, v]) => !v);
+
+    if (setStripeVars.length > 0 && missingStripeVars.length > 0) {
+      for (const [name] of missingStripeVars) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [name],
+          message: `${name} is required when Stripe billing is partially configured. Set all Stripe billing variables or none.`,
+        });
+      }
+    }
+
   });
 
 export const STRIPE_BILLING_ENV_KEYS = [

@@ -47,14 +47,24 @@ describe('Stripe env helpers', () => {
     expect(getMissingStripeBillingVars(result.success ? result.data : {})).toEqual([])
   })
 
-  it('accepts partial Stripe env but reports billing as disabled', () => {
+  it('rejects partial Stripe env so billing is not silently disabled', () => {
     const { STRIPE_WEBHOOK_SECRET, ...partial } = fullStripe
     const result = envSchema.safeParse({ ...baseEnv, ...partial })
-    expect(result.success).toBe(true)
-    expect(isStripeBillingConfigured(result.success ? result.data : {})).toBe(false)
-    expect(getMissingStripeBillingVars(result.success ? result.data : {})).toEqual([
-      'STRIPE_WEBHOOK_SECRET',
-    ])
+    expect(result.success).toBe(false)
+    expect(result.error?.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ['STRIPE_WEBHOOK_SECRET'],
+          message: expect.stringContaining('Stripe billing is partially configured'),
+        }),
+      ]),
+    )
+  })
+
+  it('reports missing Stripe vars for already-parsed partial config objects', () => {
+    const { STRIPE_WEBHOOK_SECRET, ...partial } = fullStripe
+    expect(isStripeBillingConfigured(partial)).toBe(false)
+    expect(getMissingStripeBillingVars(partial)).toEqual(['STRIPE_WEBHOOK_SECRET'])
   })
 })
 

@@ -14,6 +14,20 @@ const { allowed: canManage, isLoading: isPermissionLoading } = usePermission({ o
 const { activeOrg } = useCurrentOrg()
 const orgId = computed(() => activeOrg.value?.id ?? null)
 const { startBillingCheckout } = useBillingCheckout()
+const { openUpsell } = usePreviewReadOnly()
+
+// The read-only demo can't buy or manage a real subscription — the server
+// hard-blocks it (authorizeReference). Surface the sign-up upsell instead of a
+// checkout that would only fail. We detect the demo by org slug AND by the
+// public demo account email, since the slug isn't configured in every env.
+const { data: session } = await authClient.useSession(useFetch)
+const config = useRuntimeConfig()
+const isDemo = computed(() => {
+  const slug = config.public.demoOrgSlug
+  const isDemoOrg = !!slug && activeOrg.value?.slug === slug
+  const isDemoAccount = session.value?.user?.email === 'demo@reqcore.com'
+  return isDemoOrg || isDemoAccount
+})
 
 const route = useRoute()
 const checkoutResult = computed(() => route.query.checkout as string | undefined)
@@ -36,6 +50,12 @@ const current = computed(() => status.value?.subscription ?? null)
 const hasActivePlan = computed(() =>
   !!current.value && ['active', 'trialing', 'past_due'].includes(current.value.status),
 )
+const checkoutSuccessConfirmed = computed(() =>
+  checkoutResult.value === 'success'
+  && !!current.value
+  && ['active', 'trialing'].includes(current.value.status),
+)
+const checkoutSuccessPending = computed(() => checkoutResult.value === 'success' && !checkoutSuccessConfirmed.value)
 
 // Usage meters + upsell card are only relevant for orgs still on the free tier.
 const freeUsage = computed(() => freePlanUsage(status.value))
@@ -73,6 +93,10 @@ function isCurrent(planId: BillingPlanId): boolean {
 }
 
 async function choosePlan(planId: BillingPlanId, cadence: BillingCadence = billingAnnual.value ? 'annual' : 'monthly') {
+  if (isDemo.value) {
+    openUpsell()
+    return
+  }
   if (!canManage.value || !orgId.value) return
   errorMsg.value = ''
   billingAnnual.value = cadence === 'annual'
@@ -138,6 +162,10 @@ watch(
 )
 
 async function manageBilling() {
+  if (isDemo.value) {
+    openUpsell()
+    return
+  }
   if (!canManage.value || !orgId.value) return
   errorMsg.value = ''
   isProcessing.value = 'portal'
@@ -174,8 +202,11 @@ async function manageBilling() {
     </div>
 
     <!-- Checkout result banners -->
-    <div v-if="checkoutResult === 'success'" class="rounded-lg border border-success-200 dark:border-success-800 bg-success-50 dark:bg-success-950 px-4 py-3 text-sm text-success-700 dark:text-success-400">
+    <div v-if="checkoutSuccessConfirmed" class="rounded-lg border border-success-200 dark:border-success-800 bg-success-50 dark:bg-success-950 px-4 py-3 text-sm text-success-700 dark:text-success-400">
       Payment received — your plan is now active. It may take a few seconds to appear below.
+    </div>
+    <div v-else-if="checkoutSuccessPending" class="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+      Checkout completed — waiting for Stripe confirmation. Your plan will update as soon as the payment is confirmed.
     </div>
     <div v-else-if="checkoutResult === 'cancelled'" class="rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/60 px-4 py-3 text-sm text-surface-600 dark:text-surface-300">
       Checkout was cancelled. You haven't been charged.

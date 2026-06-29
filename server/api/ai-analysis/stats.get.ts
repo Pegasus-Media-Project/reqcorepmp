@@ -14,6 +14,9 @@ export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { scoring: ['read'] })
   const orgId = session.session.activeOrganizationId
 
+  // The AI Analysis dashboard (provider health, scoring volume) is Team+.
+  await assertPlanFeature(orgId, 'aiAnalytics')
+
   const thirtyDaysAgo = new Date()
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
   const thirtyDaysAgoISO = thirtyDaysAgo.toISOString()

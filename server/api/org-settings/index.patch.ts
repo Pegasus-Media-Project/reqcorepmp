@@ -15,6 +15,16 @@ export default defineEventHandler(async (event) => {
 
   const body = await readValidatedBody(event, updateOrgSettingsSchema.parse)
 
+  // Data-retention controls are a Scale+ feature. Other settings on this
+  // endpoint (name/date format, privacy notice) stay available on every plan,
+  // so only gate when a retention field is actually being changed.
+  const touchesRetention = body.retentionEnabled !== undefined
+    || body.retentionMonths !== undefined
+    || body.quarantineDays !== undefined
+  if (touchesRetention) {
+    await assertPlanFeature(orgId, 'retention')
+  }
+
   const existing = await db.query.orgSettings.findFirst({
     where: eq(orgSettings.organizationId, orgId),
     columns: { retentionActivatedAt: true },

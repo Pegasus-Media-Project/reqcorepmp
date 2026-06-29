@@ -9,32 +9,9 @@ import { ac, owner, admin, member } from "~~/shared/permissions";
 import { isBillingActionAllowed } from "~~/shared/billing";
 import { sendOrgInvitationEmail, sendPasswordResetEmail } from "./email";
 import { getMissingStripeBillingVars, isStripeBillingConfigured } from "./env";
+import { buildStripePlans } from "./billing/stripe-plans";
+import { isDemoOrgId, isDemoAccountEmail } from "./demoOrg";
 import * as schema from "../database/schema";
-
-/**
- * Build the Stripe subscription plan list from env price ids.
- * Plan `name` MUST match the canonical ids in shared/billing.ts (they are the
- * value persisted in subscription.plan and passed to subscription.upgrade()).
- */
-function buildStripePlans() {
-  return [
-    {
-      name: "solo",
-      priceId: env.STRIPE_PRICE_SOLO_MONTHLY!,
-      annualDiscountPriceId: env.STRIPE_PRICE_SOLO_ANNUAL!,
-    },
-    {
-      name: "team",
-      priceId: env.STRIPE_PRICE_TEAM_MONTHLY!,
-      annualDiscountPriceId: env.STRIPE_PRICE_TEAM_ANNUAL!,
-    },
-    {
-      name: "scale",
-      priceId: env.STRIPE_PRICE_SCALE_MONTHLY!,
-      annualDiscountPriceId: env.STRIPE_PRICE_SCALE_ANNUAL!,
-    },
-  ];
-}
 
 /**
  * Authorization guard for org-scoped billing. Subscriptions are referenced by
@@ -51,6 +28,28 @@ async function authorizeOrgBilling({
   referenceId: string;
   action: string;
 }): Promise<boolean> {
+  // The public demo must never buy, change, cancel, or open a billing portal
+  // for a real subscription. Reading the plan is fine; every mutating billing
+  // action is hard-blocked. This runs even for /api/auth/** checkout calls,
+  // which the demo-guard middleware intentionally skips.
+  //
+  // We block on BOTH signals because they have different coverage:
+  //   - the demo *org* (isDemoOrgId) — only resolves when DEMO_ORG_SLUG /
+  //     a Railway preview is configured, so it can be inactive in dev.
+  //   - the demo *account email* (demo@reqcore.com) — always identifies the
+  //     public demo user regardless of env config or which org is active.
+  if (action !== "list-subscription") {
+    const [actingUser] = await db
+      .select({ email: schema.user.email })
+      .from(schema.user)
+      .where(eq(schema.user.id, userId))
+      .limit(1);
+
+    if (isDemoAccountEmail(actingUser?.email) || (await isDemoOrgId(referenceId))) {
+      return false;
+    }
+  }
+
   const [membership] = await db
     .select({ role: schema.member.role })
     .from(schema.member)
@@ -466,7 +465,7 @@ function getAuth(): Auth {
                 organization: { enabled: true },
                 subscription: {
                   enabled: true,
-                  plans: buildStripePlans(),
+                  plans: buildStripePlans(env),
                   // Subscriptions are referenced by organization id; only
                   // members (owner/admin for mutations) of that org may act.
                   authorizeReference: async ({ user, referenceId, action }) =>

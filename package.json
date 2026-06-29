@@ -7,7 +7,7 @@
     "build": "nuxt build",
     "start": "node .output/server/index.mjs",
     "start:railway": "npm run db:migrate && npm run db:seed && node .output/server/index.mjs",
-    "dev": "nuxt dev",
+    "dev": "LAUNCH_EDITOR=zed nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",

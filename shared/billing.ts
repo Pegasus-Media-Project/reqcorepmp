@@ -139,6 +139,99 @@ export function activeRoleLimitForTier(tier: string): number {
   return ACTIVE_ROLE_LIMITS[tier as BillingTier] ?? ACTIVE_ROLE_LIMITS.free
 }
 
+/**
+ * ─────────────────────────────────────────────
+ * Plan-gated features (entitlements beyond the role/AI-budget caps)
+ * ─────────────────────────────────────────────
+ *
+ * The active-role limit and the AI-spend budget are quantitative caps. These
+ * are the *boolean* entitlements — capabilities a plan either has or doesn't,
+ * mirroring the per-plan feature bullets on the pricing page. Enforced
+ * server-side via assertPlanFeature in server/utils/billing/plan.ts.
+ *
+ * NOT gated here, by deliberate decision:
+ *  - Candidate stage/pipeline movement (the application-status workflow) — core
+ *    to every plan; the pricing "pipeline and stages" bullet is forward-looking
+ *    marketing, not a gate on the basic workflow.
+ *  - The candidate data export endpoint — it doubles as the GDPR data-subject
+ *    access export (Art. 15/20) and must stay available on every plan.
+ */
+export type PlanFeature =
+  | 'interviews' // Interview scheduling — Solo and above
+  | 'calendar' // Calendar (Google) sync on interviews — Team and above
+  | 'sourceAnalytics' // Source attribution dashboard — Team and above
+  | 'activityTimeline' // Org-wide activity timeline — Team and above
+  | 'aiAnalytics' // AI Analysis dashboard (provider health, scoring volume) — Team and above
+  | 'sso' // SSO / SAML / SCIM provider registration — Scale and above
+  | 'auditLog' // The org-wide audit log — Scale and above
+  | 'retention' // Data-retention policy controls — Scale and above
+  | 'byok' // Bring-your-own AI key configuration — Scale and above
+
+/** Tiers ordered cheapest → most capable. A tier is entitled to a feature when
+ *  its rank is ≥ the feature's minimum tier rank. */
+const TIER_ORDER: BillingTier[] = ['free', 'solo', 'team', 'scale', 'agency']
+
+/** Human-readable plan name per tier, for upgrade-prompt copy. */
+const TIER_DISPLAY_NAME: Record<BillingTier, string> = {
+  free: 'Free',
+  solo: 'Solo',
+  team: 'Team',
+  scale: 'Scale',
+  agency: 'Agency',
+}
+
+/** Minimum tier required for each plan-gated feature. */
+export const FEATURE_MIN_TIER: Record<PlanFeature, BillingTier> = {
+  interviews: 'solo',
+  calendar: 'team',
+  sourceAnalytics: 'team',
+  activityTimeline: 'team',
+  aiAnalytics: 'team',
+  sso: 'scale',
+  auditLog: 'scale',
+  retention: 'scale',
+  byok: 'scale',
+}
+
+/** Short, user-facing label for each feature, used in upgrade prompts. */
+export const FEATURE_LABEL: Record<PlanFeature, string> = {
+  interviews: 'Interview scheduling',
+  calendar: 'Calendar integration',
+  sourceAnalytics: 'Source analytics',
+  activityTimeline: 'The activity timeline',
+  aiAnalytics: 'The AI Analysis dashboard',
+  sso: 'SSO',
+  auditLog: 'The audit log',
+  retention: 'Retention controls',
+  byok: 'Bring your own AI key',
+}
+
+function tierRank(tier: BillingTier): number {
+  const i = TIER_ORDER.indexOf(tier)
+  return i === -1 ? 0 : i
+}
+
+/** Human-readable plan name for a tier (e.g. for upgrade prompts in the UI). */
+export function tierDisplayName(tier: BillingTier): string {
+  return TIER_DISPLAY_NAME[tier] ?? TIER_DISPLAY_NAME.free
+}
+
+/** Minimum tier required for a feature, as a display name (e.g. "Scale"). */
+export function featureRequiredTierName(feature: PlanFeature): string {
+  return tierDisplayName(FEATURE_MIN_TIER[feature])
+}
+
+/** Whether `tier` is entitled to `feature`. Higher tiers inherit lower-tier features. */
+export function tierHasFeature(tier: BillingTier, feature: PlanFeature): boolean {
+  return tierRank(tier) >= tierRank(FEATURE_MIN_TIER[feature])
+}
+
+/** Upgrade-prompt message for a feature the current tier can't access. */
+export function featureUpgradeMessage(feature: PlanFeature): string {
+  const minTier = FEATURE_MIN_TIER[feature]
+  return `${FEATURE_LABEL[feature]} is available on the ${TIER_DISPLAY_NAME[minTier]} plan and above. Upgrade to unlock it.`
+}
+
 /** Billing actions the Stripe plugin authorizes via `authorizeReference`. */
 export type BillingAction =
   | 'upgrade-subscription'

@@ -8,10 +8,25 @@
  */
 import { and, eq, sql } from 'drizzle-orm'
 import { subscription, job } from '../../database/schema'
-import { ACTIVE_ROLE_LIMITS, activeRoleLimitForTier, type BillingTier } from '../../../shared/billing'
+import {
+  ACTIVE_ROLE_LIMITS,
+  activeRoleLimitForTier,
+  tierHasFeature,
+  FEATURE_MIN_TIER,
+  featureUpgradeMessage,
+  type BillingTier,
+  type PlanFeature,
+} from '../../../shared/billing'
 
-/** Subscription statuses that mean the org currently has a paid plan. */
-const ACTIVE_SUB_STATUSES = ['active', 'trialing', 'past_due']
+/**
+ * Subscription statuses that keep paid features enabled.
+ *
+ * `past_due` is intentionally included as a dunning grace state: Stripe is still
+ * trying to collect payment, so we avoid immediately locking teams out of active
+ * work. Removing it here changes revenue/access policy and should be paired
+ * with a product decision about grace periods or read-only downgrade behavior.
+ */
+const PAID_ENTITLEMENT_STATUSES = ['active', 'trialing', 'past_due']
 
 /**
  * Resolve an org's billing tier. Returns the persisted plan id for orgs with an
@@ -24,7 +39,7 @@ export async function resolveOrgPlanId(orgId: string): Promise<BillingTier> {
     .from(subscription)
     .where(eq(subscription.referenceId, orgId))
 
-  const current = rows.find(r => ACTIVE_SUB_STATUSES.includes(r.status))
+  const current = rows.find(r => PAID_ENTITLEMENT_STATUSES.includes(r.status))
   const plan = current?.plan
   return plan && plan in ACTIVE_ROLE_LIMITS ? (plan as BillingTier) : 'free'
 }
@@ -69,4 +84,30 @@ export async function assertActiveRoleLimit(orgId: string): Promise<void> {
       data: { code: 'ACTIVE_ROLE_LIMIT', tier, limit },
     })
   }
+}
+
+/**
+ * Assert an already-resolved tier is entitled to a plan-gated feature. Throws an
+ * H3 402 (`PLAN_FEATURE_REQUIRED`) otherwise. Use this when you already have the
+ * tier in hand (e.g. to gate a sub-feature after a primary check) to avoid a
+ * second subscription lookup; otherwise prefer assertPlanFeature.
+ */
+export function assertTierFeature(tier: BillingTier, feature: PlanFeature): void {
+  if (tierHasFeature(tier, feature)) return
+  throw createError({
+    statusCode: 402,
+    statusMessage: featureUpgradeMessage(feature),
+    data: { code: 'PLAN_FEATURE_REQUIRED', feature, requiredTier: FEATURE_MIN_TIER[feature], tier },
+  })
+}
+
+/**
+ * Resolve the org's tier and assert it's entitled to `feature`, throwing an
+ * H3 402 if not. Returns the resolved tier so the caller can reuse it for
+ * further per-tier decisions without a second lookup.
+ */
+export async function assertPlanFeature(orgId: string, feature: PlanFeature): Promise<BillingTier> {
+  const tier = await resolveOrgPlanId(orgId)
+  assertTierFeature(tier, feature)
+  return tier
 }

@@ -13,6 +13,13 @@ const { allowed: canManage } = usePermission({ candidate: ['delete'] })
 const { allowed: canUpdateOrg } = usePermission({ organization: ['update'] })
 const { settings, updateSettings, formatDateTime } = useOrgSettings()
 
+// Retention policy controls are a Scale+ feature (the server gates org-settings
+// PATCH when a retention field changes). The privacy notice below stays editable
+// on every plan, so we only lock the policy fields.
+const { hasFeature } = usePlanFeature()
+const canUseRetention = computed(() => hasFeature('retention'))
+const policyDisabled = computed(() => !canUpdateOrg.value || !canUseRetention.value)
+
 // ── Policy form state ──
 const enabled = ref(false)
 const months = ref<number | null>(24)
@@ -61,16 +68,21 @@ function normalizeIntegerField(field: IntegerField, min: number, max: number, fa
 
 async function handleSave() {
   if (!canUpdateOrg.value) return
-  const retentionMonths = normalizeIntegerField('months', 1, 120, 24)
-  const retentionQuarantineDays = normalizeIntegerField('quarantineDays', 0, 365, 30)
   isSaving.value = true
   saveError.value = ''
   saveSuccess.value = false
   try {
+    // Only send the retention policy fields when the plan is entitled to them —
+    // otherwise the whole save would 402, blocking the (ungated) privacy notice.
+    const retentionFields = canUseRetention.value
+      ? {
+          retentionEnabled: enabled.value,
+          retentionMonths: normalizeIntegerField('months', 1, 120, 24),
+          quarantineDays: normalizeIntegerField('quarantineDays', 0, 365, 30),
+        }
+      : {}
     await updateSettings({
-      retentionEnabled: enabled.value,
-      retentionMonths,
-      quarantineDays: retentionQuarantineDays,
+      ...retentionFields,
       privacyPolicyUrl: policyUrl.value || null,
       privacyPolicyText: policyText.value || null,
       privacyContactEmail: contactEmail.value || null,
@@ -210,30 +222,32 @@ const statusStyles: Record<ReviewItem['status'], string> = {
       </div>
 
       <div class="px-4 sm:px-6 py-5 space-y-5">
-        <label class="flex items-start gap-3 cursor-pointer">
-          <input v-model="enabled" type="checkbox" class="mt-0.5 accent-brand-600" :disabled="!canUpdateOrg" />
+        <FeatureLockCard v-if="!canUseRetention" feature="retention" compact />
+
+        <label class="flex items-start gap-3" :class="policyDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'">
+          <input v-model="enabled" type="checkbox" class="mt-0.5 accent-brand-600" :disabled="policyDisabled" />
           <span>
             <span class="block text-sm font-medium text-surface-800 dark:text-surface-200">{{ t('retention.policy.enable') }}</span>
             <span class="block text-xs text-surface-400 mt-0.5">{{ t('retention.policy.enableHelp') }}</span>
           </span>
         </label>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" :class="{ 'opacity-60': policyDisabled }">
           <div>
             <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('retention.policy.months') }}</label>
             <input :value="months ?? ''" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3"
-              aria-valuemin="1" aria-valuemax="120" :disabled="!canUpdateOrg"
+              aria-valuemin="1" aria-valuemax="120" :disabled="policyDisabled"
               @input="handleIntegerInput($event, 'months')"
               @blur="normalizeIntegerField('months', 1, 120, 24)"
-              class="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm" />
+              class="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm disabled:cursor-not-allowed" />
           </div>
           <div>
             <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('retention.policy.quarantineDays') }}</label>
             <input :value="quarantineDays ?? ''" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3"
-              aria-valuemin="0" aria-valuemax="365" :disabled="!canUpdateOrg"
+              aria-valuemin="0" aria-valuemax="365" :disabled="policyDisabled"
               @input="handleIntegerInput($event, 'quarantineDays')"
               @blur="normalizeIntegerField('quarantineDays', 0, 365, 30)"
-              class="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm" />
+              class="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm disabled:cursor-not-allowed" />
             <p class="text-xs text-surface-400 mt-1">{{ t('retention.policy.quarantineHelp') }}</p>
           </div>
         </div>

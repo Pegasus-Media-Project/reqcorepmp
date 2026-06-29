@@ -14,6 +14,10 @@ import { encrypt } from '../../utils/encryption'
 export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { scoring: ['create'] })
   const orgId = session.session.activeOrganizationId
+
+  // Bring-your-own AI key (BYOK) configuration is a Scale+ feature.
+  await assertPlanFeature(orgId, 'byok')
+
   const body = await readValidatedBody(event, createAiConfigSchema.parse)
 
   const apiKeyEncrypted = encrypt(body.apiKey, env.BETTER_AUTH_SECRET)
