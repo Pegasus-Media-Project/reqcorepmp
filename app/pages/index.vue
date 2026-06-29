@@ -25,78 +25,70 @@ definePageMeta({ layout: false })
 
     <PublicNavBar />
 
-    <main class="relative mx-auto max-w-5xl px-6 pt-36 pb-24">
-      <!-- ── Hero ── -->
-      <div class="flex flex-col items-center text-center">
-        <h1 class="hero-animate hero-delay-1 text-5xl font-bold leading-[1.1] tracking-tight text-surface-900 dark:text-white sm:text-6xl lg:text-7xl">
-          {{ $t('home.hero.titleLine1') }}
-          <br />
-          <span class="bg-gradient-to-r from-brand-400 to-accent-400 bg-clip-text text-transparent">
-            {{ $t('home.hero.titleHighlight') }}
-          </span>
-        </h1>
+    <main class="relative pb-24">
+      <div class="mx-auto max-w-5xl px-6 pt-36">
+        <!-- ── Hero ── -->
+        <div class="flex flex-col items-center text-center">
+          <h1 class="hero-animate hero-delay-1 text-5xl font-bold leading-[1.1] tracking-tight text-surface-900 dark:text-white sm:text-6xl lg:text-7xl">
+            {{ $t('home.hero.titleLine1') }}
+            <br />
+            <span class="bg-gradient-to-r from-brand-400 to-accent-400 bg-clip-text text-transparent">
+              {{ $t('home.hero.titleHighlight') }}
+            </span>
+          </h1>
 
-        <p class="hero-animate hero-delay-2 mt-6 max-w-md text-base leading-relaxed text-surface-600 dark:text-surface-400 sm:text-lg">
-          {{ $t('home.hero.subtitle') }}
-        </p>
+          <p class="hero-animate hero-delay-2 mt-6 max-w-md text-base leading-relaxed text-surface-600 dark:text-surface-400 sm:text-lg">
+            {{ $t('home.hero.subtitle') }}
+          </p>
 
-        <div class="hero-animate hero-delay-3 mt-6 grid w-full max-w-xl grid-cols-3 overflow-hidden rounded-lg border border-surface-200 bg-surface-50 text-left dark:border-white/[0.08] dark:bg-white/[0.03]">
-          <div class="border-r border-surface-200 px-4 py-3 dark:border-white/[0.08]">
-            <p class="text-2xl font-bold text-surface-900 dark:text-white">1</p>
-            <p class="mt-0.5 text-xs leading-5 text-surface-500 dark:text-surface-400">active job free</p>
-          </div>
-          <div class="border-r border-surface-200 px-4 py-3 dark:border-white/[0.08]">
-            <p class="text-2xl font-bold text-surface-900 dark:text-white">300</p>
-            <p class="mt-0.5 text-xs leading-5 text-surface-500 dark:text-surface-400">applicants included</p>
-          </div>
-          <div class="px-4 py-3">
-            <p class="text-2xl font-bold text-surface-900 dark:text-white">$0</p>
-            <p class="mt-0.5 text-xs leading-5 text-surface-500 dark:text-surface-400">no card needed</p>
-          </div>
-        </div>
-
-        <div class="hero-animate hero-delay-4 mt-10 flex flex-wrap items-center justify-center gap-3">
-          <NuxtLink
-            v-if="session?.user"
-            :to="localePath('/dashboard')"
-            class="group flex items-center gap-2 rounded-lg bg-surface-900 dark:bg-white px-6 py-3 text-[14px] font-semibold text-white dark:text-[#09090b] transition hover:bg-surface-800 dark:hover:bg-white/90"
-          >
-            {{ $t('home.hero.goToDashboard') }}
-            <ArrowRight class="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </NuxtLink>
-          <template v-else>
+          <div class="hero-animate hero-delay-4 mt-10 flex flex-wrap items-center justify-center gap-3">
             <NuxtLink
-              :to="localePath('/auth/sign-in?live=1')"
+              v-if="session?.user"
+              :to="localePath('/dashboard')"
               class="group flex items-center gap-2 rounded-lg bg-surface-900 dark:bg-white px-6 py-3 text-[14px] font-semibold text-white dark:text-[#09090b] transition hover:bg-surface-800 dark:hover:bg-white/90"
             >
-              {{ $t('home.hero.ctaDemo') }}
+              {{ $t('home.hero.goToDashboard') }}
               <ArrowRight class="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </NuxtLink>
-            <NuxtLink
-              :to="localePath('/auth/sign-up')"
-              class="rounded-lg border border-surface-300 dark:border-white/[0.08] bg-surface-100 dark:bg-white/[0.03] px-6 py-3 text-[14px] font-medium text-surface-600 dark:text-surface-300 transition hover:border-surface-400 dark:hover:border-white/[0.14] hover:bg-surface-200 dark:hover:bg-white/[0.06]"
-            >
-              {{ $t('home.hero.createAccount') }}
-            </NuxtLink>
-          </template>
+            <template v-else>
+              <NuxtLink
+                :to="localePath('/auth/sign-in?live=1')"
+                class="group flex items-center gap-2 rounded-lg bg-surface-900 dark:bg-white px-6 py-3 text-[14px] font-semibold text-white dark:text-[#09090b] transition hover:bg-surface-800 dark:hover:bg-white/90"
+              >
+                {{ $t('home.hero.ctaDemo') }}
+                <ArrowRight class="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </NuxtLink>
+              <NuxtLink
+                :to="localePath('/auth/sign-up')"
+                class="rounded-lg border border-surface-300 dark:border-white/[0.08] bg-surface-100 dark:bg-white/[0.03] px-6 py-3 text-[14px] font-medium text-surface-600 dark:text-surface-300 transition hover:border-surface-400 dark:hover:border-white/[0.14] hover:bg-surface-200 dark:hover:bg-white/[0.06]"
+              >
+                {{ $t('home.hero.createAccount') }}
+              </NuxtLink>
+            </template>
+          </div>
+        </div>
+
+        <!-- ── Pillars ── -->
+        <div class="hero-animate hero-delay-5 mx-auto mt-28 grid max-w-3xl gap-4 sm:grid-cols-3">
+          <div
+            v-for="pillar in pillars"
+            :key="pillar.label"
+            class="bento-card relative rounded-xl p-6"
+          >
+            <component :is="pillar.icon" class="mb-4 h-5 w-5 text-brand-400" />
+            <h2 class="text-[15px] font-semibold text-surface-900 dark:text-white">{{ pillar.label }}</h2>
+            <p class="mt-1.5 text-[13px] leading-relaxed text-surface-600 dark:text-surface-400">{{ pillar.desc }}</p>
+          </div>
         </div>
       </div>
 
-      <!-- ── Pillars ── -->
-      <div class="hero-animate hero-delay-5 mx-auto mt-28 grid max-w-3xl gap-4 sm:grid-cols-3">
-        <div
-          v-for="pillar in pillars"
-          :key="pillar.label"
-          class="bento-card relative rounded-xl p-6"
-        >
-          <component :is="pillar.icon" class="mb-4 h-5 w-5 text-brand-400" />
-          <h2 class="text-[15px] font-semibold text-surface-900 dark:text-white">{{ pillar.label }}</h2>
-          <p class="mt-1.5 text-[13px] leading-relaxed text-surface-600 dark:text-surface-400">{{ pillar.desc }}</p>
-        </div>
-      </div>
+      <PublicPricingSection
+        heading-tag="h2"
+        :signed-in="Boolean(session?.user)"
+      />
 
       <!-- ── Footer ── -->
-      <footer class="hero-animate hero-delay-5 mt-28 flex flex-col items-center gap-4 text-center">
+      <footer class="hero-animate hero-delay-5 mx-auto mt-8 flex max-w-5xl flex-col items-center gap-4 px-6 text-center">
         <div class="flex items-center gap-5">
           <NuxtLink
             :to="localePath('/pricing')"

@@ -51,6 +51,24 @@ const postOrgRedirect = computed(() => {
   })
 })
 
+// A brand-new org gets the one-time onboarding survey before its final
+// destination. We thread the plan/cadence through so the survey can show the
+// chosen plan, tag the answers in PostHog, and continue to checkout/dashboard
+// itself. Returning users (org picker / join / auto-switch) skip the survey and
+// use postOrgRedirect directly.
+const postCreateRedirect = computed(() => {
+  if (pendingCheckoutIntent.value) {
+    return localePath({
+      path: '/onboarding/welcome',
+      query: buildBillingCheckoutQuery(pendingCheckoutIntent.value),
+    })
+  }
+  if (hasFreePlanIntent(route.query)) {
+    return localePath({ path: '/onboarding/welcome', query: { plan: 'free' } })
+  }
+  return localePath('/onboarding/welcome')
+})
+
 // ─────────────────────────────────────────────
 // Auto-switch: if user already belongs to exactly one org, activate it
 // ─────────────────────────────────────────────
@@ -131,7 +149,7 @@ async function handleCreateOrg() {
     track('org_created')
     await createOrg(
       { name: orgName.value.trim(), slug: slug.value.trim() },
-      { redirectTo: postOrgRedirect.value },
+      { redirectTo: postCreateRedirect.value },
     )
   }
   catch (err: any) {
@@ -297,10 +315,12 @@ async function handleSubmitJoinRequest() {
 
   <!-- Org picker: user has orgs but none is active -->
   <div v-else-if="orgs.length > 0 && viewMode === 'picker'" class="flex flex-col gap-4">
-    <h2 class="text-xl font-semibold text-center text-surface-900 dark:text-surface-100">Select an organization</h2>
-    <p class="text-sm text-surface-500 dark:text-surface-400 text-center mb-2">
-      Choose which workspace to open.
-    </p>
+    <div class="mb-2">
+      <h2 class="text-2xl font-semibold tracking-tight text-surface-900 dark:text-surface-100">Select an organization</h2>
+      <p class="mt-1.5 text-sm text-surface-500 dark:text-surface-400">
+        Choose which workspace to open.
+      </p>
+    </div>
 
     <div v-if="selectedPaidPlan" class="rounded-md border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-950/40 p-3 text-sm text-brand-700 dark:text-brand-300">
       {{ selectedPaidPlan.name }} selected. Pick a workspace and we'll open secure {{ selectedBillingLabel }} checkout.
@@ -337,9 +357,9 @@ async function handleSubmitJoinRequest() {
 
   <!-- Join existing org -->
   <div v-else-if="viewMode === 'join'" class="flex flex-col gap-5">
-    <div class="text-center">
-      <h2 class="text-xl font-semibold text-surface-900 dark:text-surface-100">Join an organization</h2>
-      <p class="text-sm text-surface-500 dark:text-surface-400 mt-1">
+    <div>
+      <h2 class="text-2xl font-semibold tracking-tight text-surface-900 dark:text-surface-100">Join an organization</h2>
+      <p class="mt-1.5 text-sm text-surface-500 dark:text-surface-400">
         Enter an invite link/code, or search for an organization to request access.
       </p>
     </div>
@@ -479,10 +499,12 @@ async function handleSubmitJoinRequest() {
 
   <!-- Create org form -->
   <form v-else class="flex flex-col gap-4" @submit.prevent="handleCreateOrg">
-    <h2 class="text-xl font-semibold text-center text-surface-900 dark:text-surface-100">Create your organization</h2>
-    <p class="text-sm text-surface-500 dark:text-surface-400 text-center mb-2">
-      Set up your workspace to start managing candidates and jobs.
-    </p>
+    <div class="mb-2">
+      <h2 class="text-2xl font-semibold tracking-tight text-surface-900 dark:text-surface-100">Create your organization</h2>
+      <p class="mt-1.5 text-sm text-surface-500 dark:text-surface-400">
+        Set up your workspace to start managing candidates and jobs.
+      </p>
+    </div>
 
     <div v-if="selectedPaidPlan" class="rounded-md border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-950/40 p-3 text-sm text-brand-700 dark:text-brand-300">
       {{ selectedPaidPlan.name }} selected. Create your workspace and we'll open secure {{ selectedBillingLabel }} checkout.

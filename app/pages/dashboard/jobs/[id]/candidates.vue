@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Users, SlidersHorizontal, X, Check, ChevronsUpDown, ChevronUp, ChevronDown, UserRound } from 'lucide-vue-next'
+import { Users, SlidersHorizontal, X, Check, ChevronsUpDown, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 
 definePageMeta({
   layout: 'dashboard',
@@ -46,6 +46,9 @@ const visibleCols = useState(`cand-visible-cols-${jobId}`, () => ({
   status: true,
   createdAt: true,
 }))
+const PAGE_SIZE_OPTIONS = [20, 50, 100] as const
+const page = useState<number>(`cand-page-${jobId}`, () => 1)
+const pageSize = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(`cand-page-size-${jobId}`, () => 20)
 
 // Only send a single status to the API when exactly one is selected; otherwise fetch all and filter client-side
 const apiStatusFilter = computed(() =>
@@ -56,7 +59,8 @@ const { data: appData, status: appFetchStatus, error: appError, refresh: refresh
   key: `candidates-table-apps-${jobId}`,
   query: computed(() => ({
     jobId,
-    limit: 100,
+    page: page.value,
+    limit: pageSize.value,
     ...(apiStatusFilter.value && { status: apiStatusFilter.value }),
   })),
   headers: useRequestHeaders(['cookie']),
@@ -64,6 +68,17 @@ const { data: appData, status: appFetchStatus, error: appError, refresh: refresh
 
 const applications = computed(() => appData.value?.data ?? [])
 const total = computed(() => appData.value?.total ?? 0)
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
+const pageStart = computed(() => total.value === 0 ? 0 : ((page.value - 1) * pageSize.value) + 1)
+const pageEnd = computed(() => Math.min(total.value, page.value * pageSize.value))
+
+watch([apiStatusFilter, selectedStatuses, scoreMin, scoreMax, pageSize], () => {
+  page.value = 1
+}, { deep: true })
+
+watch(totalPages, (next) => {
+  if (page.value > next) page.value = next
+})
 
 // ─────────────────────────────────────────────
 // Status & badge helpers
@@ -250,7 +265,7 @@ const isLoading = computed(() => jobFetchStatus.value === 'pending' || appFetchS
 </script>
 
 <template>
-  <div>
+  <div class="-mb-6 flex h-[calc(100%+1.5rem)] flex-col lg:-mb-8 lg:h-[calc(100%+2rem)]">
     <JobSubNavActions :job-id="jobId" />
 
     <!-- Loading -->
@@ -432,9 +447,9 @@ const isLoading = computed(() => jobFetchStatus.value === 'pending' || appFetchS
       <!-- Data table -->
       <div
         v-else
-        class="rounded-xl border border-surface-200/80 dark:border-surface-800/60 overflow-hidden shadow-sm shadow-surface-900/[0.03] dark:shadow-none"
+        class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-surface-200/80 dark:border-surface-800/60 shadow-sm shadow-surface-900/[0.03] dark:shadow-none"
       >
-        <div class="overflow-x-auto">
+        <div class="min-h-0 flex-1 overflow-auto">
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-surface-200/80 dark:border-surface-800/60 bg-surface-50/80 dark:bg-surface-900">
@@ -551,11 +566,45 @@ const isLoading = computed(() => jobFetchStatus.value === 'pending' || appFetchS
           </table>
         </div>
 
-        <!-- Footer / count -->
-        <div class="px-4 py-3 border-t border-surface-200/80 dark:border-surface-800/60 bg-surface-50/80 dark:bg-surface-900">
-          <p class="text-xs font-medium text-surface-500 dark:text-surface-400">
-            {{ sorted.length }} of {{ total }} candidate{{ total === 1 ? '' : 's' }}
-          </p>
+        <!-- Pagination -->
+        <div class="shrink-0 flex flex-col gap-3 border-t border-surface-200/80 dark:border-surface-800/60 bg-surface-50/80 dark:bg-surface-900 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex items-center gap-2 text-xs font-medium text-surface-500 dark:text-surface-400">
+            <span>
+              Showing {{ pageStart }}-{{ pageEnd }} of {{ total }} candidate{{ total === 1 ? '' : 's' }}
+            </span>
+            <label class="inline-flex items-center gap-1.5">
+              <span>Rows</span>
+              <select
+                v-model.number="pageSize"
+                class="h-8 rounded-md border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-950 px-2 text-xs text-surface-700 dark:text-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option v-for="size in PAGE_SIZE_OPTIONS" :key="size" :value="size">{{ size }}</option>
+              </select>
+            </label>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-medium text-surface-500 dark:text-surface-400">
+              Page {{ page }} of {{ totalPages }}
+            </span>
+            <button
+              type="button"
+              class="inline-flex size-8 items-center justify-center rounded-md border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-950 text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-800 disabled:cursor-not-allowed disabled:opacity-40"
+              :disabled="page <= 1"
+              title="Previous page"
+              @click="page--"
+            >
+              <ChevronLeft class="size-4" />
+            </button>
+            <button
+              type="button"
+              class="inline-flex size-8 items-center justify-center rounded-md border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-950 text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-800 disabled:cursor-not-allowed disabled:opacity-40"
+              :disabled="page >= totalPages"
+              title="Next page"
+              @click="page++"
+            >
+              <ChevronRight class="size-4" />
+            </button>
+          </div>
         </div>
       </div>
     </template>

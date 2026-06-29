@@ -54,6 +54,16 @@ const selectedBillingLabel = computed(() =>
         ? "yearly"
         : "monthly",
 );
+// Minimal price label (annual shows its monthly-equivalent) for the compact
+// mobile plan chip; the full summary lives in the brand side panel.
+const selectedPlanPriceLabel = computed(() => {
+    const plan = selectedPaidPlan.value;
+    if (!plan) return "";
+    if (pendingCheckoutIntent.value?.cadence === "annual" && plan.annualPrice != null) {
+        return `$${Math.round(plan.annualPrice / 12).toLocaleString("en-US")}/mo`;
+    }
+    return `$${plan.monthlyPrice}/mo`;
+});
 const onboardingQuery = computed(() => {
     if (pendingCheckoutIntent.value) {
         return buildBillingCheckoutQuery(pendingCheckoutIntent.value);
@@ -178,11 +188,14 @@ async function handleSocialSignUp(providerId: string) {
 
 <template>
     <form class="flex flex-col gap-4" @submit.prevent="handleSignUp">
-        <h2
-            class="text-xl font-semibold text-center text-surface-900 dark:text-surface-100 mb-2"
-        >
-            Create your account
-        </h2>
+        <div class="mb-2">
+            <h2 class="text-2xl font-semibold tracking-tight text-surface-900 dark:text-surface-100">
+                Create your account
+            </h2>
+            <p class="mt-1.5 text-sm text-surface-500 dark:text-surface-400">
+                Start sorting your applicant flood in minutes.
+            </p>
+        </div>
 
         <div
             v-if="error"
@@ -193,9 +206,13 @@ async function handleSocialSignUp(providerId: string) {
 
         <div
             v-if="selectedPaidPlan"
-            class="rounded-md border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-950/40 p-3 text-sm text-brand-700 dark:text-brand-300"
+            class="flex items-center justify-between gap-3 rounded-lg border border-surface-200 bg-surface-50 px-3.5 py-2.5 text-sm dark:border-surface-800 dark:bg-surface-900 xl:hidden"
         >
-            {{ selectedPaidPlan.name }} selected. Create your account, then you'll go straight to secure {{ selectedBillingLabel }} checkout.
+            <span class="text-surface-600 dark:text-surface-400">
+                <span class="font-medium text-surface-900 dark:text-surface-100">{{ selectedPaidPlan.name }}</span>
+                · {{ selectedBillingLabel }}
+            </span>
+            <span class="font-semibold text-surface-900 dark:text-surface-100">{{ selectedPlanPriceLabel }}</span>
         </div>
 
         <!-- Social sign-up providers (Google, GitHub, Microsoft) -->

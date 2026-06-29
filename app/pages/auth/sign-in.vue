@@ -207,11 +207,14 @@ async function handleSocialSignIn(providerId: string) {
 
 <template>
     <form class="flex flex-col gap-4" @submit.prevent="handleSignIn">
-        <h2
-            class="text-xl font-semibold text-center text-surface-900 dark:text-surface-100 mb-2"
-        >
-            Sign in to your account
-        </h2>
+        <div class="mb-2">
+            <h2 class="text-2xl font-semibold tracking-tight text-surface-900 dark:text-surface-100">
+                Welcome back
+            </h2>
+            <p class="mt-1.5 text-sm text-surface-500 dark:text-surface-400">
+                Sign in to your Reqcore workspace.
+            </p>
+        </div>
 
         <div
             v-if="error"
