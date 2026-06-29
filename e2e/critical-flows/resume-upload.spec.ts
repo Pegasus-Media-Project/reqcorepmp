@@ -100,9 +100,13 @@ test.describe('Resume Upload — All File Formats', () => {
     await page.getByLabel('Organization name').fill(account.orgName)
     await page.getByRole('button', { name: 'Create organization' }).click()
     await page.waitForURL(
-      url => url.pathname.includes('/dashboard') || url.pathname.includes('/auth/sign-in'),
+      url => url.pathname.includes('/dashboard') || url.pathname.includes('/auth/sign-in') || url.pathname.includes('/onboarding/welcome'),
       { waitUntil: 'commit', timeout: 30_000 },
     )
+
+    if (page.url().includes('/onboarding/welcome')) {
+      await page.goto('/dashboard')
+    }
 
     if (page.url().includes('/auth/sign-in')) {
       await page.getByLabel('Email').fill(account.email)

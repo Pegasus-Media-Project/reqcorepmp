@@ -50,11 +50,13 @@ const current = computed(() => status.value?.subscription ?? null)
 const hasActivePlan = computed(() =>
   !!current.value && ['active', 'trialing', 'past_due'].includes(current.value.status),
 )
-const checkoutSuccessConfirmed = computed(() =>
-  checkoutResult.value === 'success'
-  && !!current.value
-  && ['active', 'trialing'].includes(current.value.status),
-)
+const checkoutSuccessConfirmed = computed(() => {
+  if (checkoutResult.value !== 'success') return false
+  // When billing is not enabled (self-hosted / CI), there is no real Stripe
+  // subscription to confirm, so treat any success redirect as confirmed.
+  if (status.value && !status.value.enabled) return true
+  return !!current.value && ['active', 'trialing'].includes(current.value.status)
+})
 const checkoutSuccessPending = computed(() => checkoutResult.value === 'success' && !checkoutSuccessConfirmed.value)
 
 // Usage meters + upsell card are only relevant for orgs still on the free tier.
