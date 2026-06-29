@@ -179,6 +179,21 @@ describe('assertTierFeature', () => {
 })
 
 describe('assertPlanFeature', () => {
+  // assertPlanFeature bypasses checks when Stripe is not configured. Stub the
+  // keys so these tests exercise the full enforcement path.
+  beforeEach(() => {
+    for (const key of [
+      'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET',
+      'STRIPE_PRICE_SOLO_MONTHLY', 'STRIPE_PRICE_SOLO_ANNUAL',
+      'STRIPE_PRICE_TEAM_MONTHLY', 'STRIPE_PRICE_TEAM_ANNUAL',
+      'STRIPE_PRICE_SCALE_MONTHLY', 'STRIPE_PRICE_SCALE_ANNUAL',
+    ]) {
+      vi.stubEnv(key, 'test_value')
+    }
+  })
+
+  afterEach(() => vi.unstubAllEnvs())
+
   it('resolves the tier and returns it when entitled', async () => {
     stubDb([{ plan: 'scale', status: 'active' }])
     await expect(assertPlanFeature('org_1', 'sso')).resolves.toBe('scale')
