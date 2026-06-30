@@ -89,12 +89,12 @@ const db = drizzle(client, { schema })
 
 async function findCandidateOrgs(): Promise<CandidateOrg[]> {
   const filters = [
-    client`not (o.slug = any(${client.array(demoOrgSlugs, 25)}))`,
+    client`not (o.slug = any(${client.array(demoOrgSlugs)}))`,
   ]
 
   if (cutoff) filters.push(client`o.created_at < ${cutoff.toISOString()}`)
   if (orgFilters.length) {
-    const orgFilterArray = client.array(orgFilters, 25)
+    const orgFilterArray = client.array(orgFilters)
     filters.push(client`(o.id = any(${orgFilterArray}) or o.slug = any(${orgFilterArray}))`)
   }
 
