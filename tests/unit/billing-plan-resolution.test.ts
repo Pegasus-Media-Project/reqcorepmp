@@ -211,6 +211,27 @@ describe('assertPlanFeature', () => {
     stubDb([])
     await expect(assertPlanFeature('org_1', 'interviews')).rejects.toMatchObject({ statusCode: 402 })
   })
+
+  it('fails open (returns scale) when Stripe is unconfigured in dev/CI', async () => {
+    vi.unstubAllEnvs()
+    vi.stubEnv('NODE_ENV', 'development') // dev convenience: unlock everything
+    stubDb([])
+    await expect(assertPlanFeature('org_1', 'sso')).resolves.toBe('scale')
+  })
+
+  it('fails closed when Stripe is unconfigured in production (drift), enforcing by stored tier', async () => {
+    // Stripe is always configured on the hosted SaaS; a missing var in production
+    // is drift, not a valid state. Must enforce, never unlock.
+    vi.stubEnv('STRIPE_WEBHOOK_SECRET', '')
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('CI', '')
+    vi.stubEnv('GITHUB_ACTIONS', '')
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    stubDb([]) // free org → paid feature must be denied despite the misconfig
+    await expect(assertPlanFeature('org_1', 'sso')).rejects.toMatchObject({ statusCode: 402 })
+    expect(consoleError).toHaveBeenCalled()
+    consoleError.mockRestore()
+  })
 })
 
 describe('ActiveRoleLimitError', () => {

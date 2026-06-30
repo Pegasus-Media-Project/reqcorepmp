@@ -92,7 +92,7 @@ export async function autoScoreApplication(applicationId: string, orgId: string)
       errorMessage: err?.message ?? 'Unknown error',
     })
     captureAiGeneration({
-      orgId, applicationId,
+      orgId, applicationId, feature: 'application_analysis',
       provider: resolved.provider, model: resolved.model, billingMode: resolved.billingMode,
       promptTokens: 0, completionTokens: 0, costUsdMicros: null,
       latencyMs: Date.now() - startedAt, status: 'failed',
@@ -117,7 +117,7 @@ export async function autoScoreApplication(applicationId: string, orgId: string)
     gaps: evaluation.gaps,
   }))
 
-  await db.transaction(async (tx) => {
+  const [run] = await db.transaction(async (tx) => {
     await tx.delete(criterionScore)
       .where(and(
         eq(criterionScore.applicationId, applicationId),
@@ -132,7 +132,7 @@ export async function autoScoreApplication(applicationId: string, orgId: string)
       .set({ score: compositeScore, updatedAt: new Date() })
       .where(eq(application.id, applicationId))
 
-    await tx.insert(analysisRun).values({
+    return tx.insert(analysisRun).values({
       organizationId: orgId,
       applicationId,
       status: 'completed',
@@ -144,13 +144,14 @@ export async function autoScoreApplication(applicationId: string, orgId: string)
       promptTokens: result.usage.promptTokens,
       completionTokens: result.usage.completionTokens,
       costUsdMicros,
-    })
+    }).returning({ id: analysisRun.id })
   })
 
   captureAiGeneration({
-    orgId, applicationId,
+    orgId, applicationId, feature: 'application_analysis',
     provider: resolved.provider, model: resolved.model, billingMode: resolved.billingMode,
     promptTokens: result.usage.promptTokens, completionTokens: result.usage.completionTokens,
     costUsdMicros, latencyMs: Date.now() - startedAt, status: 'completed',
+    traceId: run?.id,
   })
 }

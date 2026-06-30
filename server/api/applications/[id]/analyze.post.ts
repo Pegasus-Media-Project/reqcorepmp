@@ -151,7 +151,7 @@ export default defineEventHandler(async (event) => {
     })
 
     captureAiGeneration({
-      orgId, userId: session.user.id, applicationId,
+      orgId, userId: session.user.id, applicationId, feature: 'application_analysis',
       provider: resolved.provider, model: resolved.model, billingMode: resolved.billingMode,
       promptTokens: 0, completionTokens: 0, costUsdMicros: null,
       latencyMs: Date.now() - startedAt, status: 'failed',
@@ -218,11 +218,11 @@ export default defineEventHandler(async (event) => {
   })
 
   captureAiGeneration({
-    orgId, userId: session.user.id, applicationId,
+    orgId, userId: session.user.id, applicationId, feature: 'application_analysis',
     provider: resolved.provider, model: resolved.model, billingMode: resolved.billingMode,
     promptTokens: result.usage.promptTokens, completionTokens: result.usage.completionTokens,
     costUsdMicros, latencyMs: Date.now() - startedAt, status: 'completed',
-    analysisRunId: run!.id,
+    traceId: run!.id,
   })
 
   recordActivity({

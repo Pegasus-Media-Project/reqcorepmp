@@ -30,6 +30,19 @@ import { STRIPE_BILLING_ENV_KEYS, isStripeBillingConfigured } from '../env'
 const PAID_ENTITLEMENT_STATUSES = ['active', 'trialing', 'past_due']
 
 /**
+ * True only in a real production deployment — not local dev, CI, or test. Matches
+ * the gate used elsewhere (e.g. api/public/jobs apply throttle). Used to decide
+ * whether an unconfigured Stripe setup is a dev convenience or production drift.
+ */
+function isProductionDeployment(): boolean {
+  return (
+    process.env.NODE_ENV === 'production' &&
+    !process.env.CI &&
+    !process.env.GITHUB_ACTIONS
+  )
+}
+
+/**
  * Resolve an org's billing tier. Returns the persisted plan id for orgs with an
  * active subscription, otherwise `'free'`. Shared by the budget gate and the
  * active-role limit so both agree on what plan an org is on.
@@ -69,6 +82,15 @@ export class ActiveRoleLimitError extends Error {
  * Assert the org can have one *more* open role. Call this right before opening a
  * job (creating with status 'open', or transitioning an existing job to 'open').
  * Throws an H3 402 when the plan's active-role cap is already reached.
+ *
+ * Caps are enforced at open-time ONLY. Downgrades and cancellations never
+ * retroactively close existing open roles: an org that opens 2 roles on Solo
+ * (cap 2) and cancels to Free (cap 1) keeps both open. This is intentional —
+ * auto-closing on downgrade would take a live careers page / application form
+ * down on *involuntary* churn (expired card → past_due → canceled), killing an
+ * in-progress hire. Over-limit orgs instead simply can't open new roles until
+ * they close back under the cap, which is a natural upgrade nudge. Do not "fix"
+ * this by auto-closing roles.
  */
 export async function assertActiveRoleLimit(orgId: string): Promise<void> {
   const tier = await resolveOrgPlanId(orgId)
@@ -107,15 +129,31 @@ export function assertTierFeature(tier: BillingTier, feature: PlanFeature): void
  * H3 402 if not. Returns the resolved tier so the caller can reuse it for
  * further per-tier decisions without a second lookup.
  *
- * When Stripe billing is not configured (self-hosted / CI build), all features
- * are available — there is no subscription to enforce, so the check is skipped.
+ * Billing is always configured on the hosted SaaS, so an unconfigured Stripe
+ * setup is only ever legitimate in local dev / CI — where there are no real
+ * subscriptions and unlocking everything is the convenient default. In a real
+ * production deployment an unconfigured (or partially configured) Stripe setup
+ * is config drift, never a valid state, so we fail *closed*: enforce against the
+ * org's stored subscription tier rather than silently granting every paid
+ * feature, and log loudly so the drift is detectable.
  */
 export async function assertPlanFeature(orgId: string, feature: PlanFeature): Promise<BillingTier> {
   const stripeBillingEnv = Object.fromEntries(
     STRIPE_BILLING_ENV_KEYS.map(key => [key, process.env[key]]),
   )
 
-  if (!isStripeBillingConfigured(stripeBillingEnv)) return 'scale'
+  if (!isStripeBillingConfigured(stripeBillingEnv)) {
+    // Dev/CI (no Stripe, no real subscriptions): unlock everything.
+    if (!isProductionDeployment()) return 'scale'
+    // Production drift: never unlock. Fall through to enforce by stored tier.
+    const missing = STRIPE_BILLING_ENV_KEYS.filter(key => !stripeBillingEnv[key])
+    console.error(
+      `[Reqcore] Stripe billing not fully configured in production (missing ${missing.join(', ')}); ` +
+        'enforcing plan features by stored subscription tier instead of unlocking. ' +
+        'Restore the missing Stripe variables to resume normal billing.',
+    )
+  }
+
   const tier = await resolveOrgPlanId(orgId)
   assertTierFeature(tier, feature)
   return tier

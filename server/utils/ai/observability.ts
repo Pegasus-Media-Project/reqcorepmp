@@ -1,5 +1,5 @@
 /**
- * PostHog LLM observability for analysis runs.
+ * PostHog LLM observability for AI generations.
  *
  * Emits a `$ai_generation` event (PostHog's LLM-observability schema) so AI
  * spend shows up next to product analytics — e.g. cost per converted customer,
@@ -7,24 +7,51 @@
  * money-safety layer (that's budget.ts) nor the billing source of truth (that's
  * the OpenRouter invoice). Numbers here won't reconcile to the penny, by design.
  *
- * Fire-and-forget: tracking must never break or slow a scoring run.
+ * Privacy by design: we deliberately never send `$ai_input` /
+ * `$ai_output_choices`. Prompts and completions contain candidate PII (resume
+ * text, recruiter notes, conversation content). We track cost, tokens, latency
+ * and outcome — never content. See DATA-RETENTION.md.
+ *
+ * Fire-and-forget: tracking must never break or slow the primary operation.
  */
+import { randomUUID } from 'node:crypto'
 import { useServerPostHog } from '../posthog'
 import { microsToUsd } from './pricing'
 
 export interface AiGenerationEvent {
+  /** Org the generation belongs to — attached as a PostHog group. */
   orgId: string
+  /** User who triggered it, if any. Background runs (auto-scoring) omit this. */
   userId?: string | null
-  applicationId: string
   provider: string
   model: string
   billingMode: 'platform' | 'byok'
   promptTokens: number
   completionTokens: number
+  /** Reasoning/thinking tokens, when the model reports them (extended thinking). */
+  reasoningTokens?: number | null
+  /** Prompt-cache read tokens, when the model reports them. */
+  cacheReadTokens?: number | null
+  /** Frozen cost in integer micro-dollars, or null when the model is unpriced. */
   costUsdMicros: number | null
   latencyMs: number
   status: 'completed' | 'failed'
-  analysisRunId?: string
+  /**
+   * Logical feature emitting the generation. Becomes both `$ai_span_name` (so
+   * it reads well in PostHog's trace view) and a `feature` dimension for
+   * slicing. e.g. 'application_analysis', 'chatbot_message'.
+   */
+  feature: string
+  /**
+   * Groups related generations under one trace in PostHog. Pass a stable id
+   * (the DB run id, or a conversation id) when you have one; otherwise a fresh
+   * UUID is generated so every event is still a valid singleton trace. PostHog
+   * requires this field, so it is never left empty.
+   */
+  traceId?: string | null
+  /** Optional product dimensions for slicing cost/usage. */
+  applicationId?: string | null
+  conversationId?: string | null
 }
 
 export function captureAiGeneration(e: AiGenerationEvent): void {
@@ -41,14 +68,21 @@ export function captureAiGeneration(e: AiGenerationEvent): void {
         $ai_model: e.model,
         $ai_input_tokens: e.promptTokens,
         $ai_output_tokens: e.completionTokens,
+        ...(e.reasoningTokens != null ? { $ai_reasoning_tokens: e.reasoningTokens } : {}),
+        ...(e.cacheReadTokens != null ? { $ai_cache_read_input_tokens: e.cacheReadTokens } : {}),
         $ai_latency: e.latencyMs / 1000,
         $ai_total_cost_usd: e.costUsdMicros != null ? microsToUsd(e.costUsdMicros) : undefined,
         $ai_is_error: e.status === 'failed',
-        $ai_trace_id: e.analysisRunId,
+        // We only know the transport succeeded on a completed run; on failure we
+        // don't have a reliable upstream status, so we let $ai_is_error carry it.
+        ...(e.status === 'completed' ? { $ai_http_status: 200 } : {}),
+        $ai_trace_id: e.traceId || randomUUID(),
+        $ai_span_name: e.feature,
         // Reqcore-specific dimensions for product/cost analysis.
         billing_mode: e.billingMode,
-        application_id: e.applicationId,
-        feature: 'application_analysis',
+        feature: e.feature,
+        ...(e.applicationId ? { application_id: e.applicationId } : {}),
+        ...(e.conversationId ? { conversation_id: e.conversationId } : {}),
       },
     })
   }
