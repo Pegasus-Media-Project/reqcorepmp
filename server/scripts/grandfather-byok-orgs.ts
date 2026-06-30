@@ -1,6 +1,6 @@
 /**
- * Marks existing BYOK workspaces as "grandfathered" so they keep free BYOK
- * access without using the platform OpenRouter key.
+ * Marks existing free workspaces as "grandfathered" so legacy users keep
+ * access to grandfathered limits and BYOK.
  *
  * Default is a dry-run:
  *   npx tsx server/scripts/grandfather-byok-orgs.ts --created-before 2026-06-30
@@ -10,15 +10,17 @@
  *
  * Optional scoping:
  *   npx tsx server/scripts/grandfather-byok-orgs.ts --apply --org acme --org org_123
+ *
+ * Demo workspaces are always excluded.
  */
 import { randomUUID } from 'node:crypto'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import { and, eq, inArray } from 'drizzle-orm'
 import * as schema from '../database/schema'
-import { BILLING_PLAN_IDS } from '../../shared/billing'
 
 const CURRENT_STATUSES = ['active', 'trialing', 'past_due']
+const DEFAULT_DEMO_ORG_SLUG = 'reqcore-demo'
 
 type CandidateOrg = {
   id: string
@@ -69,6 +71,7 @@ const apply = process.argv.includes('--apply')
 const orgFilters = repeatedOption('--org')
 const cutoffRaw = optionValue('--created-before')
 const cutoff = cutoffRaw ? new Date(cutoffRaw) : null
+const demoOrgSlugs = [...new Set([DEFAULT_DEMO_ORG_SLUG, process.env.DEMO_ORG_SLUG].filter(Boolean))]
 
 if (cutoffRaw && Number.isNaN(cutoff?.getTime())) {
   console.error(`Invalid --created-before date: ${cutoffRaw}`)
@@ -86,10 +89,10 @@ const db = drizzle(client, { schema })
 
 async function findCandidateOrgs(): Promise<CandidateOrg[]> {
   const filters = [
-    client`exists (select 1 from ai_config ac where ac.organization_id = o.id)`,
+    client`not (o.slug = any(${demoOrgSlugs}))`,
   ]
 
-  if (cutoff) filters.push(client`o.created_at < ${cutoff}`)
+  if (cutoff) filters.push(client`o.created_at < ${cutoff.toISOString()}`)
   if (orgFilters.length) {
     filters.push(client`(o.id = any(${orgFilters}) or o.slug = any(${orgFilters}))`)
   }
@@ -104,7 +107,7 @@ async function findCandidateOrgs(): Promise<CandidateOrg[]> {
       o.created_at,
       count(ac.id)::int as ai_config_count
     from organization o
-    join ai_config ac on ac.organization_id = o.id
+    left join ai_config ac on ac.organization_id = o.id
     where ${where}
     group by o.id, o.name, o.slug, o.created_at
     order by o.created_at asc
@@ -149,10 +152,7 @@ async function main() {
 
   for (const org of candidates) {
     const current = await currentSubscriptions(org.id)
-    const paid = current.find(row =>
-      row.stripeSubscriptionId
-      && BILLING_PLAN_IDS.includes(row.plan as typeof BILLING_PLAN_IDS[number]),
-    )
+    const paid = current.find(row => row.stripeSubscriptionId)
     const agency = current.find(row => row.plan === 'agency')
     const grandfathered = current.find(row => row.plan === 'grandfathered')
 
