@@ -71,7 +71,7 @@ const apply = process.argv.includes('--apply')
 const orgFilters = repeatedOption('--org')
 const cutoffRaw = optionValue('--created-before')
 const cutoff = cutoffRaw ? new Date(cutoffRaw) : null
-const demoOrgSlugs = [...new Set([DEFAULT_DEMO_ORG_SLUG, process.env.DEMO_ORG_SLUG].filter(Boolean))]
+const demoOrgSlugs = [...new Set([DEFAULT_DEMO_ORG_SLUG, process.env.DEMO_ORG_SLUG].filter((slug): slug is string => Boolean(slug)))]
 
 if (cutoffRaw && Number.isNaN(cutoff?.getTime())) {
   console.error(`Invalid --created-before date: ${cutoffRaw}`)
@@ -89,12 +89,13 @@ const db = drizzle(client, { schema })
 
 async function findCandidateOrgs(): Promise<CandidateOrg[]> {
   const filters = [
-    client`not (o.slug = any(${demoOrgSlugs}))`,
+    client`not (o.slug = any(${client.array(demoOrgSlugs, 25)}))`,
   ]
 
   if (cutoff) filters.push(client`o.created_at < ${cutoff.toISOString()}`)
   if (orgFilters.length) {
-    filters.push(client`(o.id = any(${orgFilters}) or o.slug = any(${orgFilters}))`)
+    const orgFilterArray = client.array(orgFilters, 25)
+    filters.push(client`(o.id = any(${orgFilterArray}) or o.slug = any(${orgFilterArray}))`)
   }
 
   const where = filters.reduce((acc, filter) => client`${acc} and ${filter}`)
