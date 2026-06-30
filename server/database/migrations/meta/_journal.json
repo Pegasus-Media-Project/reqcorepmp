@@ -225,6 +225,20 @@
       "when": 1781939104136,
       "tag": "0031_lonely_mister_fear",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1782107451090,
+      "tag": "0032_cheerful_iron_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1782548426784,
+      "tag": "0033_black_hydra",
+      "breakpoints": true
     }
   ]
 }

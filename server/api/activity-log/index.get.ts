@@ -12,6 +12,10 @@ export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { activityLog: ['read'] })
   const orgId = session.session.activeOrganizationId
 
+  // The org-wide audit log is a Scale+ feature. (The dashboard activity feed and
+  // the per-candidate timeline read the same table but are core UI on every plan.)
+  await assertPlanFeature(orgId, 'auditLog')
+
   const query = await getValidatedQuery(event, activityLogQuerySchema.parse)
   const offset = (query.page - 1) * query.limit
 

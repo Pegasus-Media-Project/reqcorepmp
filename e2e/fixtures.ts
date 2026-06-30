@@ -103,10 +103,16 @@ export const test = base.extend<Fixtures>({
 
     // Creating the org performs a hard navigation. Under load, the freshly
     // updated session can race that navigation and land on sign-in instead.
+    // Brand-new orgs are redirected through /onboarding/welcome (survey) first.
     await page.waitForURL(
-      url => url.pathname.includes('/dashboard') || url.pathname.includes('/auth/sign-in'),
+      url => url.pathname.includes('/dashboard') || url.pathname.includes('/auth/sign-in') || url.pathname.includes('/onboarding/welcome'),
       { waitUntil: 'commit', timeout: 30_000 },
     )
+
+    // Skip the onboarding survey — navigate directly to the dashboard.
+    if (page.url().includes('/onboarding/welcome')) {
+      await page.goto('/dashboard')
+    }
 
     if (page.url().includes('/auth/sign-in')) {
       await page.getByLabel('Email').fill(testAccount.email)

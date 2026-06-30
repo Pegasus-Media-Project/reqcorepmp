@@ -9,6 +9,7 @@ import { usePreviewReadOnly } from '~/composables/usePreviewReadOnly'
 const props = defineProps<{
   applicationId: string
   open: boolean
+  initialTab?: 'overview' | 'documents' | 'responses' | 'ai_analysis' | 'timeline'
 }>()
 
 const emit = defineEmits<{
@@ -35,7 +36,13 @@ const hasSubNav = computed(() => {
 // Tabs
 // ─────────────────────────────────────────────
 
-const activeTab = ref<'overview' | 'documents' | 'responses' | 'ai_analysis' | 'timeline'>('overview')
+const activeTab = ref<'overview' | 'documents' | 'responses' | 'ai_analysis' | 'timeline'>(
+  props.initialTab ?? 'overview',
+)
+
+watch(() => props.applicationId, () => {
+  activeTab.value = props.initialTab ?? 'overview'
+})
 
 // ─────────────────────────────────────────────
 // Fetch application detail

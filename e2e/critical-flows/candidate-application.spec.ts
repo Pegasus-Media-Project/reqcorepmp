@@ -460,11 +460,19 @@ test.describe('Candidate Application Flow — All Custom Question Field Types', 
     // Confirm all 9 question responses are shown in the "Application Responses" section
     await expect(page.getByText(/Application Responses\s*\(\s*9\s*\)/i)).toBeVisible()
 
-    // Spot-check a few response values on the detail page
-    await expect(page.getByText('5').first()).toBeVisible() // short_text: years of experience
-    await expect(page.getByText('Remote').first()).toBeVisible() // single_select
-    await expect(page.getByText('Yes').first()).toBeVisible() // checkbox
-    await expect(page.getByText('https://github.com/jane-doe').first()).toBeVisible() // url
+    // Spot-check a few response values on the detail page. Scope each assertion
+    // to its question block so generic values such as "5" do not match hidden
+    // pagination <option> elements elsewhere on the page.
+    async function assertDetailResponse(questionLabel: string, expected: string) {
+      const label = page.getByText(questionLabel, { exact: false }).first()
+      await expect(label).toBeVisible()
+      await expect(label.locator('..').locator('dd')).toContainText(expected)
+    }
+
+    await assertDetailResponse('Years of experience', '5') // short_text
+    await assertDetailResponse('Preferred work style', 'Remote') // single_select
+    await assertDetailResponse('Agree to background check', 'Yes') // checkbox
+    await assertDetailResponse('GitHub profile URL', 'https://github.com/jane-doe') // url
   })
 })
 
