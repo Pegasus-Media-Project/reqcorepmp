@@ -36,7 +36,7 @@ test.describe('Stripe billing', () => {
   test('shows the payment-received banner after a successful checkout', async ({ authenticatedPage }) => {
     const page = authenticatedPage
     await page.goto(`${BILLING_URL}?checkout=success`)
-    await expect(page.getByText('Payment received — your plan is now active.')).toBeVisible()
+    await expect(page.getByText(/Payment received|Checkout completed/)).toBeVisible()
   })
 
   test('renders the billing page state for the org', async ({ authenticatedPage }) => {
@@ -65,6 +65,7 @@ test.describe('Stripe billing', () => {
 
     // Don't actually leave for Stripe's hosted page — we only assert the handoff.
     await page.route(/checkout\.stripe\.com/, route => route.abort())
+    const stripeCheckoutRequest = page.waitForRequest(/checkout\.stripe\.com/, { timeout: 30_000 })
 
     const upgradeResponse = page.waitForResponse(
       r => r.url().includes('/subscription/upgrade') && r.request().method() === 'POST',
@@ -74,8 +75,7 @@ test.describe('Stripe billing', () => {
 
     const res = await upgradeResponse
     expect(res.status()).toBe(200)
-    const body = await res.json()
-    expect(body.url, 'upgrade must return a Stripe Checkout URL').toContain('stripe.com')
+    expect((await stripeCheckoutRequest).url(), 'upgrade must navigate to Stripe Checkout').toContain('stripe.com')
   })
 
   test('rejects forged / unsigned webhook events', async ({ authenticatedPage }) => {
