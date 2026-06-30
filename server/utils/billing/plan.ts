@@ -17,7 +17,7 @@ import {
   type BillingTier,
   type PlanFeature,
 } from '../../../shared/billing'
-import { isStripeBillingConfigured } from '../env'
+import { STRIPE_BILLING_ENV_KEYS, isStripeBillingConfigured } from '../env'
 
 /**
  * Subscription statuses that keep paid features enabled.
@@ -111,7 +111,11 @@ export function assertTierFeature(tier: BillingTier, feature: PlanFeature): void
  * are available — there is no subscription to enforce, so the check is skipped.
  */
 export async function assertPlanFeature(orgId: string, feature: PlanFeature): Promise<BillingTier> {
-  if (!isStripeBillingConfigured(process.env)) return 'scale'
+  const stripeBillingEnv = Object.fromEntries(
+    STRIPE_BILLING_ENV_KEYS.map(key => [key, process.env[key]]),
+  )
+
+  if (!isStripeBillingConfigured(stripeBillingEnv)) return 'scale'
   const tier = await resolveOrgPlanId(orgId)
   assertTierFeature(tier, feature)
   return tier
