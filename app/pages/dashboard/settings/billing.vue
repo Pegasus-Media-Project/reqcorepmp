@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { CreditCard, Check, Loader2, ExternalLink, Sparkles, ShieldCheck, TrendingUp } from 'lucide-vue-next'
 import type { BillingCadence } from '~/composables/useBillingCheckout'
-import { BILLING_PLANS, getBillingPlan, type BillingPlanId } from '~~/shared/billing'
+import { BILLING_PLANS, getBillingPlan, tierDisplayName, type BillingPlanId, type BillingTier } from '~~/shared/billing'
 
 useSeoMeta({
   title: 'Billing & Plans — Reqcore',
@@ -50,6 +50,12 @@ const current = computed(() => status.value?.subscription ?? null)
 const hasActivePlan = computed(() =>
   !!current.value && ['active', 'trialing', 'past_due'].includes(current.value.status),
 )
+const hasStripeManagedPlan = computed(() =>
+  hasActivePlan.value && !!current.value?.stripeSubscriptionId,
+)
+const isGrandfatheredPlan = computed(() =>
+  hasActivePlan.value && current.value?.plan === 'grandfathered',
+)
 const checkoutSuccessConfirmed = computed(() => {
   if (checkoutResult.value !== 'success') return false
   // When billing is not enabled (self-hosted / CI), there is no real Stripe
@@ -63,7 +69,7 @@ const checkoutSuccessPending = computed(() => checkoutResult.value === 'success'
 const freeUsage = computed(() => freePlanUsage(status.value))
 const currentPlanName = computed(() => {
   if (!hasActivePlan.value || !current.value) return 'Free'
-  return getBillingPlan(current.value.plan)?.name ?? current.value.plan
+  return getBillingPlan(current.value.plan)?.name ?? tierDisplayName(current.value.plan as BillingTier)
 })
 
 const statusBadge = computed(() => {
@@ -104,10 +110,10 @@ async function choosePlan(planId: BillingPlanId, cadence: BillingCadence = billi
   billingAnnual.value = cadence === 'annual'
   isProcessing.value = planId
   try {
-    const subscriptionId = hasActivePlan.value
+    const subscriptionId = hasStripeManagedPlan.value
       ? current.value?.stripeSubscriptionId ?? undefined
       : undefined
-    if (hasActivePlan.value && !subscriptionId) {
+    if (hasStripeManagedPlan.value && !subscriptionId) {
       errorMsg.value = 'Could not switch plans because the current Stripe subscription was not found. Please open the billing portal or contact support.'
       return
     }
@@ -257,6 +263,9 @@ async function manageBilling() {
               <p v-else-if="hasActivePlan && current?.periodEnd" class="text-sm text-surface-500 dark:text-surface-400 mt-0.5">
                 Renews on {{ formatDate(current.periodEnd) }}.
               </p>
+              <p v-else-if="isGrandfatheredPlan" class="text-sm text-surface-500 dark:text-surface-400 mt-0.5">
+                Your workspace keeps Team access for free with BYOK. AI runs use your configured provider key, not Reqcore's platform key.
+              </p>
               <p v-else class="text-sm text-surface-500 dark:text-surface-400 mt-0.5">
                 You're on the free plan. Upgrade any time below.
               </p>
@@ -264,7 +273,7 @@ async function manageBilling() {
           </div>
 
           <button
-            v-if="hasActivePlan && canManage"
+            v-if="hasStripeManagedPlan && canManage"
             :disabled="isProcessing === 'portal'"
             class="shrink-0 inline-flex items-center gap-2 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm font-medium text-surface-700 dark:text-surface-200 hover:bg-surface-50 dark:hover:bg-surface-700 disabled:opacity-50 transition-colors"
             @click="manageBilling"

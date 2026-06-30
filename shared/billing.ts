@@ -19,10 +19,11 @@ export type BillingPlanId = 'solo' | 'team' | 'scale'
 
 /**
  * Every billing tier, including the ones with no Stripe checkout:
- *  - `free`   — no subscription row; the default for any org.
- *  - `agency` — contact-sales / custom contract.
+ *  - `free`          — no subscription row; the default for any org.
+ *  - `grandfathered` — internal free Team-equivalent BYOK tier for legacy hosted orgs.
+ *  - `agency`        — contact-sales / custom contract.
  */
-export type BillingTier = 'free' | BillingPlanId | 'agency'
+export type BillingTier = 'free' | 'grandfathered' | BillingPlanId | 'agency'
 
 export interface BillingPlan {
   /** Canonical plan name — stored in subscription.plan and used in upgrade(). */
@@ -55,6 +56,7 @@ export interface BillingPlan {
  */
 export const ACTIVE_ROLE_LIMITS: Record<BillingTier, number> = {
   free: 1,
+  grandfathered: 8,
   solo: 2,
   team: 8,
   scale: 24,
@@ -169,11 +171,12 @@ export type PlanFeature =
 
 /** Tiers ordered cheapest → most capable. A tier is entitled to a feature when
  *  its rank is ≥ the feature's minimum tier rank. */
-const TIER_ORDER: BillingTier[] = ['free', 'solo', 'team', 'scale', 'agency']
+const TIER_ORDER: BillingTier[] = ['free', 'solo', 'team', 'grandfathered', 'scale', 'agency']
 
 /** Human-readable plan name per tier, for upgrade-prompt copy. */
 const TIER_DISPLAY_NAME: Record<BillingTier, string> = {
   free: 'Free',
+  grandfathered: 'Grandfathered Team',
   solo: 'Solo',
   team: 'Team',
   scale: 'Scale',
@@ -223,6 +226,9 @@ export function featureRequiredTierName(feature: PlanFeature): string {
 
 /** Whether `tier` is entitled to `feature`. Higher tiers inherit lower-tier features. */
 export function tierHasFeature(tier: BillingTier, feature: PlanFeature): boolean {
+  // Legacy hosted orgs get Team-equivalent access plus BYOK while remaining on
+  // a free, non-Stripe tier. They do not inherit Scale features.
+  if (tier === 'grandfathered' && feature === 'byok') return true
   return tierRank(tier) >= tierRank(FEATURE_MIN_TIER[feature])
 }
 

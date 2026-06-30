@@ -3,6 +3,7 @@ import Stripe from 'stripe'
 import { subscription as subscriptionTable } from '../../database/schema'
 import { isStripeBillingConfigured } from '../../utils/env'
 import { resolveStripePricePlan } from '../../utils/billing/stripe-plans'
+import { BILLING_PLAN_IDS } from '../../../shared/billing'
 
 /**
  * Billing status for the active organization.
@@ -118,9 +119,18 @@ export default defineEventHandler(async (event) => {
     .from(subscriptionTable)
     .where(eq(subscriptionTable.referenceId, orgId))
 
-  // One org normally has one subscription. Prefer an active/trialing/past_due
-  // one; otherwise fall back to the most recently relevant row (e.g. canceled).
-  const current = rows.find(r => CURRENT_STATUSES.has(r.status)) ?? rows[0] ?? null
+  // One org normally has one subscription, but internal entitlement rows (e.g.
+  // grandfathered free BYOK) can coexist with a later Stripe upgrade. Prefer a
+  // current Stripe-managed self-serve plan when present, then internal current
+  // entitlements, then the most recently relevant row (e.g. canceled).
+  const currentRows = rows.filter(r => CURRENT_STATUSES.has(r.status))
+  const current =
+    currentRows.find(r => r.stripeSubscriptionId && BILLING_PLAN_IDS.includes(r.plan as typeof BILLING_PLAN_IDS[number]))
+    ?? currentRows.find(r => r.plan === 'agency')
+    ?? currentRows.find(r => r.plan === 'grandfathered')
+    ?? currentRows[0]
+    ?? rows[0]
+    ?? null
   const reconciled = current ? await reconcileFromStripe(current) : null
 
   return {

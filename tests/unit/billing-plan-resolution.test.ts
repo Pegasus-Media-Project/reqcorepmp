@@ -72,6 +72,11 @@ describe('resolveOrgPlanId', () => {
     expect(await resolveOrgPlanId('org_1')).toBe('solo')
   })
 
+  it('resolves a manually-provisioned grandfathered free BYOK tier', async () => {
+    stubDb([{ plan: 'grandfathered', status: 'active' }])
+    expect(await resolveOrgPlanId('org_1')).toBe('grandfathered')
+  })
+
   it('falls back to free for canceled / incomplete / no subscription', async () => {
     stubDb([{ plan: 'team', status: 'canceled' }])
     expect(await resolveOrgPlanId('org_1')).toBe('free')
@@ -91,6 +96,14 @@ describe('resolveOrgPlanId', () => {
   it('prefers the active row when an org has both canceled and active subs', async () => {
     stubDb([
       { plan: 'solo', status: 'canceled' },
+      { plan: 'team', status: 'active' },
+    ])
+    expect(await resolveOrgPlanId('org_1')).toBe('team')
+  })
+
+  it('prefers a paid Stripe tier over a lingering grandfathered row', async () => {
+    stubDb([
+      { plan: 'grandfathered', status: 'active' },
       { plan: 'team', status: 'active' },
     ])
     expect(await resolveOrgPlanId('org_1')).toBe('team')
@@ -148,6 +161,18 @@ describe('tierHasFeature', () => {
       expect(tierHasFeature('team', feature)).toBe(false)
       expect(tierHasFeature('scale', feature)).toBe(true)
     }
+  })
+
+  it('gives grandfathered orgs Team features plus BYOK without Scale features', () => {
+    expect(tierHasFeature('grandfathered', 'byok')).toBe(true)
+    expect(tierHasFeature('grandfathered', 'interviews')).toBe(true)
+    expect(tierHasFeature('grandfathered', 'calendar')).toBe(true)
+    expect(tierHasFeature('grandfathered', 'sourceAnalytics')).toBe(true)
+    expect(tierHasFeature('grandfathered', 'activityTimeline')).toBe(true)
+    expect(tierHasFeature('grandfathered', 'aiAnalytics')).toBe(true)
+    expect(tierHasFeature('grandfathered', 'sso')).toBe(false)
+    expect(tierHasFeature('grandfathered', 'auditLog')).toBe(false)
+    expect(tierHasFeature('grandfathered', 'retention')).toBe(false)
   })
 
   it('grants every feature to agency (highest tier inherits all)', () => {

@@ -15,6 +15,7 @@ import {
 describe('active-role limits', () => {
   it('matches the pricing-v5 caps for every tier', () => {
     expect(ACTIVE_ROLE_LIMITS.free).toBe(1)
+    expect(ACTIVE_ROLE_LIMITS.grandfathered).toBe(8)
     expect(ACTIVE_ROLE_LIMITS.solo).toBe(2)
     expect(ACTIVE_ROLE_LIMITS.team).toBe(8)
     expect(ACTIVE_ROLE_LIMITS.scale).toBe(24)
@@ -29,6 +30,7 @@ describe('active-role limits', () => {
 
   it('falls back to the free cap for unknown tiers', () => {
     expect(activeRoleLimitForTier('mystery')).toBe(ACTIVE_ROLE_LIMITS.free)
+    expect(activeRoleLimitForTier('grandfathered')).toBe(8)
     expect(activeRoleLimitForTier('scale')).toBe(24)
     expect(activeRoleLimitForTier('agency')).toBe(Number.POSITIVE_INFINITY)
   })

@@ -10,6 +10,7 @@ import { and, eq, sql } from 'drizzle-orm'
 import { subscription, job } from '../../database/schema'
 import {
   ACTIVE_ROLE_LIMITS,
+  BILLING_PLAN_IDS,
   activeRoleLimitForTier,
   tierHasFeature,
   FEATURE_MIN_TIER,
@@ -53,7 +54,11 @@ export async function resolveOrgPlanId(orgId: string): Promise<BillingTier> {
     .from(subscription)
     .where(eq(subscription.referenceId, orgId))
 
-  const current = rows.find(r => PAID_ENTITLEMENT_STATUSES.includes(r.status))
+  const entitlementRows = rows.filter(r => PAID_ENTITLEMENT_STATUSES.includes(r.status))
+  const current =
+    entitlementRows.find(r => BILLING_PLAN_IDS.includes(r.plan as typeof BILLING_PLAN_IDS[number]))
+    ?? entitlementRows.find(r => r.plan === 'agency')
+    ?? entitlementRows.find(r => r.plan === 'grandfathered')
   const plan = current?.plan
   return plan && plan in ACTIVE_ROLE_LIMITS ? (plan as BillingTier) : 'free'
 }

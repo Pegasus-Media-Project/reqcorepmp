@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { aiConfig } from '../../database/schema'
+import { resolveOrgPlanId } from '../../utils/billing/plan'
 
 /**
  * GET /api/ai-config
@@ -39,8 +40,10 @@ export default defineEventHandler(async (event) => {
     hasApiKey: Boolean(apiKeyEncrypted),
   }))
 
-  // Platform-level OpenRouter fallback — orgs with no BYOK config still get AI.
-  if (env.OPENROUTER_API_KEY && !mapped.some(c => c.hasApiKey)) {
+  // Platform-level OpenRouter fallback — orgs with no BYOK config still get AI,
+  // except grandfathered orgs whose free access is explicitly BYOK-only.
+  const allowsPlatformFallback = await resolveOrgPlanId(orgId) !== 'grandfathered'
+  if (allowsPlatformFallback && env.OPENROUTER_API_KEY && !mapped.some(c => c.hasApiKey)) {
     mapped.push({
       id: '__platform__',
       name: 'Platform (OpenRouter)',
