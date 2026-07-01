@@ -239,6 +239,20 @@
       "when": 1782548426784,
       "tag": "0033_black_hydra",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1782890256869,
+      "tag": "0034_green_mimic",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1782890973909,
+      "tag": "0035_perpetual_clint_barton",
+      "breakpoints": true
     }
   ]
 }

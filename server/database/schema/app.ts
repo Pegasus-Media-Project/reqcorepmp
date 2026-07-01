@@ -42,6 +42,34 @@ export const dateFormatEnum = pgEnum('date_format', ['mdy', 'dmy', 'ymd'])
 // ─────────────────────────────────────────────
 
 /**
+ * Post-signup onboarding survey answers for an account.
+ *
+ * One row per user. Answers are nullable because each question is skippable.
+ * `organizationId` captures the active organization created during onboarding,
+ * while `userId` is the durable account link for user-level analysis.
+ */
+export const onboardingSurveyResponse = pgTable('onboarding_survey_response', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  signupPlan: text('signup_plan'),
+  signupBilling: text('signup_billing'),
+  companySize: text('company_size'),
+  userRole: text('user_role'),
+  discoverySource: text('discovery_source'),
+  currentHiringProcess: text('current_hiring_process'),
+  expectedRoles12m: text('expected_roles_12m'),
+  answeredCount: integer('answered_count').notNull().default(0),
+  skippedCount: integer('skipped_count').notNull().default(0),
+  completedAt: timestamp('completed_at').notNull().defaultNow(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (t) => ([
+  uniqueIndex('onboarding_survey_response_user_id_idx').on(t.userId),
+  index('onboarding_survey_response_organization_id_idx').on(t.organizationId),
+]))
+
+/**
  * Jobs / Positions within an organization.
  */
 export const job = pgTable('job', {
@@ -790,6 +818,11 @@ export const analysisRun = pgTable('analysis_run', {
 // ─────────────────────────────────────────────
 // Relations
 // ─────────────────────────────────────────────
+
+export const onboardingSurveyResponseRelations = relations(onboardingSurveyResponse, ({ one }) => ({
+  user: one(user, { fields: [onboardingSurveyResponse.userId], references: [user.id] }),
+  organization: one(organization, { fields: [onboardingSurveyResponse.organizationId], references: [organization.id] }),
+}))
 
 export const jobRelations = relations(job, ({ one, many }) => ({
   organization: one(organization, { fields: [job.organizationId], references: [organization.id] }),
