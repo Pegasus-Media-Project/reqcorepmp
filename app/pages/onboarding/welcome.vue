@@ -15,7 +15,7 @@ useSeoMeta({
 
 const route = useRoute()
 const localePath = useLocalePath()
-const { track, setPersonProperties } = useTrack()
+const { track, captureError, setPersonProperties } = useTrack()
 const { questions, personProps } = useOnboardingSurvey()
 
 // ── Plan context (threaded from pricing → sign-up → create-org → here) ──
@@ -111,6 +111,24 @@ async function finish() {
 
   const answered = questions.filter(q => answers[q.id])
   const skipped = questions.filter(q => !answers[q.id])
+  const answeredEntries = Object.fromEntries(answered.map(q => [q.id, answers[q.id]]))
+
+  try {
+    await $fetch('/api/onboarding-survey', {
+      method: 'POST',
+      body: {
+        answers: answeredEntries,
+        plan: planId.value ?? undefined,
+        billing: cadence.value ?? undefined,
+      },
+    })
+  }
+  catch (error) {
+    captureError(error, {
+      area: 'onboarding_survey',
+      action: 'save_response',
+    })
+  }
 
   // Person properties — durable, account-level segmentation on the user's
   // PostHog profile. Only write answers that were actually given.
@@ -127,7 +145,7 @@ async function finish() {
     ...trackBase.value,
     answered_count: answered.length,
     skipped_count: skipped.length,
-    ...Object.fromEntries(answered.map(q => [q.id, answers[q.id]])),
+    ...answeredEntries,
   })
 
   await navigateTo(destination.value)

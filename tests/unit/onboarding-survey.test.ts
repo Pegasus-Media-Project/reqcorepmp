@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { SURVEY_QUESTIONS, SURVEY_PERSON_PROPS } from '../../app/composables/useOnboardingSurvey'
+import { SURVEY_QUESTIONS, SURVEY_PERSON_PROPS } from '../../shared/onboarding-survey'
+import { saveOnboardingSurveySchema } from '../../server/utils/schemas/onboardingSurvey'
 
 /**
- * The onboarding survey writes each answer to the user's PostHog person profile
- * under a fixed key. Those keys (question ids + option values) become the column
- * names analytics segments on, so they must stay stable and collision-free — a
- * duplicate id would silently overwrite another question's answer.
+ * The onboarding survey writes each answer to PostHog and to the
+ * onboarding_survey_response table. Question ids and option values become stable
+ * storage keys, so they must remain collision-free.
  */
 describe('onboarding survey config', () => {
   it('asks the five expected questions', () => {
@@ -13,15 +13,15 @@ describe('onboarding survey config', () => {
       'company_size',
       'user_role',
       'discovery_source',
-      'choice_reason',
-      'hiring_frequency',
+      'current_hiring_process',
+      'expected_roles_12m',
     ])
   })
 
   it('has unique, non-empty question ids', () => {
     const ids = SURVEY_QUESTIONS.map(q => q.id)
     expect(new Set(ids).size).toBe(ids.length)
-    for (const id of ids) expect(id).toMatch(/^[a-z_]+$/)
+    for (const id of ids) expect(id).toMatch(/^[a-z0-9_]+$/)
   })
 
   it('gives every question at least two options with unique values', () => {
@@ -41,5 +41,34 @@ describe('onboarding survey config', () => {
     for (const q of SURVEY_QUESTIONS) {
       expect(metaKeys).not.toContain(q.id)
     }
+  })
+
+  it('accepts valid partial survey persistence payloads', () => {
+    const result = saveOnboardingSurveySchema.safeParse({
+      plan: 'team',
+      billing: 'annual',
+      answers: {
+        company_size: '11-50',
+        user_role: 'people_hr',
+        current_hiring_process: 'existing_ats',
+        expected_roles_12m: '6-15',
+      },
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects unknown questions and invalid option values before persistence', () => {
+    expect(saveOnboardingSurveySchema.safeParse({
+      answers: {
+        company_size: 'enterprise',
+      },
+    }).success).toBe(false)
+
+    expect(saveOnboardingSurveySchema.safeParse({
+      answers: {
+        unknown_question: 'anything',
+      },
+    }).success).toBe(false)
   })
 })
