@@ -2,7 +2,7 @@
 
 ## Overview
 
-Reqcore is a **Nuxt 4** full-stack application following a monolithic architecture with clear separation between client (`app/`) and server (`server/`) code. The system supports both **managed deployment** on Railway and **self-hosted deployment** via Docker Compose.
+Reqcore is a **Nuxt 4** full-stack application following a monolithic architecture with clear separation between client (`app/`) and server (`server/`) code. Reqcore is closed-source, cloud-hosted SaaS — production runs as a **managed deployment** on Railway. Docker Compose is used only to run Postgres/MinIO for local development, not as a self-hosting offering.
 
 ## Technology Stack
 

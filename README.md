@@ -2,39 +2,30 @@
 
 # Reqcore
 
-**The simple, open-source ATS. Self-hosted. No per-seat fees.**
+**The ATS built for high-volume applicant flow. Closed-source, cloud-hosted, no per-seat fees.**
 
-[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![E2E Tests](https://github.com/reqcore-inc/reqcore/actions/workflows/e2e-tests.yml/badge.svg)](https://github.com/reqcore-inc/reqcore/actions/workflows/e2e-tests.yml)
 [![PR Validation](https://github.com/reqcore-inc/reqcore/actions/workflows/pr-validation.yml/badge.svg)](https://github.com/reqcore-inc/reqcore/actions/workflows/pr-validation.yml)
-[![Docker Integration](https://github.com/reqcore-inc/reqcore/actions/workflows/docker-readme-validation.yml/badge.svg)](https://github.com/reqcore-inc/reqcore/actions/workflows/docker-readme-validation.yml)
-[![Docker Image](https://ghcr-badge.egpl.dev/reqcore-inc/reqcore/latest_tag?trim=major&label=docker)](https://github.com/reqcore-inc/reqcore/pkgs/container/reqcore)
 
 [Live Demo](https://reqcore.com) · [Documentation](ARCHITECTURE.md) · [Roadmap](ROADMAP.md) · [Report Bug](https://github.com/reqcore-inc/reqcore/issues/new)
-
-
-<a href="https://openalternative.co/reqcore?utm_source=openalternative&utm_medium=badge&utm_campaign=embed&utm_content=tool-reqcore" target="_blank"><img src="https://openalternative.co/reqcore/badge.svg?theme=dark&width=200&height=50" width="200" height="50" alt="Reqcore badge" loading="lazy" /></a>
-<a href="https://railway.com/deploy/reqcore" target="_blank"><img src="public/deploy-on-railway.svg" width="183" height="40" alt="Deploy on Railway" /></a>
 
 
 </div>
 
 ---
 
-Hiring software shouldn't be complicated or expensive. Most applicant tracking systems charge per seat, lock your data in their cloud, and overwhelm you with features you don't need. Reqcore is a lightweight, open-source ATS you can self-host in minutes. No per-seat fees, no vendor lock-in, no bloat — just a clean tool that helps you hire.
+Hiring software shouldn't be complicated or expensive. Most applicant tracking systems charge per seat and overwhelm you with features you don't need. Reqcore is a lightweight, cloud-hosted ATS built to turn a flood of applicants into a trustworthy shortlist, fast. No per-seat fees, no bloat — just a clean tool that helps you hire.
 
-> **Early open-source release** — Reqcore is actively developed and improving every week. The foundation is solid (jobs, pipeline, applications, documents, job board), but some features are still on the roadmap. Check the [Roadmap](ROADMAP.md) for what's shipped and what's next.
+> Reqcore is a commercial, closed-source SaaS product. It is actively developed and improving every week. The foundation is solid (jobs, pipeline, applications, documents, job board), but some features are still on the roadmap. Check the [Roadmap](ROADMAP.md) for what's shipped and what's next.
 
 ## Why Reqcore?
 
-*Simple hiring software you actually own.*
+*Built for teams drowning in applicants.*
 
 | | **Reqcore** | Greenhouse | Lever | Ashby | OpenCATS |
 |---|:---:|:---:|:---:|:---:|:---:|
-| **Open source** | ✅ | ❌ | ❌ | ❌ | ✅ |
-| **Self-hosted** | ✅ | ❌ | ❌ | ❌ | ✅ |
 | **No per-seat pricing** | ✅ | ❌ | ❌ | ❌ | ✅ |
-| **Own your data** | ✅ | ❌ | ❌ | ❌ | ✅ |
+| **Built for high applicant volume** | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **Transparent AI ranking** | 🔜 | ❌ | ❌ | ❌ | ❌ |
 | **Modern tech stack** | Nuxt 4 / Vue 3 | — | — | — | PHP 5 |
 | **Active development** | ✅ 2026 | ✅ | ✅ | ✅ | ❌ Stale |
@@ -346,8 +337,8 @@ See the full [Roadmap](ROADMAP.md) and [Product Vision](PRODUCT.md).
 
 ## Contributing
 
-Reqcore is in early development and contributions are welcome. Check [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow, DCO sign-off requirements, and submission guidelines.
+Reqcore is closed-source; the codebase is maintained internally. See [CONTRIBUTING.md](CONTRIBUTING.md) for the internal workflow.
 
 ## License
 
-Licensed under the [GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE).
+Proprietary. © Reqcore Inc. All rights reserved.

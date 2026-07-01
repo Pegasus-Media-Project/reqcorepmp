@@ -267,7 +267,7 @@ Goal: Teams can work together on hiring decisions.
 
 ## Phase 4: Production Readiness
 
-Goal: Ready for real teams to self-host in production.
+Goal: Ready for real teams to use in production (cloud-hosted only).
 
 ### Milestone 13: Hardening
 
@@ -301,8 +301,8 @@ Goal: Ready for real teams to self-host in production.
 - [x] Full OG + Twitter Card meta on all public pages (landing, job board, job detail, roadmap, blog)
 - [x] `noindex` on private pages (auth, onboarding, apply form, confirmation)
 - [x] ISR route rules — `/jobs/**` (3600s), prerender `/`, `/roadmap`, `/blog/**`
-- [x] Landing page H1 + copy optimized for "open source ATS" / "applicant tracking system" keywords
-- [x] Blog seed article: "Self-Hosted vs Cloud ATS: Pros, Cons, and When to Switch"
+- [x] Landing page H1 + copy optimized for "applicant tracking system" / high-applicant-volume keywords (historical note: earlier copy targeted "open source ATS" keywords before the 2026-06-24 closed-source pivot)
+- [x] Blog seed article: "Self-Hosted vs Cloud ATS: Pros, Cons, and When to Switch" (comparison content — Reqcore itself is cloud-only)
 - [x] Blog listing + detail pages with dark theme, navigation links
 - [x] `@tailwindcss/typography` for styled `prose` content rendering
 - [x] SVG favicon

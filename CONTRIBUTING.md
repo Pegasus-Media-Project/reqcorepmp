@@ -1,6 +1,6 @@
 # Contributing to Reqcore
 
-Thanks for contributing to Reqcore.
+Reqcore is closed-source, commercial software maintained by the internal team — this guide covers the internal development workflow, not open community contribution.
 
 ## Before You Start
 
