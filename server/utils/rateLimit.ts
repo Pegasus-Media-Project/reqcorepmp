@@ -46,9 +46,10 @@ interface RateLimitEntry {
  * builds its own Map, so two limiters never share buckets even when their
  * window/max are identical.
  *
- * Reqcore runs as a single Railway instance today. If it ever runs multiple
- * replicas behind a load balancer, terminate rate limiting at the edge
- * instead — Cloudflare WAF, Caddy `rate_limit`, or nginx `limit_req`.
+ * Reqcore is designed as a single-instance deployment (one Railway service,
+ * or one Docker Compose container for self-hosters). If it ever runs
+ * multiple replicas behind a load balancer, terminate rate limiting at the
+ * edge instead — Cloudflare WAF, Caddy `rate_limit`, or nginx `limit_req`.
  *
  * @example
  * ```ts

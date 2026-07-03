@@ -1,7 +1,7 @@
 # Data Retention & GDPR
 
-Reqcore ships a free data-retention and erasure foundation for its hosted
-cloud deployment. No paid plan, license key, or quota gates any of it.
+Reqcore ships a free data-retention and erasure foundation for both hosted
+and self-hosted deployments. No paid plan, license key, or quota gates any of it.
 
 > **Scope.** These tools help you operate a GDPR-aligned retention process; they
 > do not by themselves make a deployment "GDPR-compliant." Compliance also
@@ -91,6 +91,16 @@ instance level without changing any organization's stored retention policy.
 The built-in Nitro task runs while the application process is continuously
 running. If the service can sleep or scheduled Nitro tasks are unsupported,
 configure a Railway cron that POSTs to `/api/admin/retention-cleanup`.
+
+### Self-hosted
+
+The built-in task is sufficient for continuously running Node deployments.
+Alternatively, point any scheduler at the endpoint once a day:
+
+```cron
+0 3 * * * curl -fsS -X POST https://your-host/api/admin/retention-cleanup \
+  -H "x-cron-secret: $CRON_SECRET" -H "content-type: application/json" -d '{}'
+```
 
 ## Backups
 

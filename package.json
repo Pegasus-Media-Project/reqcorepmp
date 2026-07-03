@@ -2,7 +2,15 @@
   "name": "reqcore",
   "version": "1.5.0",
   "type": "module",
-  "private": true,
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/reqcore-inc/reqcore.git"
+  },
+  "bugs": {
+    "url": "https://github.com/reqcore-inc/reqcore/issues"
+  },
+  "homepage": "https://github.com/reqcore-inc/reqcore#readme",
   "scripts": {
     "build": "nuxt build",
     "start": "node .output/server/index.mjs",

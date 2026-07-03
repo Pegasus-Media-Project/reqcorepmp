@@ -1,6 +1,6 @@
 import { eq, and, sql, count, gte, lte, desc } from 'drizzle-orm'
-import { applicationSource, application, trackingLink, job, candidate } from '../../database/schema'
-import { sourceStatsQuerySchema } from '../../utils/schemas/trackingLink'
+import { applicationSource, application, trackingLink, job, candidate } from '~~/server/database/schema'
+import { sourceStatsQuerySchema } from '~~/server/utils/schemas/trackingLink'
 
 /**
  * GET /api/source-tracking/stats

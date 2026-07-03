@@ -1,5 +1,5 @@
 import { eq, and, desc, sql, count, sum } from 'drizzle-orm'
-import { analysisRun, job, application, candidate, aiConfig } from '../../database/schema'
+import { analysisRun, job, application, candidate, aiConfig } from '~~/server/database/schema'
 
 /**
  * GET /api/ai-analysis/stats

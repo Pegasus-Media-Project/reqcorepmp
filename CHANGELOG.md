@@ -8,6 +8,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com). Categories: **Add
 
 ## Unreleased
 
+### Changed
+
+* **licensing:** re-open Reqcore as open-core — AGPLv3 for the core app, with a new [`ee/`](ee) directory (Nuxt layer) for paid, cloud-only features under a separate commercial license. Self-hosting is supported again, best-effort and unsupported (see [SELF-HOSTING.md](SELF-HOSTING.md)). Moved the already plan-gated SSO (`ee/server/api/sso/`), org-wide audit log (`ee/server/api/activity-log/index.get.ts`), source-analytics (`ee/server/api/source-tracking/stats.get.ts`), and AI-analysis dashboard (`ee/server/api/ai-analysis/stats.get.ts`) endpoints out of the AGPL tree and into `ee/` so the license split matches what's actually gated; the underlying tables and the ungated candidate timeline/activity feed/tracking-link CRUD stay in core.
+
 ### Added
 
 * **GDPR retention:** add a shared candidate-retention runner with a daily Nitro task, external cron endpoint, instance-wide emergency switch, quarantine restoration on renewed public engagement, localized administration UI, and computed expiry visibility.

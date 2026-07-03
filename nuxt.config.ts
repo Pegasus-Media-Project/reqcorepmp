@@ -92,6 +92,12 @@ export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   devtools: { enabled: true },
 
+  // Enterprise Edition layer — see ee/README.md and ee/LICENSE. Code here is
+  // licensed separately from the AGPLv3 core and gated behind paid plan
+  // features at runtime (assertPlanFeature); it stays merged into every
+  // build since Reqcore only ships one hosted deployment.
+  extends: ["./ee"],
+
   modules: [
     "@nuxtjs/i18n",
     "@nuxtjs/mdc",
