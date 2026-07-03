@@ -234,8 +234,8 @@ async function manageBilling() {
       </div>
       <h2 class="mt-4 text-base font-semibold text-surface-900 dark:text-surface-100">Billing isn't enabled on this instance</h2>
       <p class="mx-auto mt-1 max-w-md text-sm text-surface-500 dark:text-surface-400">
-        This is the open-source build with no payment provider configured — all features are available without a subscription.
-        To enable paid cloud plans, an operator sets the Stripe environment variables.
+        This instance has no payment provider configured. In production, paid features stay limited to the workspace's stored plan tier.
+        To enable paid cloud plans, an operator must set the Stripe environment variables.
       </p>
     </section>
 
