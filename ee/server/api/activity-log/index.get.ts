@@ -1,6 +1,6 @@
 import { eq, and, desc } from 'drizzle-orm'
-import { activityLog, user } from '../../database/schema'
-import { activityLogQuerySchema } from '../../utils/schemas/activityLog'
+import { activityLog, user } from '~~/server/database/schema'
+import { activityLogQuerySchema } from '~~/server/utils/schemas/activityLog'
 
 /**
  * GET /api/activity-log

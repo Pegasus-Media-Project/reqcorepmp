@@ -2,7 +2,7 @@
 
 ## The ATS for High-Volume Applicant Flow
 
-Reqcore is a closed-source, cloud-hosted Applicant Tracking System (ATS) built for teams that receive a high volume of applications. It turns a flood of applicants into a trustworthy shortlist, fast.
+Reqcore is an open-source Applicant Tracking System (ATS) built for teams that receive a high volume of applications. It turns a flood of applicants into a trustworthy shortlist, fast.
 
 ## Problem Statement
 
@@ -23,8 +23,8 @@ Planned AI features will expose ranking logic in a visible **Matching Logic** su
 ### 3. No Per-Seat Pricing
 Reqcore is designed to let companies scale their hiring teams without increasing their software bill.
 
-### 4. Cloud-Hosted, Commercial Product
-Reqcore is a closed-source SaaS product — there is no self-hosted or open-source edition. Customers use the hosted app; the codebase is maintained internally.
+### 4. Open Source and Self-Hostable
+Reqcore is licensed under the AGPLv3 and can be self-hosted with Docker Compose (best-effort, unsupported — see [SELF-HOSTING.md](SELF-HOSTING.md)). A small set of paid, cloud-only features live under [`ee/`](ee) on a separate commercial license; the core hiring/scoring workflow never depends on it.
 
 ## Target Users
 
@@ -38,7 +38,7 @@ Reqcore is a closed-source SaaS product — there is no self-hosted or open-sour
 
 - **Businesses with continuous high-volume hiring** — staffing/recruitment agencies, BPOs/call centers, home/healthcare staffing, multi-unit franchise groups
 - **Any SMB drowning in applicants** for a role (remote/entry-level postings routinely draw 250–1,000+ applications)
-- **Not for**: teams looking for a free/self-hosted/open-source ATS, or occasional/accidental hirers with low applicant volume
+- **Not for**: occasional/accidental hirers with low applicant volume, or teams that need a large enterprise suite before they need high-throughput applicant review
 
 ## Core Features (Current & Planned)
 

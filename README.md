@@ -2,7 +2,7 @@
 
 # Reqcore
 
-**The ATS built for high-volume applicant flow. Closed-source, cloud-hosted, no per-seat fees.**
+**Open-source ATS for high-volume applicant flow. Self-hostable, modern, no per-seat fees.**
 
 [![E2E Tests](https://github.com/reqcore-inc/reqcore/actions/workflows/e2e-tests.yml/badge.svg)](https://github.com/reqcore-inc/reqcore/actions/workflows/e2e-tests.yml)
 [![PR Validation](https://github.com/reqcore-inc/reqcore/actions/workflows/pr-validation.yml/badge.svg)](https://github.com/reqcore-inc/reqcore/actions/workflows/pr-validation.yml)
@@ -14,9 +14,9 @@
 
 ---
 
-Hiring software shouldn't be complicated or expensive. Most applicant tracking systems charge per seat and overwhelm you with features you don't need. Reqcore is a lightweight, cloud-hosted ATS built to turn a flood of applicants into a trustworthy shortlist, fast. No per-seat fees, no bloat — just a clean tool that helps you hire.
+Hiring software shouldn't be complicated or expensive. Most applicant tracking systems charge per seat and overwhelm you with features you don't need. Reqcore is a lightweight, open-source ATS built to turn a flood of applicants into a trustworthy shortlist, fast. No per-seat fees, no bloat — just a clean tool that helps you hire.
 
-> Reqcore is a commercial, closed-source SaaS product. It is actively developed and improving every week. The foundation is solid (jobs, pipeline, applications, documents, job board), but some features are still on the roadmap. Check the [Roadmap](ROADMAP.md) for what's shipped and what's next.
+> Reqcore is open-source software licensed under the GNU AGPLv3. It is actively developed and improving every week. The foundation is solid (jobs, pipeline, applications, documents, job board), but some features are still on the roadmap. Check the [Roadmap](ROADMAP.md) for what's shipped and what's next.
 
 ## Why Reqcore?
 
@@ -286,11 +286,11 @@ setup.sh                      # One-time secret generator → writes .env
 
 ## Deployment
 
-Reqcore is designed to run on a single VPS. The reference deployment uses:
+Reqcore is designed to run well on Docker Compose for local use, small teams, and single-server self-hosting. Self-hosting is best-effort and unsupported — see [SELF-HOSTING.md](SELF-HOSTING.md). A typical production deployment uses:
 
 | Component | Role |
 |-----------|------|
-| **Hetzner Cloud CX23** | 2 vCPU, 4GB RAM, Ubuntu 24.04 (~€5/mo) |
+| **VPS or container host** | 2 vCPU, 4GB RAM recommended as a starting point |
 | **Caddy** | Reverse proxy with automatic HTTPS |
 | **Cloudflare** | DNS, DDoS protection, edge SSL (free tier) |
 | **Docker Compose** | Postgres + MinIO (localhost only) |
@@ -299,8 +299,8 @@ Reqcore is designed to run on a single VPS. The reference deployment uses:
 ### Deploy
 
 ```bash
-ssh deploy@your-server '~/deploy.sh'
-# Pulls latest code, installs, builds, restarts — zero downtime
+docker compose -f docker-compose.production.yml up -d
+# Pulls the published image and starts the app, database, and object storage
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full deployment architecture diagram.
@@ -337,8 +337,8 @@ See the full [Roadmap](ROADMAP.md) and [Product Vision](PRODUCT.md).
 
 ## Contributing
 
-Reqcore is closed-source; the codebase is maintained internally. See [CONTRIBUTING.md](CONTRIBUTING.md) for the internal workflow.
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening an issue or pull request.
 
 ## License
 
-Proprietary. © Reqcore Inc. All rights reserved.
+Reqcore is licensed under the [GNU Affero General Public License v3.0](LICENSE), with the exception of the [`ee/`](ee) directory, which contains paid, cloud-only features under a separate [commercial license](ee/LICENSE).
