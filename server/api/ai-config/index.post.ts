@@ -15,7 +15,8 @@ export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { scoring: ['create'] })
   const orgId = session.session.activeOrganizationId
 
-  // Bring-your-own AI key (BYOK) configuration is a Scale+ feature.
+  // Bring-your-own AI key (BYOK) configuration is available on Free (to go
+  // past the free run limit) and Scale+.
   await assertPlanFeature(orgId, 'byok')
 
   const body = await readValidatedBody(event, createAiConfigSchema.parse)

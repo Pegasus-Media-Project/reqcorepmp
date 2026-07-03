@@ -47,8 +47,9 @@ interface ProviderInfo {
 const { allowed: canManageAi, isLoading: isPermissionLoading } = usePermission({ scoring: ['create'] })
 const toast = useToast()
 
-// Bring-your-own AI key (adding a model) is a Scale+ feature. Existing configs
-// stay usable/editable on any plan; only creating new ones is locked.
+// Bring-your-own AI key (adding a model) is available on Free (to go past the
+// free run limit) and Scale+. Solo/Team don't get it. Existing configs stay
+// usable/editable on any plan; only creating new ones is locked.
 const { hasFeature } = usePlanFeature()
 const canUseByok = computed(() => hasFeature('byok'))
 const canAddModel = computed(() => canManageAi.value && canUseByok.value)
@@ -159,7 +160,7 @@ function formatPrice(p: number | null): string {
       </NuxtLink>
     </div>
 
-    <!-- BYOK is a Scale+ feature. Existing configs still work; adding is locked. -->
+    <!-- BYOK is available on Free and Scale+ (not Solo/Team). Existing configs still work; adding is locked otherwise. -->
     <FeatureLockCard v-if="canManageAi && !canUseByok" feature="byok" class="mb-6" />
 
     <!-- Permission guard -->
