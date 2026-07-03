@@ -156,11 +156,19 @@ describe('tierHasFeature', () => {
     }
   })
 
-  it('gates sso / auditLog / retention / byok at Scale+', () => {
-    for (const feature of ['sso', 'auditLog', 'retention', 'byok'] as const) {
+  it('gates sso / auditLog / retention at Scale+', () => {
+    for (const feature of ['sso', 'auditLog', 'retention'] as const) {
+      expect(tierHasFeature('free', feature)).toBe(false)
       expect(tierHasFeature('team', feature)).toBe(false)
       expect(tierHasFeature('scale', feature)).toBe(true)
     }
+  })
+
+  it('gates byok at Scale+, except Free gets it too (to go past the free run limit)', () => {
+    expect(tierHasFeature('free', 'byok')).toBe(true)
+    expect(tierHasFeature('solo', 'byok')).toBe(false)
+    expect(tierHasFeature('team', 'byok')).toBe(false)
+    expect(tierHasFeature('scale', 'byok')).toBe(true)
   })
 
   it('gives grandfathered orgs Team features plus BYOK without Scale features', () => {

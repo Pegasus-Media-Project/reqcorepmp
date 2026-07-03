@@ -141,6 +141,7 @@ const plans = computed<PlanCard[]>(() => [
       'Unlimited team members',
       'AI shortlist ranking',
       'Your first AI shortlist free, no card',
+      'Bring your own AI key for unlimited shortlists after that',
       'Branded application forms',
       'Resume parsing and candidate profiles',
       'Source tracking',

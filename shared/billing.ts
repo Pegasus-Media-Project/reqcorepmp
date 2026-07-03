@@ -167,7 +167,7 @@ export type PlanFeature =
   | 'sso' // SSO / SAML / SCIM provider registration — Scale and above
   | 'auditLog' // The org-wide audit log — Scale and above
   | 'retention' // Data-retention policy controls — Scale and above
-  | 'byok' // Bring-your-own AI key configuration — Scale and above
+  | 'byok' // Bring-your-own AI key configuration — Free (to go past the free run limit) and Scale and above
 
 /** Tiers ordered cheapest → most capable. A tier is entitled to a feature when
  *  its rank is ≥ the feature's minimum tier rank. */
@@ -229,6 +229,11 @@ export function tierHasFeature(tier: BillingTier, feature: PlanFeature): boolean
   // Legacy hosted orgs get Team-equivalent access plus BYOK while remaining on
   // a free, non-Stripe tier. They do not inherit Scale features.
   if (tier === 'grandfathered' && feature === 'byok') return true
+  // Free orgs can configure their own key to keep running AI analysis past the
+  // lifetime free-run limit (see FREE_PLAN_ANALYSIS_LIMIT) instead of being
+  // forced to upgrade. This is the Free plan's advertised "then bring your own
+  // key" — Solo/Team don't get this; they buy a bigger platform-paid budget.
+  if (tier === 'free' && feature === 'byok') return true
   return tierRank(tier) >= tierRank(FEATURE_MIN_TIER[feature])
 }
 
