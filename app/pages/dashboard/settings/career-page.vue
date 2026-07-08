@@ -3,7 +3,9 @@ import {
   Globe2, Loader2, Check, Copy, ExternalLink, Lock, ImageUp, Trash2,
 } from 'lucide-vue-next'
 
-definePageMeta({})
+definePageMeta({
+  fullbleed: true,
+})
 
 useSeoMeta({
   title: 'Career Page — Reqcore',
@@ -140,9 +142,17 @@ const ASSET_ACCEPT = 'image/png,image/jpeg,image/webp'
 
 const uploadingAsset = ref<'logo' | 'banner' | null>(null)
 const assetError = ref('')
+const logoInput = ref<HTMLInputElement | null>(null)
+const bannerInput = ref<HTMLInputElement | null>(null)
 
 // Preview prefers the uploaded career-page logo, then the org profile logo.
 const previewLogo = computed(() => logoUrl.value ?? activeOrg.value?.logo ?? null)
+
+function openAssetPicker(kind: 'logo' | 'banner') {
+  if (!canManage.value || uploadingAsset.value === kind) return
+  const input = kind === 'logo' ? logoInput.value : bannerInput.value
+  input?.click()
+}
 
 async function onAssetChange(kind: 'logo' | 'banner', e: Event) {
   const input = e.target as HTMLInputElement
@@ -245,7 +255,7 @@ async function handleSave() {
   <!-- Editor -->
   <div
     v-else
-    class="-mx-4 -my-5 sm:-mx-6 sm:-my-6 lg:-mx-8 lg:-my-8 flex flex-col lg:h-[calc(100vh-3.5rem)] lg:overflow-hidden bg-surface-50 dark:bg-surface-950"
+    class="flex min-h-full flex-col bg-surface-50 dark:bg-surface-950 lg:h-full lg:min-h-0 lg:overflow-hidden"
   >
     <!-- Top toolbar -->
     <div class="shrink-0 border-b border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-4 sm:px-6 py-3">
@@ -494,21 +504,25 @@ async function handleSave() {
                     <ImageUp v-else class="size-5 text-surface-300" />
                   </div>
                   <div class="flex flex-col gap-1.5">
-                    <label
+                    <button
+                      type="button"
+                      :disabled="!canManage || uploadingAsset === 'logo'"
                       class="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-2.5 py-1.5 text-xs font-medium text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors cursor-pointer"
-                      :class="(!canManage || uploadingAsset === 'logo') && 'opacity-50 pointer-events-none'"
+                      :class="(!canManage || uploadingAsset === 'logo') && 'opacity-50 cursor-not-allowed'"
+                      @click="openAssetPicker('logo')"
                     >
                       <Loader2 v-if="uploadingAsset === 'logo'" class="size-3.5 animate-spin" />
                       <ImageUp v-else class="size-3.5" />
                       {{ logoUrl ? 'Replace' : 'Upload' }}
-                      <input
-                        type="file"
-                        :accept="ASSET_ACCEPT"
-                        class="sr-only"
-                        :disabled="!canManage || uploadingAsset === 'logo'"
-                        @change="onAssetChange('logo', $event)"
-                      >
-                    </label>
+                    </button>
+                    <input
+                      ref="logoInput"
+                      type="file"
+                      :accept="ASSET_ACCEPT"
+                      class="hidden"
+                      :disabled="!canManage || uploadingAsset === 'logo'"
+                      @change="onAssetChange('logo', $event)"
+                    >
                     <button
                       v-if="logoUrl"
                       type="button"
@@ -534,21 +548,25 @@ async function handleSave() {
                   </div>
                 </div>
                 <div class="mt-2 flex items-center gap-3">
-                  <label
+                  <button
+                    type="button"
+                    :disabled="!canManage || uploadingAsset === 'banner'"
                     class="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-2.5 py-1.5 text-xs font-medium text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors cursor-pointer"
-                    :class="(!canManage || uploadingAsset === 'banner') && 'opacity-50 pointer-events-none'"
+                    :class="(!canManage || uploadingAsset === 'banner') && 'opacity-50 cursor-not-allowed'"
+                    @click="openAssetPicker('banner')"
                   >
                     <Loader2 v-if="uploadingAsset === 'banner'" class="size-3.5 animate-spin" />
                     <ImageUp v-else class="size-3.5" />
                     {{ bannerUrl ? 'Replace' : 'Upload' }}
-                    <input
-                      type="file"
-                      :accept="ASSET_ACCEPT"
-                      class="sr-only"
-                      :disabled="!canManage || uploadingAsset === 'banner'"
-                      @change="onAssetChange('banner', $event)"
-                    >
-                  </label>
+                  </button>
+                  <input
+                    ref="bannerInput"
+                    type="file"
+                    :accept="ASSET_ACCEPT"
+                    class="hidden"
+                    :disabled="!canManage || uploadingAsset === 'banner'"
+                    @change="onAssetChange('banner', $event)"
+                  >
                   <button
                     v-if="bannerUrl"
                     type="button"
