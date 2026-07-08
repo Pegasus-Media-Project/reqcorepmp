@@ -89,6 +89,7 @@ export const BILLING_PLANS: BillingPlan[] = [
       'Unlimited applicants and hires per role',
       'Unlimited AI shortlists on every role',
       'Full shortlist workflow',
+      'Branded career page for your open roles',
       'Invite your whole team. No per-seat fees.',
       'Share and export shortlists',
       'Email support',
@@ -160,6 +161,7 @@ export function activeRoleLimitForTier(tier: string): number {
  */
 export type PlanFeature =
   | 'interviews' // Interview scheduling — Solo and above
+  | 'careerPage' // Branded per-org career page — Solo and above
   | 'calendar' // Calendar (Google) sync on interviews — Team and above
   | 'sourceAnalytics' // Source attribution dashboard — Team and above
   | 'activityTimeline' // Org-wide activity timeline — Team and above
@@ -186,6 +188,7 @@ const TIER_DISPLAY_NAME: Record<BillingTier, string> = {
 /** Minimum tier required for each plan-gated feature. */
 export const FEATURE_MIN_TIER: Record<PlanFeature, BillingTier> = {
   interviews: 'solo',
+  careerPage: 'solo',
   calendar: 'team',
   sourceAnalytics: 'team',
   activityTimeline: 'team',
@@ -199,6 +202,7 @@ export const FEATURE_MIN_TIER: Record<PlanFeature, BillingTier> = {
 /** Short, user-facing label for each feature, used in upgrade prompts. */
 export const FEATURE_LABEL: Record<PlanFeature, string> = {
   interviews: 'Interview scheduling',
+  careerPage: 'Career page',
   calendar: 'Calendar integration',
   sourceAnalytics: 'Source analytics',
   activityTimeline: 'The activity timeline',

@@ -149,6 +149,14 @@ describe('tierHasFeature', () => {
     expect(tierHasFeature('team', 'calendar')).toBe(true)
   })
 
+  it('gates the branded career page at Solo+', () => {
+    expect(tierHasFeature('free', 'careerPage')).toBe(false)
+    expect(tierHasFeature('solo', 'careerPage')).toBe(true)
+    expect(tierHasFeature('team', 'careerPage')).toBe(true)
+    expect(tierHasFeature('scale', 'careerPage')).toBe(true)
+    expect(tierHasFeature('grandfathered', 'careerPage')).toBe(true)
+  })
+
   it('gates source / timeline / AI analytics dashboards at Team+', () => {
     for (const feature of ['sourceAnalytics', 'activityTimeline', 'aiAnalytics'] as const) {
       expect(tierHasFeature('solo', feature)).toBe(false)

@@ -60,8 +60,10 @@ const localizedPricingRedirectRules = Object.fromEntries(
     ]),
 );
 
-// Allow search-engine indexing for localized public marketing pages
-const localizedJobsRobotsRules = Object.fromEntries(
+// Allow search-engine indexing for localized public marketing pages.
+// Branded career pages (/career/**) are indexable too; individual disabled or
+// missing pages opt back out with a page-level noindex meta tag.
+const localizedPublicRobotsRules = Object.fromEntries(
   i18nLocales
     .filter((locale) => locale.code !== i18nDefaultLocale)
     .flatMap((locale) => [
@@ -75,6 +77,10 @@ const localizedJobsRobotsRules = Object.fromEntries(
       ],
       [
         `/${locale.code}/jobs/**`,
+        { headers: { "X-Robots-Tag": "index, follow" } },
+      ],
+      [
+        `/${locale.code}/career/**`,
         { headers: { "X-Robots-Tag": "index, follow" } },
       ],
     ]),
@@ -332,8 +338,15 @@ export default defineNuxtConfig({
           "X-Robots-Tag": "index, follow",
         },
       },
+      // Branded per-org career pages — allow indexing (disabled/missing pages
+      // set a page-level noindex meta tag to opt back out).
+      "/career/**": {
+        headers: {
+          "X-Robots-Tag": "index, follow",
+        },
+      },
       // Localized public marketing pages — allow indexing
-      ...localizedJobsRobotsRules,
+      ...localizedPublicRobotsRules,
       // Allow same-origin framing for inline PDF preview in the sidebar iframe
       "/api/documents/*/preview": {
         headers: {

@@ -383,10 +383,10 @@ onUnmounted(() => {
             >
               <div
                 v-if="showUserMenu"
-                class="absolute right-0 top-[calc(100%+6px)] w-64 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 shadow-xl shadow-surface-900/8 dark:shadow-surface-950/30 overflow-hidden"
+                class="absolute right-0 top-[calc(100%+6px)] w-64 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 shadow-xl shadow-surface-900/8 dark:shadow-surface-950/30"
               >
                 <!-- User info header -->
-                <div class="px-4 py-3 border-b border-surface-100 dark:border-surface-800">
+                <div class="rounded-t-xl overflow-hidden px-4 py-3 border-b border-surface-100 dark:border-surface-800">
                   <div class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ userName }}</div>
                   <div class="text-xs text-surface-500 dark:text-surface-400 truncate mt-0.5">{{ userEmail }}</div>
                 </div>
@@ -472,7 +472,7 @@ onUnmounted(() => {
                 </div>
 
                 <!-- Sign out -->
-                <div class="py-1">
+                <div class="rounded-b-xl overflow-hidden py-1">
                   <button
                     class="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800 hover:text-surface-900 dark:hover:text-surface-100 transition-colors cursor-pointer border-0 bg-transparent text-left"
                     :disabled="isSigningOut"
