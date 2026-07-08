@@ -236,7 +236,7 @@
       "lastName": "Etternavn",
       "lastNamePlaceholder": "Nordmann",
       "email": "E-post",
-      "emailPlaceholder": "deg@eksempel.no",
+      "emailPlaceholder": "deg{'@'}eksempel.no",
       "phone": "Telefon",
       "optional": "(valgfritt)",
       "phonePlaceholder": "+47 123 45 678",

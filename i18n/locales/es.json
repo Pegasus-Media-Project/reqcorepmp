@@ -236,7 +236,7 @@
       "lastName": "Apellido",
       "lastNamePlaceholder": "García",
       "email": "Correo electrónico",
-      "emailPlaceholder": "tu@ejemplo.com",
+      "emailPlaceholder": "tu{'@'}ejemplo.com",
       "phone": "Teléfono",
       "optional": "(opcional)",
       "phonePlaceholder": "+34 600 123 456",

@@ -236,7 +236,7 @@
       "lastName": "Họ",
       "lastNamePlaceholder": "Nguyễn",
       "email": "Email",
-      "emailPlaceholder": "ban@vidu.com",
+      "emailPlaceholder": "ban{'@'}vidu.com",
       "phone": "Số điện thoại",
       "optional": "(không bắt buộc)",
       "phonePlaceholder": "+84 912 345 678",

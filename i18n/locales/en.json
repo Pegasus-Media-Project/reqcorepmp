@@ -236,7 +236,7 @@
       "lastName": "Last Name",
       "lastNamePlaceholder": "Doe",
       "email": "Email",
-      "emailPlaceholder": "you@example.com",
+      "emailPlaceholder": "you{'@'}example.com",
       "phone": "Phone",
       "optional": "(optional)",
       "phonePlaceholder": "+1 (555) 123-4567",

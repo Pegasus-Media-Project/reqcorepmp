@@ -236,7 +236,7 @@
       "lastName": "Nom",
       "lastNamePlaceholder": "Dupont",
       "email": "E-mail",
-      "emailPlaceholder": "vous@exemple.com",
+      "emailPlaceholder": "vous{'@'}exemple.com",
       "phone": "Téléphone",
       "optional": "(facultatif)",
       "phonePlaceholder": "+33 6 12 34 56 78",

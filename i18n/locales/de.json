@@ -235,7 +235,7 @@
       "lastName": "Nachname",
       "lastNamePlaceholder": "Muster",
       "email": "E-Mail",
-      "emailPlaceholder": "sie@beispiel.de",
+      "emailPlaceholder": "sie{'@'}beispiel.de",
       "phone": "Telefon",
       "optional": "(optional)",
       "phonePlaceholder": "+49 30 12345678",
