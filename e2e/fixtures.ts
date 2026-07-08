@@ -39,6 +39,22 @@ export async function declineAnalyticsConsent(context: BrowserContext) {
   }])
 }
 
+export async function getPublishedApplicationLink(page: Page) {
+  await page.waitForFunction(() => {
+    return Array.from(document.querySelectorAll<HTMLInputElement>('input[readonly]'))
+      .some(input => /\/jobs\/[^/]+\/apply(?:$|[?#])/.test(input.value))
+  }, undefined, { timeout: 10_000 })
+
+  const applicationLink = await page.locator('input[readonly]').evaluateAll(inputs => {
+    return inputs
+      .map(input => (input as HTMLInputElement).value)
+      .find(value => /\/jobs\/[^/]+\/apply(?:$|[?#])/.test(value))
+  })
+
+  if (!applicationLink) throw new Error('Published application link input was not found')
+  return applicationLink
+}
+
 export const test = base.extend<Fixtures>({
   testAccount: [
     // eslint-disable-next-line no-empty-pattern
