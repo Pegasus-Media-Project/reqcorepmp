@@ -23,9 +23,11 @@ const props = withDefaults(defineProps<{
   prominent: false,
 })
 
-const horizontalAlign = computed(() =>
+const preferredHorizontalAlign = computed(() =>
   props.align ?? (props.dropUp ? 'left' : 'right'),
 )
+const renderedHorizontalAlign = ref<'left' | 'right'>(preferredHorizontalAlign.value)
+const menuOffsetX = ref(0)
 
 const route = useRoute()
 const requestURL = useRequestURL()
@@ -33,10 +35,70 @@ const { locale, locales, t } = useI18n()
 
 const isOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
+const menuRef = ref<HTMLElement | null>(null)
 
 function closeDropdown() {
   isOpen.value = false
 }
+
+function updateMenuPlacement() {
+  if (!import.meta.client || !isOpen.value || !dropdownRef.value || !menuRef.value) return
+
+  const triggerRect = dropdownRef.value.getBoundingClientRect()
+  const menuRect = menuRef.value.getBoundingClientRect()
+  const viewportPadding = 8
+  const menuWidth = menuRect.width
+  const wouldFitLeftAligned = triggerRect.left + menuWidth <= window.innerWidth - viewportPadding
+  const wouldFitRightAligned = triggerRect.right - menuWidth >= viewportPadding
+
+  // Prefer the alignment that keeps the menu on-screen without shifting.
+  if (preferredHorizontalAlign.value === 'left' && !wouldFitLeftAligned && wouldFitRightAligned) {
+    renderedHorizontalAlign.value = 'right'
+  }
+  else if (preferredHorizontalAlign.value === 'right' && !wouldFitRightAligned && wouldFitLeftAligned) {
+    renderedHorizontalAlign.value = 'left'
+  }
+  else {
+    renderedHorizontalAlign.value = preferredHorizontalAlign.value
+  }
+
+  // Even the chosen alignment can overflow when the trigger sits inside a
+  // narrow popup near a screen edge (e.g. the user menu). Nudge the menu back
+  // into the viewport so it never renders off-screen.
+  const menuLeft = renderedHorizontalAlign.value === 'left'
+    ? triggerRect.left
+    : triggerRect.right - menuWidth
+  const menuRight = menuLeft + menuWidth
+  const overflowRight = menuRight - (window.innerWidth - viewportPadding)
+  const overflowLeft = viewportPadding - menuLeft
+
+  if (overflowRight > 0) {
+    menuOffsetX.value = -overflowRight
+  }
+  else if (overflowLeft > 0) {
+    menuOffsetX.value = overflowLeft
+  }
+  else {
+    menuOffsetX.value = 0
+  }
+}
+
+watch(preferredHorizontalAlign, async (nextAlign) => {
+  renderedHorizontalAlign.value = nextAlign
+  if (!isOpen.value) return
+  await nextTick()
+  updateMenuPlacement()
+})
+
+watch(isOpen, async (open) => {
+  if (!open) {
+    menuOffsetX.value = 0
+    return
+  }
+  renderedHorizontalAlign.value = preferredHorizontalAlign.value
+  await nextTick()
+  updateMenuPlacement()
+})
 
 function handleClickOutside(event: MouseEvent) {
   if (dropdownRef.value && !dropdownRef.value.contains(event.target as Node)) {
@@ -44,8 +106,14 @@ function handleClickOutside(event: MouseEvent) {
   }
 }
 
-onMounted(() => document.addEventListener('mousedown', handleClickOutside))
-onUnmounted(() => document.removeEventListener('mousedown', handleClickOutside))
+onMounted(() => {
+  document.addEventListener('mousedown', handleClickOutside)
+  window.addEventListener('resize', updateMenuPlacement)
+})
+onUnmounted(() => {
+  document.removeEventListener('mousedown', handleClickOutside)
+  window.removeEventListener('resize', updateMenuPlacement)
+})
 const localePath = useLocalePath()
 const switchLocalePath = useSwitchLocalePath()
 type SwitchLocale = Parameters<typeof switchLocalePath>[0]
@@ -240,13 +308,15 @@ async function handleLocaleChange(nextLocale: string) {
       <!-- Dropdown list -->
       <ul
         v-if="isOpen"
+        ref="menuRef"
         role="listbox"
         :aria-label="t('common.selectLanguage')"
-        class="absolute z-50 min-w-48 rounded-md border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 shadow-lg py-1 text-xs"
+        class="absolute z-50 w-48 max-w-[calc(100vw-1rem)] rounded-md border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 shadow-lg py-1 text-xs"
         :class="[
           props.dropUp ? 'bottom-full mb-1' : 'mt-1',
-          horizontalAlign === 'left' ? 'left-0' : 'right-0',
+          renderedHorizontalAlign === 'left' ? 'left-0' : 'right-0',
         ]"
+        :style="menuOffsetX ? { transform: `translateX(${menuOffsetX}px)` } : undefined"
       >
         <li
           v-for="option in localeOptions"

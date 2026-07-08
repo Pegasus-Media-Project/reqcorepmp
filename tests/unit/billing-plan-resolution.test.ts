@@ -164,10 +164,16 @@ describe('tierHasFeature', () => {
     }
   })
 
-  it('gates sso / auditLog / retention / byok at Scale+', () => {
-    for (const feature of ['sso', 'auditLog', 'retention', 'byok'] as const) {
+  it('gates sso / auditLog / retention at Scale+', () => {
+    for (const feature of ['sso', 'auditLog', 'retention'] as const) {
       expect(tierHasFeature('team', feature)).toBe(false)
       expect(tierHasFeature('scale', feature)).toBe(true)
+    }
+  })
+
+  it('makes byok / AI model configuration available on every plan, including free', () => {
+    for (const tier of ['free', 'solo', 'team', 'scale', 'agency'] as const) {
+      expect(tierHasFeature(tier, 'byok')).toBe(true)
     }
   })
 
@@ -201,11 +207,11 @@ describe('assertTierFeature', () => {
   it('throws a 402 with a machine-readable code + required tier when not entitled', () => {
     expect(() => assertTierFeature('free', 'sso')).toThrow()
     try {
-      assertTierFeature('team', 'byok')
+      assertTierFeature('free', 'sso')
     } catch (err) {
       expect(err).toMatchObject({
         statusCode: 402,
-        data: { code: 'PLAN_FEATURE_REQUIRED', feature: 'byok', requiredTier: 'scale', tier: 'team' },
+        data: { code: 'PLAN_FEATURE_REQUIRED', feature: 'sso', requiredTier: 'scale', tier: 'free' },
       })
     }
   })

@@ -169,7 +169,7 @@ export type PlanFeature =
   | 'sso' // SSO / SAML / SCIM provider registration — Scale and above
   | 'auditLog' // The org-wide audit log — Scale and above
   | 'retention' // Data-retention policy controls — Scale and above
-  | 'byok' // Bring-your-own AI key configuration — Scale and above
+  | 'byok' // Bring-your-own AI key / AI model configuration — all plans
 
 /** Tiers ordered cheapest → most capable. A tier is entitled to a feature when
  *  its rank is ≥ the feature's minimum tier rank. */
@@ -196,7 +196,7 @@ export const FEATURE_MIN_TIER: Record<PlanFeature, BillingTier> = {
   sso: 'scale',
   auditLog: 'scale',
   retention: 'scale',
-  byok: 'scale',
+  byok: 'free',
 }
 
 /** Short, user-facing label for each feature, used in upgrade prompts. */

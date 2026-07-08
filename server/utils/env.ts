@@ -169,8 +169,8 @@ export const envSchema = z
     // budget.ts); BYOK orgs are unaffected. Leave unset to keep BYOK-only.
     /** OpenRouter API key (sk-or-…). Enables platform-paid AI for orgs without their own key. */
     OPENROUTER_API_KEY: emptyToUndefined.pipe(z.string().min(1)).optional(),
-    /** Default model for platform-paid runs, OpenRouter-prefixed. Defaults to openai/gpt-4.1-mini. */
-    OPENROUTER_MODEL: emptyToUndefined.pipe(z.string().min(1)).optional().default('openai/gpt-4.1-mini'),
+    /** Default model for platform-paid runs, OpenRouter-prefixed. Defaults to openai/gpt-5.4-mini. */
+    OPENROUTER_MODEL: emptyToUndefined.pipe(z.string().min(1)).optional().default('openai/gpt-5.4-mini'),
     /** Global platform-wide daily AI spend cap in USD (runaway-loop kill-switch). Defaults to 25. */
     AI_DAILY_SPEND_CAP_USD: emptyToUndefined
       .pipe(z.string().regex(/^\d+(\.\d+)?$/, 'Must be a number'))

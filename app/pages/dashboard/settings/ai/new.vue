@@ -41,7 +41,7 @@ interface ProviderInfo {
 
 const { allowed: canManageAi, isLoading: isPermissionLoading } = usePermission({ scoring: ['create'] })
 
-// Adding an AI model is a Scale+ feature (BYOK); guard direct navigation here too.
+// Adding an AI model (BYOK) is available on all plans; guard direct navigation here too.
 const { hasFeature } = usePlanFeature()
 const canUseByok = computed(() => hasFeature('byok'))
 

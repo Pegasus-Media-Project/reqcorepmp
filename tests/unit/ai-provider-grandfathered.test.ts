@@ -19,7 +19,7 @@ describe('resolveAnalysisProvider grandfathered tier', () => {
     state.plan = 'grandfathered'
     vi.stubGlobal('env', {
       OPENROUTER_API_KEY: 'sk-platform-test',
-      OPENROUTER_MODEL: 'openai/gpt-4.1-mini',
+      OPENROUTER_MODEL: 'openai/gpt-5.4-mini',
       BETTER_AUTH_SECRET: 'test-secret-that-is-long-enough',
     })
   })
@@ -35,7 +35,7 @@ describe('resolveAnalysisProvider grandfathered tier', () => {
     await expect(resolveAnalysisProvider('org_1')).resolves.toMatchObject({
       billingMode: 'platform',
       provider: 'openrouter',
-      model: 'openai/gpt-4.1-mini',
+      model: 'openai/gpt-5.4-mini',
     })
   })
 })

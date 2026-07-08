@@ -159,7 +159,7 @@ function formatPrice(p: number | null): string {
       </NuxtLink>
     </div>
 
-    <!-- BYOK is a Scale+ feature. Existing configs still work; adding is locked. -->
+    <!-- BYOK is available on all plans; the lock card only shows if byok is ever re-gated. -->
     <FeatureLockCard v-if="canManageAi && !canUseByok" feature="byok" class="mb-6" />
 
     <!-- Permission guard -->
