@@ -172,11 +172,10 @@ describe('tierHasFeature', () => {
     }
   })
 
-  it('gates byok at Scale+, except Free gets it too (to go past the free run limit)', () => {
-    expect(tierHasFeature('free', 'byok')).toBe(true)
-    expect(tierHasFeature('solo', 'byok')).toBe(false)
-    expect(tierHasFeature('team', 'byok')).toBe(false)
-    expect(tierHasFeature('scale', 'byok')).toBe(true)
+  it('allows BYOK on every plan', () => {
+    for (const tier of ['free', 'solo', 'team', 'grandfathered', 'scale', 'agency'] as const) {
+      expect(tierHasFeature(tier, 'byok')).toBe(true)
+    }
   })
 
   it('gives grandfathered orgs Team features plus BYOK without Scale features', () => {
@@ -203,7 +202,7 @@ describe('tierHasFeature', () => {
 
 describe('assertTierFeature', () => {
   it('passes silently when the tier is entitled', () => {
-    expect(() => assertTierFeature('scale', 'byok')).not.toThrow()
+    expect(() => assertTierFeature('free', 'byok')).not.toThrow()
   })
 
   it('throws a 402 with a machine-readable code + required tier when not entitled', () => {

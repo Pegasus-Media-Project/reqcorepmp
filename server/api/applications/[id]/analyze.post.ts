@@ -1,7 +1,7 @@
 import { eq, and } from 'drizzle-orm'
 import {
   application, scoringCriterion, criterionScore,
-  analysisRun, document, candidate,
+  analysisRun, document,
 } from '../../../database/schema'
 import { scoreApplication, computeCompositeScore } from '../../../utils/ai/scoring'
 import type { CriterionDefinition } from '../../../utils/ai/scoring'
@@ -10,6 +10,7 @@ import { assertPlatformBudget, BudgetExceededError, budgetErrorToHttp } from '..
 import { computeCostUsdMicros } from '../../../utils/ai/pricing'
 import { captureAiGeneration } from '../../../utils/ai/observability'
 import { extractResumeText } from '../../../utils/resume-parser'
+import { parseAndPersistDocument } from '../../../utils/document-parser'
 import { createRateLimiter } from '../../../utils/rateLimit'
 import { z } from 'zod'
 
@@ -71,6 +72,8 @@ export default defineEventHandler(async (event) => {
   // Fetch candidate documents (resume text)
   const docs = await db.select({
     id: document.id,
+    storageKey: document.storageKey,
+    mimeType: document.mimeType,
     parsedContent: document.parsedContent,
     type: document.type,
   })
@@ -81,7 +84,20 @@ export default defineEventHandler(async (event) => {
     ))
 
   const resumeDoc = docs.find(d => d.type === 'resume')
-  const resumeText = extractResumeText(resumeDoc?.parsedContent)
+  let resumeText = extractResumeText(resumeDoc?.parsedContent)
+
+  if (!resumeText && resumeDoc) {
+    try {
+      const parsedContent = await parseAndPersistDocument(resumeDoc)
+      resumeText = extractResumeText(parsedContent)
+    } catch (err) {
+      logWarn('application_analysis.resume_reparse_failed', {
+        application_id: applicationId,
+        document_id: resumeDoc.id,
+        error_message: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
 
   if (!resumeText) {
     // Resume document exists but parsing failed or was incomplete

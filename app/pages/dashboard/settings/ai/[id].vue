@@ -25,6 +25,7 @@ interface AiConfigRow {
   isDefaultChatbot: boolean
   isDefaultAnalysis: boolean
   hasApiKey: boolean
+  source?: 'byok' | 'platform'
 }
 
 interface ProviderInfo {

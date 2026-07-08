@@ -100,6 +100,21 @@ export const PROVIDER_REGISTRY: Record<string, {
       { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite', description: 'Cost-efficient Gemini 3 model for high-volume lightweight tasks.', inputPricePer1m: 0.25, outputPricePer1m: 1.5, badge: 'cheap' },
     ],
   },
+  openrouter: {
+    name: 'OpenRouter',
+    tagline: 'Unified gateway for OpenAI-compatible models with platform-managed routing.',
+    modelsUrl: 'https://openrouter.ai/models',
+    apiKeyUrl: 'https://openrouter.ai/keys',
+    signupUrl: 'https://openrouter.ai/',
+    supportsBaseUrl: false,
+    defaultModel: 'openai/gpt-5.4-mini',
+    models: [
+      { id: 'openai/gpt-5.4-mini', label: 'GPT-5.4 Mini via OpenRouter', description: 'Cost-efficient default for platform-paid candidate analysis.', inputPricePer1m: 0.75, outputPricePer1m: 4.5, badge: 'recommended' },
+      { id: 'openai/gpt-5.4', label: 'GPT-5.4 via OpenRouter', description: 'Stronger OpenAI model routed through OpenRouter.', inputPricePer1m: 2.5, outputPricePer1m: 15.0 },
+      { id: 'anthropic/claude-sonnet-5', label: 'Claude Sonnet 5 via OpenRouter', description: 'Balanced Claude model routed through OpenRouter.', inputPricePer1m: 2.0, outputPricePer1m: 10.0 },
+      { id: 'google/gemini-3.5-flash', label: 'Gemini 3.5 Flash via OpenRouter', description: 'Fast Gemini model routed through OpenRouter.', inputPricePer1m: 1.5, outputPricePer1m: 9.0, badge: 'fast' },
+    ],
+  },
   openai_compatible: {
     name: 'OpenAI-Compatible (Custom)',
     tagline: 'Connect any OpenAI-compatible endpoint: Ollama, LM Studio, OpenRouter, Groq, Together AI, vLLM, …',

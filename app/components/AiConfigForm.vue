@@ -44,6 +44,7 @@ interface AiConfigRow {
   isDefaultChatbot: boolean
   isDefaultAnalysis: boolean
   hasApiKey: boolean
+  source?: 'byok' | 'platform'
 }
 
 const props = defineProps<{
@@ -62,6 +63,7 @@ const emit = defineEmits<{
 const toast = useToast()
 
 const isEdit = computed(() => props.config !== null)
+const isPlatformManaged = computed(() => props.config?.source === 'platform')
 
 const DEFAULT_MAX_TOKENS = 16384
 
@@ -101,6 +103,11 @@ const testResult = ref<{ success: boolean, message?: string } | null>(null)
 const selectedProvider = computed<ProviderInfo | null>(() =>
   props.providers?.[form.value.provider] ?? null,
 )
+const visibleProviders = computed<Record<string, ProviderInfo>>(() => {
+  if (!isPlatformManaged.value) return props.providers ?? {}
+  const openrouter = props.providers?.openrouter
+  return openrouter ? { openrouter } : {}
+})
 
 const isCustomProvider = computed(() => form.value.provider === 'openai_compatible')
 
@@ -115,6 +122,7 @@ function pickModel(m: ModelInfo) {
 }
 
 function pickProvider(key: string) {
+  if (isPlatformManaged.value) return
   form.value.provider = key
   const first = props.providers?.[key]?.models[0]
   if (first) {
@@ -245,7 +253,7 @@ const badgeLabel = (badge?: ModelInfo['badge']) => {
           </h1>
           <p class="text-xs text-surface-500 dark:text-surface-400">
             {{ isEdit
-              ? 'Update settings, rotate the API key, or change pricing for this model.'
+              ? (isPlatformManaged ? 'Update the platform-paid OpenRouter model and pricing shown for analysis runs.' : 'Update settings, rotate the API key, or change pricing for this model.')
               : 'Connect an AI provider so the chatbot and candidate analysis can use it.' }}
           </p>
         </div>
@@ -258,14 +266,15 @@ const badgeLabel = (badge?: ModelInfo['badge']) => {
         <header class="mb-4">
           <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Provider</h2>
           <p class="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
-            Choose where the model runs. We'll suggest the best models for that provider next.
+            {{ isPlatformManaged ? 'This configuration uses the server-managed OpenRouter account.' : "Choose where the model runs. We'll suggest the best models for that provider next." }}
           </p>
         </header>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <button
-            v-for="(info, key) in providers ?? {}"
+            v-for="(info, key) in visibleProviders"
             :key="key"
             type="button"
+            :disabled="isPlatformManaged"
             class="flex flex-col items-start gap-1 rounded-xl border px-3 py-2.5 text-left transition-colors cursor-pointer"
             :class="form.provider === key
               ? 'border-brand-500 bg-brand-50/60 dark:bg-brand-950/30 ring-1 ring-brand-500/30'
@@ -352,7 +361,9 @@ const badgeLabel = (badge?: ModelInfo['badge']) => {
         <header class="mb-4">
           <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Connection</h2>
           <p class="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
-            Give this configuration a name and connect your API key. Keys are encrypted with AES-256-GCM and never sent back to the browser.
+            {{ isPlatformManaged
+              ? 'Name this platform configuration. The OpenRouter key is managed by the server and is never exposed here.'
+              : 'Give this configuration a name and connect your API key. Keys are encrypted with AES-256-GCM and never sent back to the browser.' }}
           </p>
         </header>
 
@@ -390,7 +401,7 @@ const badgeLabel = (badge?: ModelInfo['badge']) => {
           </div>
 
           <!-- API key -->
-          <div>
+          <div v-if="!isPlatformManaged">
             <div class="flex items-center justify-between mb-1.5">
               <label class="text-xs font-medium text-surface-700 dark:text-surface-300">
                 API key
@@ -425,6 +436,13 @@ const badgeLabel = (badge?: ModelInfo['badge']) => {
               </button>
             </div>
           </div>
+          <p
+            v-else
+            class="rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50 dark:bg-surface-800/60 px-4 py-3 text-xs text-surface-600 dark:text-surface-300 flex items-start gap-2"
+          >
+            <KeyRound class="size-3.5 mt-0.5 shrink-0" />
+            <span>The platform OpenRouter API key is configured in the server environment. You can change the model, output cap, and pricing metadata here.</span>
+          </p>
 
           <!-- Test connection -->
           <div v-if="isEdit" class="flex items-center gap-3 pt-1">
@@ -579,7 +597,7 @@ const badgeLabel = (badge?: ModelInfo['badge']) => {
 
       <p class="text-[11px] text-surface-500 dark:text-surface-400 flex items-start gap-1.5">
         <KeyRound class="size-3 mt-0.5 shrink-0" />
-        <span>API keys are encrypted at rest with AES-256-GCM and never returned to the browser.</span>
+        <span>{{ isPlatformManaged ? 'This platform-paid configuration uses the server OpenRouter key and remains subject to platform AI budgets.' : 'API keys are encrypted at rest with AES-256-GCM and never returned to the browser.' }}</span>
       </p>
     </div>
 

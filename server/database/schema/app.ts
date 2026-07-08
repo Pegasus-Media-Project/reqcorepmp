@@ -727,6 +727,28 @@ export const aiConfig = pgTable('ai_config', {
 ]))
 
 /**
+ * Per-organization overrides for the platform-paid OpenRouter fallback.
+ * This deliberately does not store an API key: the key remains server-owned,
+ * so analysis runs through this config stay `billingMode = platform`.
+ */
+export const platformAiConfig = pgTable('platform_ai_config', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  name: text('name').notNull().default('Platform (OpenRouter)'),
+  provider: text('provider').notNull().default('openrouter'),
+  model: text('model').notNull().default('openai/gpt-5.4-mini'),
+  maxTokens: integer('max_tokens').notNull().default(4096),
+  inputPricePer1m: numeric('input_price_per_1m', { precision: 10, scale: 4 }),
+  outputPricePer1m: numeric('output_price_per_1m', { precision: 10, scale: 4 }),
+  isDefaultAnalysis: boolean('is_default_analysis').notNull().default(true),
+  isEnabled: boolean('is_enabled').notNull().default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (t) => ([
+  uniqueIndex('platform_ai_config_organization_id_idx').on(t.organizationId),
+]))
+
+/**
  * Per-job scoring criteria. Each criterion defines one dimension of evaluation.
  * Weights are user-adjustable via sliders and used to compute weighted composite scores.
  */

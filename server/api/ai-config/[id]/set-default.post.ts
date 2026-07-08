@@ -1,7 +1,15 @@
 import { and, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { aiConfig } from '../../../database/schema'
+import { aiConfig, platformAiConfig } from '../../../database/schema'
 import { setAiConfigDefaultSchema } from '../../../utils/schemas/scoring'
+import {
+  canUsePlatformAi,
+  DEFAULT_PLATFORM_AI_NAME,
+  DEFAULT_PLATFORM_MAX_TOKENS,
+  getPlatformAiOverride,
+  PLATFORM_AI_CONFIG_ID,
+  PLATFORM_AI_PROVIDER,
+} from '../../../utils/ai/platformConfig'
 
 const paramsSchema = z.object({ id: z.string().min(1) })
 
@@ -20,6 +28,57 @@ export default defineEventHandler(async (event) => {
   const orgId = session.session.activeOrganizationId
   const { id } = await getValidatedRouterParams(event, paramsSchema.parse)
   const body = await readValidatedBody(event, setAiConfigDefaultSchema.parse)
+
+  if (id === PLATFORM_AI_CONFIG_ID) {
+    if (body.purposes.includes('chatbot')) {
+      throw createError({
+        statusCode: 422,
+        statusMessage: 'The platform OpenRouter configuration can only be used for candidate analysis.',
+      })
+    }
+    if (!await canUsePlatformAi(orgId)) {
+      throw createError({ statusCode: 404, statusMessage: 'AI configuration not found.' })
+    }
+
+    const existingOverride = await getPlatformAiOverride(orgId)
+    await db.transaction(async (tx) => {
+      await tx.update(aiConfig)
+        .set({ isDefaultAnalysis: false, updatedAt: new Date() })
+        .where(eq(aiConfig.organizationId, orgId))
+
+      await tx.insert(platformAiConfig)
+        .values({
+          organizationId: orgId,
+          name: existingOverride?.name ?? DEFAULT_PLATFORM_AI_NAME,
+          provider: PLATFORM_AI_PROVIDER,
+          model: existingOverride?.model ?? env.OPENROUTER_MODEL,
+          maxTokens: existingOverride?.maxTokens ?? DEFAULT_PLATFORM_MAX_TOKENS,
+          inputPricePer1m: existingOverride?.inputPricePer1m ?? null,
+          outputPricePer1m: existingOverride?.outputPricePer1m ?? null,
+          isDefaultAnalysis: true,
+          isEnabled: true,
+        })
+        .onConflictDoUpdate({
+          target: platformAiConfig.organizationId,
+          set: {
+            isDefaultAnalysis: true,
+            isEnabled: true,
+            updatedAt: new Date(),
+          },
+        })
+    })
+
+    recordActivity({
+      organizationId: orgId,
+      actorId: session.user.id,
+      action: 'updated',
+      resourceType: 'aiConfig',
+      resourceId: id,
+      metadata: { setDefault: body.purposes, source: 'platform' },
+    })
+
+    return { success: true }
+  }
 
   const existing = await db.query.aiConfig.findFirst({
     where: and(eq(aiConfig.id, id), eq(aiConfig.organizationId, orgId)),
@@ -43,6 +102,10 @@ export default defineEventHandler(async (event) => {
           updatedAt: new Date(),
         })
         .where(eq(aiConfig.organizationId, orgId))
+
+      await tx.update(platformAiConfig)
+        .set({ isDefaultAnalysis: false, updatedAt: new Date() })
+        .where(eq(platformAiConfig.organizationId, orgId))
     }
   })
 

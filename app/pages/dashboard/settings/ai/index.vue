@@ -29,6 +29,7 @@ interface AiConfigRow {
   isDefaultChatbot: boolean
   isDefaultAnalysis: boolean
   hasApiKey: boolean
+  source?: 'byok' | 'platform'
   createdAt?: string | Date
   updatedAt?: string | Date
 }
@@ -47,9 +48,7 @@ interface ProviderInfo {
 const { allowed: canManageAi, isLoading: isPermissionLoading } = usePermission({ scoring: ['create'] })
 const toast = useToast()
 
-// Bring-your-own AI key (adding a model) is available on Free (to go past the
-// free run limit) and Scale+. Solo/Team don't get it. Existing configs stay
-// usable/editable on any plan; only creating new ones is locked.
+// Bring-your-own AI key (adding a model) is available on every plan.
 const { hasFeature } = usePlanFeature()
 const canUseByok = computed(() => hasFeature('byok'))
 const canAddModel = computed(() => canManageAi.value && canUseByok.value)
@@ -114,7 +113,10 @@ async function testConnection(c: AiConfigRow) {
 
 const deletingId = ref<string | null>(null)
 async function deleteConfig(c: AiConfigRow) {
-  if (!confirm(`Delete the "${c.name}" configuration? Conversations using it will fall back to the default.`)) return
+  const message = c.source === 'platform'
+    ? `Remove the "${c.name}" platform configuration? Platform-paid AI analysis will stay disabled for this workspace until it is restored by an administrator.`
+    : `Delete the "${c.name}" configuration? Conversations using it will fall back to the default.`
+  if (!confirm(message)) return
   deletingId.value = c.id
   try {
     await $fetch(`/api/ai-config/${c.id}`, {
@@ -160,7 +162,7 @@ function formatPrice(p: number | null): string {
       </NuxtLink>
     </div>
 
-    <!-- BYOK is available on Free and Scale+ (not Solo/Team). Existing configs still work; adding is locked otherwise. -->
+    <!-- Kept as a defensive server/UI mismatch fallback; BYOK should be available on every plan. -->
     <FeatureLockCard v-if="canManageAi && !canUseByok" feature="byok" class="mb-6" />
 
     <!-- Permission guard -->
@@ -223,6 +225,12 @@ function formatPrice(p: number | null): string {
                 {{ providerLabel(c.provider) }}
               </span>
               <span
+                v-if="c.source === 'platform'"
+                class="inline-flex items-center gap-1 rounded-full border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 px-2 py-0.5 text-[11px] font-medium text-surface-700 dark:text-surface-300"
+              >
+                <KeyRound class="size-3" /> Platform managed
+              </span>
+              <span
                 v-if="c.isDefaultChatbot"
                 class="inline-flex items-center gap-1 rounded-full border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-950/50 px-2 py-0.5 text-[11px] font-medium text-brand-700 dark:text-brand-300"
                 title="Default for the chatbot"
@@ -274,7 +282,7 @@ function formatPrice(p: number | null): string {
           <!-- Actions -->
           <div class="flex flex-wrap items-center gap-1.5 shrink-0">
             <button
-              v-if="!c.isDefaultChatbot"
+              v-if="c.source !== 'platform' && !c.isDefaultChatbot"
               :disabled="!c.hasApiKey || (togglingDefaultId === c.id && togglingPurpose === 'chatbot')"
               class="inline-flex items-center gap-1 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-2.5 py-1.5 text-xs font-medium text-surface-700 dark:text-surface-300 hover:border-brand-300 dark:hover:border-brand-700 hover:text-brand-700 dark:hover:text-brand-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               :title="c.hasApiKey ? 'Use this model for the chatbot' : 'Add an API key first'"
