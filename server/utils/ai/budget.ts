@@ -131,7 +131,7 @@ export async function assertPlatformBudget(orgId: string): Promise<void> {
     if (runs >= limit) {
       throw new BudgetExceededError(
         'org_free_limit',
-        'You’ve used your free AI shortlist. Upgrade to a paid plan to keep running AI analysis — your existing rankings stay available.',
+        'You’ve used your free AI analysis runs. Add your own AI key (Settings → AI Configuration) or upgrade to a paid plan to keep running AI analysis — your existing rankings stay available.',
       )
     }
     assertDailyCap(daySpend)
