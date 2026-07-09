@@ -5,7 +5,6 @@ import {
   canUsePlatformAi,
   getPlatformAiOverride,
   PLATFORM_AI_CONFIG_ID,
-  platformOverrideEnabled,
   toPlatformAiConfigListRow,
 } from '../../utils/ai/platformConfig'
 
@@ -20,11 +19,10 @@ export default defineEventHandler(async (event) => {
   const { id } = await getValidatedRouterParams(event, paramsSchema.parse)
 
   if (id === PLATFORM_AI_CONFIG_ID) {
-    const platformOverride = await getPlatformAiOverride(orgId)
-    if (!await canUsePlatformAi(orgId) || !platformOverrideEnabled(platformOverride)) {
+    if (!await canUsePlatformAi(orgId)) {
       throw createError({ statusCode: 404, statusMessage: 'AI configuration not found.' })
     }
-    return toPlatformAiConfigListRow(platformOverride)
+    return toPlatformAiConfigListRow(await getPlatformAiOverride(orgId))
   }
 
   const row = await db.query.aiConfig.findFirst({

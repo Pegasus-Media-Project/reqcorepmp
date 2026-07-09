@@ -36,6 +36,9 @@ export const updateAiConfigSchema = z.object({
   maxTokens: z.number().int().min(256).max(200000).optional(),
   inputPricePer1m: z.number().min(0).max(9999).nullish(),
   outputPricePer1m: z.number().min(0).max(9999).nullish(),
+  // Only the platform ("company") config uses this — it is server-managed and
+  // can only be enabled or disabled, never edited.
+  isEnabled: z.boolean().optional(),
 })
 
 export const setAiConfigDefaultSchema = z.object({

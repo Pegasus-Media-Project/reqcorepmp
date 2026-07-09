@@ -6,7 +6,7 @@ import { OPENROUTER_BASE_URL, type ProviderConfig } from './provider'
 
 export const PLATFORM_AI_CONFIG_ID = '__platform__'
 export const PLATFORM_AI_PROVIDER = 'openrouter'
-export const DEFAULT_PLATFORM_AI_NAME = 'Platform (OpenRouter)'
+export const DEFAULT_PLATFORM_AI_NAME = 'Reqcore AI'
 export const DEFAULT_PLATFORM_MAX_TOKENS = 4096
 
 type PlatformAiOverride = typeof platformAiConfig.$inferSelect
@@ -22,6 +22,7 @@ export interface PlatformAiConfigListRow {
   outputPricePer1m: number | null
   isDefaultChatbot: false
   isDefaultAnalysis: boolean
+  isEnabled: boolean
   hasApiKey: boolean
   source: 'platform'
   createdAt: Date
@@ -38,34 +39,38 @@ export async function canUsePlatformAi(orgId: string): Promise<boolean> {
   return Boolean(env.OPENROUTER_API_KEY) && (await resolveOrgPlanId(orgId)) !== 'grandfathered'
 }
 
-function platformModel(row: PlatformAiOverride | null): string {
-  return row?.model ?? env.OPENROUTER_MODEL
-}
-
-function platformName(row: PlatformAiOverride | null): string {
-  return row?.name ?? DEFAULT_PLATFORM_AI_NAME
-}
-
-function platformMaxTokens(row: PlatformAiOverride | null): number {
-  return row?.maxTokens ?? DEFAULT_PLATFORM_MAX_TOKENS
+// The platform ("company") AI is server-managed: its model, display name and
+// token cap always come from the environment, never from per-org edits. The
+// only per-org state we honour is whether it is enabled and whether it holds
+// the analysis-default slot.
+function platformModel(): string {
+  return env.OPENROUTER_MODEL
 }
 
 export function platformOverrideEnabled(row: PlatformAiOverride | null): boolean {
   return row?.isEnabled ?? true
 }
 
-export function toPlatformAiConfigListRow(row: PlatformAiOverride | null): PlatformAiConfigListRow {
+export function toPlatformAiConfigListRow(
+  row: PlatformAiOverride | null,
+  opts: { isDefaultAnalysisFallback?: boolean } = {},
+): PlatformAiConfigListRow {
+  const isEnabled = platformOverrideEnabled(row)
+  const isDefaultAnalysis = isEnabled
+    ? (row?.isDefaultAnalysis ?? opts.isDefaultAnalysisFallback ?? true)
+    : false
   return {
     id: PLATFORM_AI_CONFIG_ID,
-    name: platformName(row),
+    name: DEFAULT_PLATFORM_AI_NAME,
     provider: PLATFORM_AI_PROVIDER,
-    model: platformModel(row),
+    model: platformModel(),
     baseUrl: null,
-    maxTokens: platformMaxTokens(row),
+    maxTokens: DEFAULT_PLATFORM_MAX_TOKENS,
     inputPricePer1m: row?.inputPricePer1m != null ? Number(row.inputPricePer1m) : null,
     outputPricePer1m: row?.outputPricePer1m != null ? Number(row.outputPricePer1m) : null,
     isDefaultChatbot: false,
-    isDefaultAnalysis: row?.isDefaultAnalysis ?? true,
+    isDefaultAnalysis,
+    isEnabled,
     hasApiKey: Boolean(env.OPENROUTER_API_KEY),
     source: 'platform',
     createdAt: row?.createdAt ?? new Date(0),
@@ -100,14 +105,14 @@ export async function resolvePlatformAiProviderConfig(
     })
   }
 
-  const model = platformModel(row)
+  const model = platformModel()
   return {
     providerConfig: {
       provider: PLATFORM_AI_PROVIDER,
       model,
       apiKeyEncrypted: encrypt(apiKey, env.BETTER_AUTH_SECRET),
       baseUrl: OPENROUTER_BASE_URL,
-      maxTokens: platformMaxTokens(row),
+      maxTokens: DEFAULT_PLATFORM_MAX_TOKENS,
     },
     provider: PLATFORM_AI_PROVIDER,
     model,

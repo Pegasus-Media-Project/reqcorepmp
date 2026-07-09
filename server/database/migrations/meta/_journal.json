@@ -281,6 +281,13 @@
       "when": 1783526400000,
       "tag": "0039_platform_ai_config",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1783601900645,
+      "tag": "0040_shallow_molly_hayes",
+      "breakpoints": true
     }
   ]
 }

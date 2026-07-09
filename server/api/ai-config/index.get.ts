@@ -3,7 +3,6 @@ import { aiConfig } from '../../database/schema'
 import {
   canUsePlatformAi,
   getPlatformAiOverride,
-  platformOverrideEnabled,
   toPlatformAiConfigListRow,
 } from '../../utils/ai/platformConfig'
 
@@ -46,18 +45,17 @@ export default defineEventHandler(async (event) => {
     source: 'byok',
   }))
 
-  // Platform-level OpenRouter fallback — orgs with no BYOK config still get AI,
-  // except grandfathered orgs whose free access is explicitly BYOK-only. If an
-  // org customizes the platform fallback, keep showing it alongside BYOK rows
-  // until they remove it.
-  const platformOverride = await getPlatformAiOverride(orgId)
-  const hasPlatformOverride = Boolean(platformOverride)
-  if (
-    await canUsePlatformAi(orgId)
-    && platformOverrideEnabled(platformOverride)
-    && (hasPlatformOverride || !mapped.some(c => c.hasApiKey))
-  ) {
-    mapped.push(toPlatformAiConfigListRow(platformOverride))
+  // The platform ("company") OpenRouter engine is always listed so it can be
+  // toggled on or off — it is never removed. Grandfathered orgs are the sole
+  // exception: their free access is explicitly BYOK-only, so they never see it.
+  if (await canUsePlatformAi(orgId)) {
+    const platformOverride = await getPlatformAiOverride(orgId)
+    const anyByokAnalysisDefault = mapped.some(c => c.isDefaultAnalysis)
+    mapped.push(
+      toPlatformAiConfigListRow(platformOverride, {
+        isDefaultAnalysisFallback: !anyByokAnalysisDefault,
+      }),
+    )
   }
 
   return mapped

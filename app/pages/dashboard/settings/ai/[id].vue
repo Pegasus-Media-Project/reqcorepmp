@@ -64,6 +64,14 @@ const isReady = computed(() =>
 )
 const notFound = computed(() => isReady.value && !config.value)
 
+// The platform ("company") AI is server-managed and not editable — bounce
+// straight back to the list, where it can be enabled or disabled.
+watch([isReady, config], () => {
+  if (isReady.value && config.value?.source === 'platform') {
+    navigateTo('/dashboard/settings/ai')
+  }
+}, { immediate: true })
+
 async function onSaved() {
   await navigateTo('/dashboard/settings/ai')
 }

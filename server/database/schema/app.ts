@@ -97,6 +97,16 @@ export const job = pgTable('job', {
   requireCoverLetter: boolean('require_cover_letter').notNull().default(false),
   // ── AI scoring settings ──
   autoScoreOnApply: boolean('auto_score_on_apply').notNull().default(false),
+  /**
+   * Which candidate data sources the AI analysis reads, beyond the resume.
+   * The resume is always included (analysis requires it); these are the
+   * optional extras the recruiter can toggle per job.
+   */
+  analysisContext: jsonb('analysis_context').$type<{
+    coverLetter: boolean
+    screeningAnswers: boolean
+    recruiterNotes: boolean
+  }>().notNull().default({ coverLetter: true, screeningAnswers: true, recruiterNotes: false }),
   // ── Timestamps ──
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

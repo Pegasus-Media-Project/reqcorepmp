@@ -4,9 +4,6 @@ import { aiConfig, platformAiConfig } from '../../../database/schema'
 import { setAiConfigDefaultSchema } from '../../../utils/schemas/scoring'
 import {
   canUsePlatformAi,
-  DEFAULT_PLATFORM_AI_NAME,
-  DEFAULT_PLATFORM_MAX_TOKENS,
-  getPlatformAiOverride,
   PLATFORM_AI_CONFIG_ID,
   PLATFORM_AI_PROVIDER,
 } from '../../../utils/ai/platformConfig'
@@ -40,7 +37,8 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 404, statusMessage: 'AI configuration not found.' })
     }
 
-    const existingOverride = await getPlatformAiOverride(orgId)
+    // Claiming the analysis slot also (re-)enables the platform engine: a
+    // disabled engine can't be a default.
     await db.transaction(async (tx) => {
       await tx.update(aiConfig)
         .set({ isDefaultAnalysis: false, updatedAt: new Date() })
@@ -49,12 +47,7 @@ export default defineEventHandler(async (event) => {
       await tx.insert(platformAiConfig)
         .values({
           organizationId: orgId,
-          name: existingOverride?.name ?? DEFAULT_PLATFORM_AI_NAME,
           provider: PLATFORM_AI_PROVIDER,
-          model: existingOverride?.model ?? env.OPENROUTER_MODEL,
-          maxTokens: existingOverride?.maxTokens ?? DEFAULT_PLATFORM_MAX_TOKENS,
-          inputPricePer1m: existingOverride?.inputPricePer1m ?? null,
-          outputPricePer1m: existingOverride?.outputPricePer1m ?? null,
           isDefaultAnalysis: true,
           isEnabled: true,
         })

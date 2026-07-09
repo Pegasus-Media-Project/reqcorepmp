@@ -5,8 +5,6 @@ import { updateAiConfigSchema } from '../../utils/schemas/scoring'
 import { encrypt } from '../../utils/encryption'
 import {
   canUsePlatformAi,
-  DEFAULT_PLATFORM_AI_NAME,
-  DEFAULT_PLATFORM_MAX_TOKENS,
   getPlatformAiOverride,
   PLATFORM_AI_CONFIG_ID,
   PLATFORM_AI_PROVIDER,
@@ -20,6 +18,10 @@ const paramsSchema = z.object({ id: z.string().min(1) })
  *
  * Update an AI configuration. Re-encrypts the API key only when supplied,
  * so users can edit name / model / pricing without re-entering credentials.
+ *
+ * The platform ("company") config is the exception: it is server-managed and
+ * cannot be edited — the only accepted field is `isEnabled`, which toggles it
+ * on or off for this workspace.
  */
 export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { scoring: ['create'] })
@@ -31,61 +33,55 @@ export default defineEventHandler(async (event) => {
     if (!await canUsePlatformAi(orgId)) {
       throw createError({ statusCode: 404, statusMessage: 'AI configuration not found.' })
     }
-    if (body.provider !== undefined && body.provider !== PLATFORM_AI_PROVIDER) {
+    if (body.isEnabled === undefined) {
       throw createError({
         statusCode: 422,
-        statusMessage: 'The platform AI configuration must use OpenRouter.',
+        statusMessage: 'The platform AI is managed by Reqcore — you can only enable or disable it.',
       })
     }
-    if (body.baseUrl != null) {
-      throw createError({
-        statusCode: 422,
-        statusMessage: 'The platform AI configuration uses the server OpenRouter endpoint.',
-      })
-    }
-    if (body.apiKey) {
-      throw createError({
-        statusCode: 422,
-        statusMessage: 'The platform OpenRouter key is managed on the server.',
-      })
-    }
-
+    const enabled = body.isEnabled
     const existingOverride = await getPlatformAiOverride(orgId)
-    const orgConfigCount = await db.$count(aiConfig, eq(aiConfig.organizationId, orgId))
-    const [updated] = await db.insert(platformAiConfig)
-      .values({
-        organizationId: orgId,
-        name: body.name ?? existingOverride?.name ?? DEFAULT_PLATFORM_AI_NAME,
-        provider: PLATFORM_AI_PROVIDER,
-        model: body.model ?? existingOverride?.model ?? env.OPENROUTER_MODEL,
-        maxTokens: body.maxTokens ?? existingOverride?.maxTokens ?? DEFAULT_PLATFORM_MAX_TOKENS,
-        inputPricePer1m: body.inputPricePer1m !== undefined
-          ? (body.inputPricePer1m != null ? String(body.inputPricePer1m) : null)
-          : existingOverride?.inputPricePer1m ?? null,
-        outputPricePer1m: body.outputPricePer1m !== undefined
-          ? (body.outputPricePer1m != null ? String(body.outputPricePer1m) : null)
-          : existingOverride?.outputPricePer1m ?? null,
-        isDefaultAnalysis: existingOverride?.isDefaultAnalysis ?? orgConfigCount === 0,
-        isEnabled: true,
-      })
-      .onConflictDoUpdate({
-        target: platformAiConfig.organizationId,
-        set: {
-          name: body.name ?? existingOverride?.name ?? DEFAULT_PLATFORM_AI_NAME,
+    const wasDefaultAnalysis = existingOverride?.isDefaultAnalysis ?? false
+    const byokAnalysisDefaultCount = await db.$count(
+      aiConfig,
+      and(eq(aiConfig.organizationId, orgId), eq(aiConfig.isDefaultAnalysis, true)),
+    )
+    // When enabling, claim the analysis slot if nothing else holds it — so the
+    // org always has a working, visibly-marked analysis engine.
+    const isDefaultAnalysis = enabled && (wasDefaultAnalysis || byokAnalysisDefaultCount === 0)
+
+    await db.transaction(async (tx) => {
+      await tx.insert(platformAiConfig)
+        .values({
+          organizationId: orgId,
           provider: PLATFORM_AI_PROVIDER,
-          model: body.model ?? existingOverride?.model ?? env.OPENROUTER_MODEL,
-          maxTokens: body.maxTokens ?? existingOverride?.maxTokens ?? DEFAULT_PLATFORM_MAX_TOKENS,
-          inputPricePer1m: body.inputPricePer1m !== undefined
-            ? (body.inputPricePer1m != null ? String(body.inputPricePer1m) : null)
-            : existingOverride?.inputPricePer1m ?? null,
-          outputPricePer1m: body.outputPricePer1m !== undefined
-            ? (body.outputPricePer1m != null ? String(body.outputPricePer1m) : null)
-            : existingOverride?.outputPricePer1m ?? null,
-          isEnabled: true,
-          updatedAt: new Date(),
-        },
-      })
-      .returning()
+          isDefaultAnalysis,
+          isEnabled: enabled,
+        })
+        .onConflictDoUpdate({
+          target: platformAiConfig.organizationId,
+          set: {
+            isEnabled: enabled,
+            isDefaultAnalysis,
+            updatedAt: new Date(),
+          },
+        })
+
+      // If we just disabled the analysis default, promote the newest BYOK
+      // config so the org doesn't silently lose candidate analysis.
+      if (!enabled && wasDefaultAnalysis) {
+        const successor = await tx.query.aiConfig.findFirst({
+          where: eq(aiConfig.organizationId, orgId),
+          orderBy: (t, { desc }) => [desc(t.createdAt)],
+          columns: { id: true },
+        })
+        if (successor) {
+          await tx.update(aiConfig)
+            .set({ isDefaultAnalysis: true, updatedAt: new Date() })
+            .where(eq(aiConfig.id, successor.id))
+        }
+      }
+    })
 
     recordActivity({
       organizationId: orgId,
@@ -93,10 +89,19 @@ export default defineEventHandler(async (event) => {
       action: 'updated',
       resourceType: 'aiConfig',
       resourceId: id,
-      metadata: { source: 'platform' },
+      metadata: { source: 'platform', isEnabled: enabled },
     })
 
-    return { config: toPlatformAiConfigListRow(updated!) }
+    const anyByokAnalysisDefault = await db.$count(
+      aiConfig,
+      and(eq(aiConfig.organizationId, orgId), eq(aiConfig.isDefaultAnalysis, true)),
+    )
+    const updated = await getPlatformAiOverride(orgId)
+    return {
+      config: toPlatformAiConfigListRow(updated, {
+        isDefaultAnalysisFallback: anyByokAnalysisDefault === 0,
+      }),
+    }
   }
 
   const existing = await db.query.aiConfig.findFirst({

@@ -15,13 +15,14 @@ import { assertPlatformBudget } from './budget'
 import { computeCostUsdMicros } from './pricing'
 import { captureAiGeneration } from './observability'
 import { extractResumeText } from '../resume-parser'
+import { fetchScreeningAnswers, DEFAULT_ANALYSIS_CONTEXT } from './analysisContext'
 
 export async function autoScoreApplication(applicationId: string, orgId: string) {
   const app = await db.query.application.findFirst({
     where: and(eq(application.id, applicationId), eq(application.organizationId, orgId)),
     with: {
       candidate: { columns: { id: true, firstName: true, lastName: true } },
-      job: { columns: { id: true, title: true, description: true } },
+      job: { columns: { id: true, title: true, description: true, analysisContext: true } },
     },
   })
   if (!app) return
@@ -69,6 +70,11 @@ export async function autoScoreApplication(applicationId: string, orgId: string)
     weight: c.weight,
   }))
 
+  const analysisContext = app.job.analysisContext ?? DEFAULT_ANALYSIS_CONTEXT
+  const screeningAnswers = analysisContext.screeningAnswers
+    ? await fetchScreeningAnswers(applicationId, orgId)
+    : null
+
   const startedAt = Date.now()
   let result
   try {
@@ -77,8 +83,9 @@ export async function autoScoreApplication(applicationId: string, orgId: string)
       jobDescription: app.job.description,
       criteria: criteriaDefinitions,
       resumeText,
-      coverLetterText: app.coverLetterText,
-      applicationNotes: app.notes,
+      coverLetterText: analysisContext.coverLetter ? app.coverLetterText : null,
+      applicationNotes: analysisContext.recruiterNotes ? app.notes : null,
+      screeningAnswers,
     })
   } catch (err: any) {
     await db.insert(analysisRun).values({

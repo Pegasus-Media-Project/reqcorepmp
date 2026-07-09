@@ -10,6 +10,7 @@ import { assertPlatformBudget, BudgetExceededError, budgetErrorToHttp } from '..
 import { computeCostUsdMicros } from '../../../utils/ai/pricing'
 import { captureAiGeneration } from '../../../utils/ai/observability'
 import { extractResumeText } from '../../../utils/resume-parser'
+import { fetchScreeningAnswers, DEFAULT_ANALYSIS_CONTEXT } from '../../../utils/ai/analysisContext'
 import { parseAndPersistDocument } from '../../../utils/document-parser'
 import { createRateLimiter } from '../../../utils/rateLimit'
 import { z } from 'zod'
@@ -43,7 +44,7 @@ export default defineEventHandler(async (event) => {
         columns: { id: true, firstName: true, lastName: true },
       },
       job: {
-        columns: { id: true, title: true, description: true },
+        columns: { id: true, title: true, description: true, analysisContext: true },
       },
     },
   })
@@ -141,6 +142,12 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  // Which optional data sources the recruiter enabled for this job (resume is always in).
+  const analysisContext = app.job.analysisContext ?? DEFAULT_ANALYSIS_CONTEXT
+  const screeningAnswers = analysisContext.screeningAnswers
+    ? await fetchScreeningAnswers(applicationId, orgId)
+    : null
+
   const startedAt = Date.now()
   let result
   try {
@@ -149,8 +156,9 @@ export default defineEventHandler(async (event) => {
       jobDescription: app.job.description,
       criteria: criteriaDefinitions,
       resumeText,
-      coverLetterText: app.coverLetterText,
-      applicationNotes: app.notes,
+      coverLetterText: analysisContext.coverLetter ? app.coverLetterText : null,
+      applicationNotes: analysisContext.recruiterNotes ? app.notes : null,
+      screeningAnswers,
     })
   } catch (err: any) {
     // Record failed analysis run

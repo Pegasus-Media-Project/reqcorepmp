@@ -279,11 +279,12 @@ watch(currentIndex, () => {
 const currentSummary = computed(() => filteredApplications.value[currentIndex.value] ?? null)
 
 // Detail tab for center panel
-type DetailTab = 'overview' | 'interviews' | 'documents' | 'responses' | 'ai-analysis' | 'timeline' | 'properties'
+type DetailTab = 'overview' | 'cover-letter' | 'interviews' | 'documents' | 'responses' | 'ai-analysis' | 'timeline' | 'properties'
 const detailTab = ref<DetailTab>('overview')
 
 // Overview section visibility toggles
 const overviewSections = reactive({
+  coverLetter: true,
   aiAnalysis: true,
   interviews: true,
   documents: true,
@@ -310,6 +311,7 @@ watch(showOverviewDropdown, (val) => {
 // Which sections to display based on active tab
 const showSection = computed(() => ({
   profile: detailTab.value === 'overview',
+  coverLetter: detailTab.value === 'overview' ? overviewSections.coverLetter : detailTab.value === 'cover-letter',
   aiAnalysis: detailTab.value === 'overview' ? overviewSections.aiAnalysis : detailTab.value === 'ai-analysis',
   interviews: detailTab.value === 'overview' ? overviewSections.interviews : detailTab.value === 'interviews',
   documents: detailTab.value === 'overview' ? overviewSections.documents : detailTab.value === 'documents',
@@ -439,6 +441,7 @@ type SwipeApplicationDetail = {
   status: string
   score: number | null
   notes: string | null
+  coverLetterText: string | null
   createdAt: string | Date
   updatedAt: string | Date
   candidate: {
@@ -1667,6 +1670,10 @@ function closeDocPreview() {
                     >
                       <span class="block px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500">Sections</span>
                       <label class="flex items-center gap-2.5 px-3.5 py-2 text-sm text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800/80 cursor-pointer select-none transition-colors">
+                        <input v-model="overviewSections.coverLetter" type="checkbox" class="size-3.5 rounded border-surface-300 text-brand-600 focus:ring-brand-500 dark:border-surface-600 dark:bg-surface-800" />
+                        Cover Letter
+                      </label>
+                      <label class="flex items-center gap-2.5 px-3.5 py-2 text-sm text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800/80 cursor-pointer select-none transition-colors">
                         <input v-model="overviewSections.aiAnalysis" type="checkbox" class="size-3.5 rounded border-surface-300 text-brand-600 focus:ring-brand-500 dark:border-surface-600 dark:bg-surface-800" />
                         AI Analysis
                       </label>
@@ -1689,6 +1696,16 @@ function closeDocPreview() {
                     </div>
                   </Transition>
                 </div>
+                <button
+                  class="cursor-pointer px-3.5 py-2.5 text-sm font-medium transition-all duration-150 border-b-2 -mb-px flex items-center gap-1.5"
+                  :class="detailTab === 'cover-letter'
+                    ? 'border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300'
+                    : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300 dark:text-surface-400 dark:hover:text-surface-300 dark:hover:border-surface-600'"
+                  @click="detailTab = 'cover-letter'"
+                >
+                  <FileText class="size-3.5" />
+                  Cover Letter
+                </button>
                 <button
                   class="cursor-pointer px-3.5 py-2.5 text-sm font-medium transition-all duration-150 border-b-2 -mb-px"
                   :class="detailTab === 'ai-analysis'
@@ -1801,6 +1818,29 @@ function closeDocPreview() {
                     <ExternalLink class="size-3.5 transition-transform group-hover:translate-x-0.5" />
                     Full application page
                   </NuxtLink>
+                </div>
+              </div>
+
+              <!-- COVER LETTER SECTION -->
+              <div v-if="showSection.coverLetter" class="max-w-4xl mx-auto" :class="detailTab === 'overview' ? 'mt-5' : ''">
+                <div v-if="resolvedCurrentApplication?.coverLetterText" class="rounded-xl border border-surface-200/80 bg-white p-5 shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
+                  <div class="flex items-center gap-2.5 mb-4">
+                    <div class="flex size-7 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-950/40">
+                      <FileText class="size-3.5 text-brand-600 dark:text-brand-400" />
+                    </div>
+                    <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">Cover letter</h3>
+                  </div>
+                  <p class="text-sm leading-relaxed text-surface-600 dark:text-surface-300 whitespace-pre-wrap">
+                    {{ resolvedCurrentApplication.coverLetterText }}
+                  </p>
+                </div>
+
+                <div v-else class="rounded-xl border border-surface-200/80 bg-white p-10 text-center shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
+                  <div class="flex size-14 items-center justify-center rounded-2xl bg-surface-100 dark:bg-surface-800/60 mx-auto mb-3">
+                    <FileText class="size-6 text-surface-400 dark:text-surface-500" />
+                  </div>
+                  <p class="text-sm font-medium text-surface-600 dark:text-surface-300">No cover letter</p>
+                  <p class="mt-1 text-xs text-surface-400 dark:text-surface-500">This candidate did not include a cover letter.</p>
                 </div>
               </div>
 

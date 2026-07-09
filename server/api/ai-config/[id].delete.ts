@@ -1,14 +1,7 @@
 import { and, eq, ne } from 'drizzle-orm'
 import { z } from 'zod'
 import { aiConfig, platformAiConfig } from '../../database/schema'
-import {
-  canUsePlatformAi,
-  DEFAULT_PLATFORM_AI_NAME,
-  DEFAULT_PLATFORM_MAX_TOKENS,
-  getPlatformAiOverride,
-  PLATFORM_AI_CONFIG_ID,
-  PLATFORM_AI_PROVIDER,
-} from '../../utils/ai/platformConfig'
+import { PLATFORM_AI_CONFIG_ID } from '../../utils/ai/platformConfig'
 
 const paramsSchema = z.object({ id: z.string().min(1) })
 
@@ -27,59 +20,13 @@ export default defineEventHandler(async (event) => {
   const orgId = session.session.activeOrganizationId
   const { id } = await getValidatedRouterParams(event, paramsSchema.parse)
 
+  // The platform ("company") AI is never deleted — it is toggled off instead
+  // (PATCH { isEnabled: false }) so it can always be turned back on.
   if (id === PLATFORM_AI_CONFIG_ID) {
-    if (!await canUsePlatformAi(orgId)) {
-      throw createError({ statusCode: 404, statusMessage: 'AI configuration not found.' })
-    }
-    const existingOverride = await getPlatformAiOverride(orgId)
-    const wasDefaultAnalysis = existingOverride?.isDefaultAnalysis ?? true
-
-    await db.transaction(async (tx) => {
-      await tx.insert(platformAiConfig)
-        .values({
-          organizationId: orgId,
-          name: existingOverride?.name ?? DEFAULT_PLATFORM_AI_NAME,
-          provider: PLATFORM_AI_PROVIDER,
-          model: existingOverride?.model ?? env.OPENROUTER_MODEL,
-          maxTokens: existingOverride?.maxTokens ?? DEFAULT_PLATFORM_MAX_TOKENS,
-          inputPricePer1m: existingOverride?.inputPricePer1m ?? null,
-          outputPricePer1m: existingOverride?.outputPricePer1m ?? null,
-          isDefaultAnalysis: false,
-          isEnabled: false,
-        })
-        .onConflictDoUpdate({
-          target: platformAiConfig.organizationId,
-          set: {
-            isDefaultAnalysis: false,
-            isEnabled: false,
-            updatedAt: new Date(),
-          },
-        })
-
-      if (wasDefaultAnalysis) {
-        const successor = await tx.query.aiConfig.findFirst({
-          where: eq(aiConfig.organizationId, orgId),
-          orderBy: (t, { desc }) => [desc(t.createdAt)],
-          columns: { id: true },
-        })
-        if (successor) {
-          await tx.update(aiConfig)
-            .set({ isDefaultAnalysis: true, updatedAt: new Date() })
-            .where(eq(aiConfig.id, successor.id))
-        }
-      }
+    throw createError({
+      statusCode: 422,
+      statusMessage: 'The platform AI can\'t be deleted — disable it instead.',
     })
-
-    recordActivity({
-      organizationId: orgId,
-      actorId: session.user.id,
-      action: 'deleted',
-      resourceType: 'aiConfig',
-      resourceId: id,
-      metadata: { source: 'platform' },
-    })
-
-    return { success: true }
   }
 
   const existing = await db.query.aiConfig.findFirst({
