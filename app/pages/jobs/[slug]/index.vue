@@ -9,15 +9,22 @@ const route = useRoute()
 const jobSlug = route.params.slug as string
 const requestURL = useRequestURL()
 const { track } = useTrack()
-const { t, locale } = useI18n()
+const { t, locale, defaultLocale } = useI18n()
 
 // Canonical + JobPosting URL are built from the real request origin rather than
 // the i18n `baseUrl` (which can point at the marketing host if the env var is
-// unset). The canonical self-references the current path so it never conflicts
-// with the noindex that localized variants inherit; `jobUrl` is the unprefixed
-// default-locale URL — the single page Google for Jobs should dedupe to.
+// unset). The canonical self-references the current path (a self-referential
+// canonical is valid on the noindex localized variants); `jobUrl` is the
+// unprefixed default-locale URL — the single page Google for Jobs dedupes to.
 const canonicalUrl = computed(() => `${requestURL.origin}${route.path}`)
 const jobUrl = computed(() => `${requestURL.origin}/jobs/${jobSlug}`)
+
+// Localized (`/es/jobs/x`, …) URLs are non-canonical duplicates of the
+// unprefixed default-locale page: the job content is single-language and only
+// the UI chrome is translated. The nuxt.config routeRules already serve them
+// `X-Robots-Tag: noindex` — mirror that in the page-level robots meta so the
+// two signals agree instead of the meta asserting `index` against the header.
+const isLocalizedVariant = computed(() => locale.value !== defaultLocale)
 
 /** Forward source-tracking query params (?ref=, utm_*) to the apply page */
 const applyQuery = computed(() => {
@@ -84,14 +91,14 @@ useSeoMeta({
     if (!job.value) return t('jobs.detail.metaDescriptionFallback')
     return `${t('jobs.detail.metaApplyFor')} ${job.value.title}. ${job.value.location ?? t('career.remote.remote')}.`
   }),
-  // A closed/expired or missing job 404s at the API and renders a "not found"
-  // body with a 200 status — opt it out of indexing so it isn't kept as a soft
-  // 404, and so Google for Jobs drops the expired posting.
-  robots: () => (fetchError.value ? 'noindex, nofollow' : 'index, follow'),
-})
-
-useHead({
-  link: () => [{ rel: 'canonical', href: canonicalUrl.value }],
+  // Noindex when either (a) the job is closed/expired/missing — it 404s at the
+  // API but renders a "not found" body with a 200 status, so opt it out of
+  // indexing to avoid a soft 404 and drop the expired posting from Google for
+  // Jobs — or (b) this is a localized variant (see `isLocalizedVariant`).
+  robots: () =>
+    fetchError.value || isLocalizedVariant.value
+      ? 'noindex, nofollow'
+      : 'index, follow',
 })
 
 // ─────────────────────────────────────────────
@@ -109,9 +116,14 @@ function mapEmploymentType(type: string): string {
   return map[type] || 'OTHER'
 }
 
-// Build the JobPosting JSON-LD reactively
-watchEffect(() => {
-  if (!job.value) return
+// Build the JobPosting JSON-LD reactively. Exposed as a computed and injected
+// via a top-level `useHead` (below) rather than a `watchEffect` + nested
+// `useHead`: on the server the watch runs once during setup before the async
+// `useFetch` resolves and never re-runs, so the script was missing from the
+// SSR HTML that Google for Jobs reads. A computed re-evaluates once `job`
+// resolves and is serialized into the rendered head.
+const jobPostingJsonLd = computed(() => {
+  if (!job.value) return null
 
   const j = job.value
   const posting: Record<string, unknown> = {
@@ -181,18 +193,19 @@ watchEffect(() => {
     }
   }
 
-  // Inject JSON-LD as a <script> tag (works without @nuxtjs/seo)
-  useHead({
-    script: [
-      {
-        type: 'application/ld+json',
-        innerHTML: JSON.stringify({
-          '@context': 'https://schema.org',
-          ...posting,
-        }),
-      },
-    ],
+  return JSON.stringify({
+    '@context': 'https://schema.org',
+    ...posting,
   })
+})
+
+// Canonical + JSON-LD, injected top-level so both are server-rendered.
+useHead({
+  link: () => [{ rel: 'canonical', href: canonicalUrl.value }],
+  script: () =>
+    jobPostingJsonLd.value
+      ? [{ type: 'application/ld+json', innerHTML: jobPostingJsonLd.value }]
+      : [],
 })
 
 const typeLabels = computed<Record<string, string>>(() => ({

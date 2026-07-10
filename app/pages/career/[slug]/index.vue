@@ -4,7 +4,7 @@ definePageMeta({
 })
 
 const route = useRoute()
-const { t } = useI18n()
+const { t, locale, defaultLocale } = useI18n()
 const localePath = useLocalePath()
 const requestURL = useRequestURL()
 
@@ -63,11 +63,17 @@ const pageDescription = computed(() =>
   data.value?.description
   || (data.value?.name ? t('career.headlineWithName', { name: data.value.name }) : t('career.openRoles')))
 
-// A disabled or missing page still returns 200 (rendering an "unavailable" or
-// "not found" body), so opt it out of indexing here — the /career/** route rule
-// otherwise marks the namespace indexable. Live pages (ready/empty) stay indexable.
+// Opt out of indexing when the page is not a live, default-locale page:
+//  - offline/notfound still return 200 (rendering an "unavailable"/"not found"
+//    body), so exclude them to avoid a soft 404 — the /career/** route rule
+//    otherwise marks the namespace indexable.
+//  - localized variants (`/es/career/x`, …) serve the same single-language,
+//    recruiter-authored content under a locale prefix; the nuxt.config
+//    routeRules already send them `X-Robots-Tag: noindex`, so mirror that here
+//    instead of letting the meta assert `index` against the header.
+// Live default-locale pages (ready/empty) stay indexable.
 const robots = computed(() =>
-  (state.value === 'offline' || state.value === 'notfound')
+  (state.value === 'offline' || state.value === 'notfound' || locale.value !== defaultLocale)
     ? 'noindex, nofollow'
     : 'index, follow')
 
