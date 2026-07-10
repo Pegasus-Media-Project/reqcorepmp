@@ -9,7 +9,6 @@ const querySchema = z.object({ kind: careerAssetKindSchema })
  * DELETE /api/career-page/asset?kind=logo|banner
  *
  * Remove a career-page image. Clears the stored key and deletes the S3 object.
- * Solo+ feature — gated via assertPlanFeature.
  */
 export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { organization: ['update'] })

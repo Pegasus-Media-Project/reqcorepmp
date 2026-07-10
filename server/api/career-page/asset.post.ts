@@ -16,8 +16,8 @@ import {
  *   - `file`: the image (PNG / JPEG / WebP)
  *   - `kind`: "logo" | "banner"
  *
- * Solo+ feature — gated via assertPlanFeature, which fails closed in production
- * when billing is unset. The image is stored to S3 under a server-generated key
+ * Available on every plan, including free — see FEATURE_MIN_TIER.
+ * The image is stored to S3 under a server-generated key
  * and the key is upserted onto the org's career_page row. Any previously stored
  * image for the same slot is deleted. Served publicly via
  * /api/public/career-page/:slug/asset.

@@ -11,7 +11,7 @@ import { careerAssetKindSchema, CAREER_ASSET_MIME_TYPES } from '../../../../util
  * through our origin so the public page can render it without exposing the
  * private bucket.
  *
- * - Org not found, plan lacks `careerPage`, or no image for the slot → 404.
+ * - Org not found, or no image for the slot → 404.
  * - Content-Type is forced to the safe raster set and sniffing is disabled.
  */
 const querySchema = z.object({ kind: careerAssetKindSchema })

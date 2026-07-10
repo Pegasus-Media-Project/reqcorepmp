@@ -11,8 +11,8 @@ function emptyToNull(v: string | null | undefined): string | null | undefined {
 
 /**
  * PUT /api/career-page
- * Upserts the active org's career-page configuration. Solo+ feature — gated via
- * assertPlanFeature, which fails closed in production when billing is unset.
+ * Upserts the active org's career-page configuration. Available on every plan,
+ * including free — see FEATURE_MIN_TIER.
  */
 export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { organization: ['update'] })

@@ -1137,8 +1137,8 @@ export const chatbotMessageRelations = relations(chatbotMessage, ({ one }) => ({
  *
  * One row per organization — upserted on first edit. Absence of a row means the
  * org has never customized its page and defaults apply (accent = brand, headline
- * derived from the org name). The page is only live for orgs whose plan
- * includes the `careerPage` feature (Solo+); the public route 404s otherwise.
+ * derived from the org name). Every plan includes the `careerPage` feature, so
+ * the page is live unless the org has explicitly disabled it.
  */
 export const careerPage = pgTable('career_page', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),

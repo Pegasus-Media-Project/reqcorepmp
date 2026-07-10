@@ -1,7 +1,5 @@
 import { eq } from 'drizzle-orm'
 import { job, careerPage } from '../database/schema'
-import { tierHasFeature } from '../../shared/billing'
-import { resolveOrgPlanId } from '../utils/billing/plan'
 
 /**
  * GET /sitemap.xml
@@ -40,17 +38,14 @@ export default defineEventHandler(async (event) => {
   }
 
   // Live career pages — orgs that have customized their page (a row exists) and
-  // left it enabled, gated to plans that include the careerPage feature. Entitled
-  // orgs that never touched their page (no row) still have a default page but are
-  // omitted here; they remain crawlable when linked.
+  // left it enabled. Orgs that never touched their page (no row) still have a
+  // default page but are omitted here; they remain crawlable when linked.
   const pages = await db.query.careerPage.findMany({
     where: eq(careerPage.enabled, true),
     columns: { slug: true, organizationId: true, updatedAt: true },
     with: { organization: { columns: { slug: true } } },
   })
   for (const p of pages) {
-    const tier = await resolveOrgPlanId(p.organizationId)
-    if (!tierHasFeature(tier, 'careerPage')) continue
     const canonicalSlug = p.slug ?? p.organization.slug
     urls.push({ loc: `${origin}/career/${canonicalSlug}`, lastmod: p.updatedAt.toISOString() })
   }

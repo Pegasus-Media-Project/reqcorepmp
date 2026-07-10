@@ -162,7 +162,7 @@ export function activeRoleLimitForTier(tier: string): number {
  */
 export type PlanFeature =
   | 'interviews' // Interview scheduling — Solo and above
-  | 'careerPage' // Branded per-org career page — Solo and above
+  | 'careerPage' // Branded per-org career page — available on every plan
   | 'calendar' // Calendar (Google) sync on interviews — Team and above
   | 'sourceAnalytics' // Source attribution dashboard — Team and above
   | 'activityTimeline' // Org-wide activity timeline — Team and above
@@ -186,10 +186,17 @@ const TIER_DISPLAY_NAME: Record<BillingTier, string> = {
   agency: 'Agency',
 }
 
-/** Minimum tier required for each plan-gated feature. */
+/**
+ * Minimum tier required for each plan-gated feature.
+ *
+ * `careerPage` is deliberately free: a free org has no applicant flood to import,
+ * so the career page is its only route to a first shortlist — the moment the
+ * value-gated trial exists to reach. The Reqcore-branded page is also the
+ * acquisition surface; Team monetizes *removing* that branding, not having it.
+ */
 export const FEATURE_MIN_TIER: Record<PlanFeature, BillingTier> = {
   interviews: 'solo',
-  careerPage: 'solo',
+  careerPage: 'free',
   calendar: 'team',
   sourceAnalytics: 'team',
   activityTimeline: 'team',

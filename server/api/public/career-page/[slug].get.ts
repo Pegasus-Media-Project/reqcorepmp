@@ -11,8 +11,8 @@ import { publicJobSlugSchema } from '../../../utils/schemas/publicApplication'
  * The `:slug` may be a custom career-page slug or the org slug (custom wins).
  * `canonicalSlug` lets the page emit a canonical URL when both resolve.
  *
- * - Org not found, or plan lacks `careerPage` (free) → 404.
- * - Org found + entitled but page disabled → 200 with `{ offline: true }` so the
+ * - Org not found → 404.
+ * - Org found but page disabled → 200 with `{ offline: true }` so the
  *   page can render an "unavailable" state rather than a hard 404.
  */
 export default defineEventHandler(async (event) => {
