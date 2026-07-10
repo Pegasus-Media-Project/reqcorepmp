@@ -5,9 +5,11 @@ import {
   Pencil, Trash2, Globe, ChevronDown, X,
   Video, Building2, Code2, UsersRound, Save, Check, MapPin, Users, Plus,
   CheckCircle2, XCircle, AlertTriangle, ArrowUpDown, ListFilter,
-  Maximize2, Minimize2, Brain, Loader2, History, SlidersHorizontal,
-  ChevronLeft, ChevronRight,
+  Maximize2, Minimize2, Brain, History, SlidersHorizontal,
+  ChevronLeft, ChevronRight, UnfoldHorizontal, FoldHorizontal,
+  StickyNote, MoreHorizontal,
 } from 'lucide-vue-next'
+import type { Component } from 'vue'
 import type { PropertyEntry, PropertyFilter } from '~~/shared/properties'
 import { usePreviewReadOnly } from '~/composables/usePreviewReadOnly'
 import { APPLICATION_STATUS_TRANSITIONS, INTERVIEW_STATUS_TRANSITIONS } from '~~/shared/status-transitions'
@@ -176,10 +178,23 @@ const statusCounts = computed(() => {
 })
 
 const selectedApplicationId = ref<string | null>(null)
-const pendingPageSelection = ref<'first' | 'last' | null>(null)
+// One-shot instruction for the next list arrival: paging backwards should land on
+// the last candidate of the previous page instead of the default first.
+const selectLastOnNextLoad = ref(false)
+
+// Derived, not assigned from a watcher: the applications fetch resolves after
+// setup() on the server and watchers never re-run there, so a watcher-set
+// selection stays null in the server HTML while the client picks a candidate
+// during hydration. Vue does not patch mismatched classes on hydration, which
+// leaves the sidebar with nothing highlighted.
+const currentSummary = computed(() => {
+  const apps = filteredApplications.value
+  if (apps.length === 0) return null
+  return apps.find(app => app.id === selectedApplicationId.value) ?? apps[0]!
+})
 
 const currentIndex = computed({
-  get: () => filteredApplications.value.findIndex(app => app.id === selectedApplicationId.value),
+  get: () => filteredApplications.value.findIndex(app => app.id === currentSummary.value?.id),
   set: (index: number) => {
     selectedApplicationId.value = filteredApplications.value[index]?.id ?? null
   },
@@ -189,18 +204,11 @@ const currentIndex = computed({
 const showMobileDetail = ref(false)
 
 watch(filteredApplications, (apps) => {
-  if (apps.length === 0) {
-    selectedApplicationId.value = null
-    return
+  if (selectLastOnNextLoad.value && apps.length > 0) {
+    selectedApplicationId.value = apps[apps.length - 1]!.id
   }
-
-  if (!apps.some(app => app.id === selectedApplicationId.value)) {
-    selectedApplicationId.value = pendingPageSelection.value === 'last'
-      ? apps[apps.length - 1]!.id
-      : apps[0]!.id
-  }
-  pendingPageSelection.value = null
-}, { immediate: true })
+  selectLastOnNextLoad.value = false
+})
 
 watch(focusStatus, () => {
   searchTerm.value = ''
@@ -230,12 +238,8 @@ watch(currentIndex, () => {
   })
 })
 
-const currentSummary = computed(() =>
-  filteredApplications.value.find(app => app.id === selectedApplicationId.value) ?? null,
-)
-
 // Detail tab for center panel
-type DetailTab = 'overview' | 'cover-letter' | 'interviews' | 'documents' | 'responses' | 'ai-analysis' | 'timeline' | 'properties'
+type DetailTab = 'overview' | 'cover-letter' | 'interviews' | 'documents' | 'responses' | 'ai-analysis' | 'timeline' | 'properties' | 'notes'
 const detailTab = ref<DetailTab>('overview')
 
 // Overview section visibility toggles
@@ -246,6 +250,7 @@ const overviewSections = reactive({
   documents: true,
   responses: true,
   properties: true,
+  notes: true,
 })
 const showOverviewDropdown = ref(false)
 const overviewDropdownRef = ref<HTMLElement | null>(null)
@@ -273,6 +278,7 @@ const showSection = computed(() => ({
   documents: detailTab.value === 'overview' ? overviewSections.documents : detailTab.value === 'documents',
   responses: detailTab.value === 'overview' ? overviewSections.responses : detailTab.value === 'responses',
   properties: detailTab.value === 'overview' ? overviewSections.properties : detailTab.value === 'properties',
+  notes: detailTab.value === 'overview' ? overviewSections.notes : detailTab.value === 'notes',
   timeline: detailTab.value === 'timeline',
 }))
 
@@ -488,6 +494,177 @@ watch([detailTab, timelineCandidateId], () => {
     loadTimeline()
   }
 })
+
+// ─────────────────────────────────────────────
+// Notes (comments on the application)
+// ─────────────────────────────────────────────
+
+interface ApplicationNote {
+  id: string
+  body: string
+  createdAt: string
+  updatedAt: string
+  authorId: string
+  authorName: string | null
+  authorEmail: string | null
+  authorImage: string | null
+}
+
+const { allowed: canCreateNote, role: noteRole } = usePermission({ comment: ['create'] })
+
+// Only used to decide which notes the current user owns, and notes are never
+// rendered during SSR — so resolve the session on the client rather than
+// awaiting it in setup.
+const currentUserId = ref<string | null>(null)
+onMounted(async () => {
+  const { data } = await authClient.getSession()
+  currentUserId.value = data?.user?.id ?? null
+})
+
+// Every role can edit/delete its own note; admins & owners can delete anyone's.
+const canDeleteAnyNote = computed(() => noteRole.value === 'admin' || noteRole.value === 'owner')
+
+const notes = ref<ApplicationNote[]>([])
+const notesLoading = ref(false)
+const notesError = ref<string | null>(null)
+const notesLoaded = ref(false)
+
+const noteDraft = ref('')
+const isSavingNote = ref(false)
+const editingNoteId = ref<string | null>(null)
+const editingNoteBody = ref('')
+const isUpdatingNote = ref(false)
+const deletingNoteId = ref<string | null>(null)
+
+const NOTE_MAX_LENGTH = 10000
+
+function canEditNote(note: ApplicationNote) {
+  return note.authorId === currentUserId.value
+}
+
+function canRemoveNote(note: ApplicationNote) {
+  return canDeleteAnyNote.value || note.authorId === currentUserId.value
+}
+
+function noteAuthorLabel(note: ApplicationNote) {
+  return note.authorName ?? note.authorEmail ?? 'Unknown'
+}
+
+/** `silent` keeps the existing list on screen while refreshing after a mutation. */
+async function loadNotes(silent = false) {
+  const appId = currentApplicationId.value
+  if (!appId) return
+  if (!silent) notesLoading.value = true
+  notesError.value = null
+  try {
+    const result = await $fetch<{ data: ApplicationNote[] }>('/api/comments', {
+      query: { targetType: 'application', targetId: appId, limit: 100 },
+    })
+    if (appId !== currentApplicationId.value) return
+    notes.value = result.data
+    notesLoaded.value = true
+  } catch (err: any) {
+    if (appId !== currentApplicationId.value) return
+    notesError.value = err?.data?.statusMessage ?? 'Failed to load notes'
+  } finally {
+    if (appId === currentApplicationId.value) notesLoading.value = false
+  }
+}
+
+watch(currentApplicationId, () => {
+  notes.value = []
+  notesLoading.value = false
+  notesLoaded.value = false
+  notesError.value = null
+  noteDraft.value = ''
+  editingNoteId.value = null
+  editingNoteBody.value = ''
+})
+
+// Notes live inside the detail pane, which only renders once the (client-side)
+// detail fetch resolves — so a server-side fetch here would be thrown away.
+watch([() => showSection.value.notes, currentApplicationId], () => {
+  if (import.meta.server) return
+  if (showSection.value.notes && !notesLoaded.value && currentApplicationId.value) {
+    loadNotes()
+  }
+}, { immediate: true })
+
+async function addNote() {
+  const body = noteDraft.value.trim()
+  const appId = currentApplicationId.value
+  if (!body || !appId || isSavingNote.value) return
+
+  isSavingNote.value = true
+  try {
+    await $fetch('/api/comments', {
+      method: 'POST',
+      body: { targetType: 'application', targetId: appId, body },
+    })
+    if (appId !== currentApplicationId.value) return
+    noteDraft.value = ''
+    timelineLoaded.value = false
+    await loadNotes(true)
+  } catch (err: any) {
+    if (handlePreviewReadOnlyError(err)) return
+    toast.error('Failed to add note', { message: err?.data?.statusMessage, statusCode: err?.data?.statusCode })
+  } finally {
+    isSavingNote.value = false
+  }
+}
+
+function startEditNote(note: ApplicationNote) {
+  editingNoteId.value = note.id
+  editingNoteBody.value = note.body
+}
+
+function cancelEditNote() {
+  editingNoteId.value = null
+  editingNoteBody.value = ''
+}
+
+async function saveNote() {
+  const noteId = editingNoteId.value
+  const body = editingNoteBody.value.trim()
+  if (!noteId || !body || isUpdatingNote.value) return
+
+  isUpdatingNote.value = true
+  try {
+    const updated = await $fetch<ApplicationNote>(`/api/comments/${noteId}`, {
+      method: 'PATCH',
+      body: { body },
+    })
+    const existing = notes.value.find(n => n.id === noteId)
+    if (existing) {
+      existing.body = updated.body
+      existing.updatedAt = updated.updatedAt
+    }
+    cancelEditNote()
+  } catch (err: any) {
+    if (handlePreviewReadOnlyError(err)) return
+    toast.error('Failed to save note', { message: err?.data?.statusMessage, statusCode: err?.data?.statusCode })
+  } finally {
+    isUpdatingNote.value = false
+  }
+}
+
+async function deleteNote(note: ApplicationNote) {
+  if (deletingNoteId.value) return
+  if (!confirm('Delete this note? This cannot be undone.')) return
+
+  deletingNoteId.value = note.id
+  try {
+    await $fetch(`/api/comments/${note.id}`, { method: 'DELETE' })
+    notes.value = notes.value.filter(n => n.id !== note.id)
+    timelineLoaded.value = false
+    if (editingNoteId.value === note.id) cancelEditNote()
+  } catch (err: any) {
+    if (handlePreviewReadOnlyError(err)) return
+    toast.error('Failed to delete note', { message: err?.data?.statusMessage, statusCode: err?.data?.statusCode })
+  } finally {
+    deletingNoteId.value = null
+  }
+}
 
 useSeoMeta({
   title: computed(() =>
@@ -922,7 +1099,7 @@ async function goToPreviousCard() {
     return
   }
   if (page.value > 1) {
-    pendingPageSelection.value = 'last'
+    selectLastOnNextLoad.value = true
     page.value -= 1
   }
 }
@@ -933,7 +1110,7 @@ async function goToNextCard() {
     return
   }
   if (page.value < totalPages.value) {
-    pendingPageSelection.value = 'first'
+    selectLastOnNextLoad.value = false
     page.value += 1
   }
 }
@@ -942,6 +1119,8 @@ async function goToNextCard() {
 // Fullscreen (focus) mode
 // ─────────────────────────────────────────────
 const isFullscreen = ref(false)
+const isWideDetail = ref(false)
+const detailWidthClass = computed(() => isWideDetail.value ? 'max-w-none' : 'max-w-4xl')
 const pipelineContainer = useTemplateRef<HTMLElement>('pipelineContainer')
 const teleportTarget = computed(() => isFullscreen.value && pipelineContainer.value ? pipelineContainer.value : 'body')
 
@@ -967,6 +1146,118 @@ function onFullscreenChange() {
 
 onMounted(() => document.addEventListener('fullscreenchange', onFullscreenChange))
 onBeforeUnmount(() => document.removeEventListener('fullscreenchange', onFullscreenChange))
+
+// ─────────────────────────────────────────────
+// Detail tab overflow ("priority+" tab bar)
+//
+// Overview is pinned; the remaining tabs are shown inline as long as they fit
+// the detail pane, and collapse into a "more" menu from the right when they
+// don't. Widths come from an invisible ghost row that always renders the full
+// tab set, so measuring never depends on what is currently visible.
+// ─────────────────────────────────────────────
+type OverflowTab = Exclude<DetailTab, 'overview'>
+
+interface DetailTabDef {
+  key: OverflowTab
+  label: string
+  icon?: Component
+  count?: number
+}
+
+const detailTabDefs = computed<DetailTabDef[]>(() => {
+  const defs: DetailTabDef[] = []
+  if (hasCoverLetter.value) {
+    defs.push({ key: 'cover-letter', label: 'Cover Letter', icon: FileText })
+  }
+  defs.push({ key: 'ai-analysis', label: 'AI Analysis' })
+  defs.push({ key: 'interviews', label: 'Interviews', count: currentApplicationInterviews.value.length })
+  defs.push({ key: 'documents', label: 'Documents', count: resolvedCurrentApplication.value?.candidate.documents?.length ?? 0 })
+  defs.push({ key: 'responses', label: 'Responses', count: resolvedCurrentApplication.value?.responses?.length ?? 0 })
+  defs.push({ key: 'notes', label: 'Notes', icon: StickyNote, count: notes.value.length })
+  defs.push({ key: 'timeline', label: 'Timeline', icon: History })
+  defs.push({ key: 'properties', label: 'Properties', icon: SlidersHorizontal })
+  return defs
+})
+
+const tabBar = useTemplateRef<HTMLElement>('tabBar')
+const tabGhost = useTemplateRef<HTMLElement>('tabGhost')
+const tabOverflowRef = ref<HTMLElement | null>(null)
+const showTabOverflowMenu = ref(false)
+const visibleTabCount = ref(Number.POSITIVE_INFINITY)
+
+const visibleTabs = computed(() => detailTabDefs.value.slice(0, visibleTabCount.value))
+const overflowTabs = computed(() => detailTabDefs.value.slice(visibleTabCount.value))
+const isOverflowTabActive = computed(() => overflowTabs.value.some(tab => tab.key === detailTab.value))
+
+// Matches the `gap-1` between tab buttons.
+const TAB_GAP_PX = 4
+
+function recomputeTabOverflow() {
+  const bar = tabBar.value
+  const ghost = tabGhost.value
+  if (!bar || !ghost) return
+
+  const pinned = ghost.querySelector<HTMLElement>('[data-ghost-pinned]')
+  const more = ghost.querySelector<HTMLElement>('[data-ghost-more]')
+  const items = [...ghost.querySelectorAll<HTMLElement>('[data-ghost-tab]')]
+  if (!pinned || !more || items.length !== detailTabDefs.value.length) return
+
+  const widths = items.map(el => el.offsetWidth + TAB_GAP_PX)
+  const available = bar.clientWidth - pinned.offsetWidth
+  if (widths.reduce((sum, w) => sum + w, 0) <= available) {
+    visibleTabCount.value = items.length
+    return
+  }
+
+  const budget = available - (more.offsetWidth + TAB_GAP_PX)
+  let used = 0
+  let count = 0
+  for (const width of widths) {
+    if (used + width > budget) break
+    used += width
+    count++
+  }
+  visibleTabCount.value = count
+}
+
+function selectOverflowTab(key: OverflowTab) {
+  detailTab.value = key
+  showTabOverflowMenu.value = false
+}
+
+function handleTabOverflowClickOutside(event: MouseEvent) {
+  if (tabOverflowRef.value && !tabOverflowRef.value.contains(event.target as Node)) {
+    showTabOverflowMenu.value = false
+  }
+}
+
+watch(showTabOverflowMenu, (val) => {
+  if (val) {
+    showOverviewDropdown.value = false
+    setTimeout(() => document.addEventListener('click', handleTabOverflowClickOutside), 0)
+  } else {
+    document.removeEventListener('click', handleTabOverflowClickOutside)
+  }
+})
+
+if (import.meta.client) {
+  let tabResizeObserver: ResizeObserver | null = null
+
+  // The ghost row is `w-max`, so observing it also catches label/count changes.
+  watch([tabBar, tabGhost], ([bar, ghost]) => {
+    tabResizeObserver?.disconnect()
+    if (!bar || !ghost || typeof ResizeObserver === 'undefined') return
+    tabResizeObserver ??= new ResizeObserver(() => recomputeTabOverflow())
+    tabResizeObserver.observe(bar)
+    tabResizeObserver.observe(ghost)
+    recomputeTabOverflow()
+  }, { flush: 'post' })
+
+  onBeforeUnmount(() => {
+    tabResizeObserver?.disconnect()
+    document.removeEventListener('click', handleTabOverflowClickOutside)
+  })
+}
 
 function goToPreviousStage() {
   const idx = PIPELINE_STATUSES.indexOf(focusStatus.value)
@@ -1040,41 +1331,6 @@ const jobStatusBadgeClasses: Record<string, string> = {
   open: 'bg-success-50 dark:bg-success-950 text-success-700 dark:text-success-400',
   closed: 'bg-warning-50 dark:bg-warning-950 text-warning-700 dark:text-warning-400',
   archived: 'bg-surface-100 dark:bg-surface-800 text-surface-400',
-}
-
-const isScoringIndividual = ref(false)
-
-async function scoreIndividualCandidate(applicationId: string) {
-  isScoringIndividual.value = true
-  try {
-    await $fetch(`/api/applications/${applicationId}/analyze`, {
-      method: 'POST',
-    })
-    await refreshApps()
-    // Re-fetch the detail so score updates in the detail panel
-    if (currentApplicationId.value === applicationId) {
-      await executeDetailFetch()
-    }
-    track('individual_scoring_completed', { application_id: applicationId })
-    toast.success('Candidate scored', 'AI analysis complete.')
-  } catch (err: any) {
-    const statusMessage = err?.data?.statusMessage ?? ''
-    if (statusMessage.includes('AI provider not configured')) {
-      toast.add({
-        type: 'warning',
-        title: 'AI provider not configured',
-        message: 'Set up your AI provider in Settings first.',
-        link: { label: 'Go to AI Settings', href: '/dashboard/settings/ai' },
-        duration: 8000,
-      })
-    } else if (statusMessage.includes('No scoring criteria')) {
-      toast.warning('No scoring criteria', 'Add scoring criteria to this job first.')
-    } else {
-      toast.error('Scoring failed', { message: statusMessage || 'An unexpected error occurred.', statusCode: err?.data?.statusCode })
-    }
-  } finally {
-    isScoringIndividual.value = false
-  }
 }
 
 onBeforeUnmount(() => {
@@ -1490,7 +1746,7 @@ function closeDocPreview() {
           <template v-else>
             <!-- Sticky status transitions (stays visible on scroll) -->
             <div v-if="allowedTransitions.length > 0" class="shrink-0 border-b border-surface-200/80 bg-white/95 backdrop-blur-sm px-4 sm:px-6 py-2.5 dark:border-surface-800/60 dark:bg-surface-900/95">
-              <div class="mx-auto max-w-4xl flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <div class="mx-auto flex flex-wrap items-center gap-1.5 sm:gap-2" :class="detailWidthClass">
                 <button
                   v-for="(nextStatus, idx) in allowedTransitions"
                   :key="nextStatus"
@@ -1509,8 +1765,8 @@ function closeDocPreview() {
             <div ref="detailScrollContainer" class="flex-1 overflow-y-auto scrollbar-thin pb-20 md:pb-0">
 
             <!-- Candidate header -->
-            <div class="border-b border-surface-200 bg-surface-50 px-4 sm:px-6 py-4 sm:py-6 dark:border-surface-800 dark:bg-surface-900/80">
-              <div class="mx-auto max-w-4xl">
+            <div class="border-b border-surface-200 bg-surface-50 px-4 sm:px-6 py-3 sm:py-4 dark:border-surface-800 dark:bg-surface-900/80">
+              <div class="mx-auto" :class="detailWidthClass">
               <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div class="flex items-start gap-4 min-w-0">
                   <div class="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 text-lg font-bold text-white shadow-lg shadow-brand-500/20 dark:from-brand-500 dark:to-brand-700 dark:shadow-brand-500/10">
@@ -1548,10 +1804,16 @@ function closeDocPreview() {
                         <Phone class="size-3.5" />
                         {{ resolvedCurrentApplication.candidate.phone }}
                       </span>
+                      <TimelineDateLink :date="currentSummary.createdAt" class="inline-flex items-center gap-1 text-[11px] text-surface-400 dark:text-surface-500">
+                        <Clock class="size-3" />
+                        Applied {{ new Date(currentSummary.createdAt).toLocaleDateString() }}
+                      </TimelineDateLink>
+                      <span v-if="currentSummary.updatedAt !== currentSummary.createdAt" class="inline-flex items-center gap-1 text-[11px] text-surface-400 dark:text-surface-500">
+                        · <TimelineDateLink :date="currentSummary.updatedAt">Updated {{ new Date(currentSummary.updatedAt).toLocaleDateString() }}</TimelineDateLink>
+                      </span>
                     </div>
-                    <div class="mt-2 flex flex-wrap items-center gap-2">
+                    <div v-if="currentSummary.score != null" class="mt-2 flex flex-wrap items-center gap-2">
                       <span
-                        v-if="currentSummary.score != null"
                         class="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset"
                         :class="{
                           'bg-success-50 text-success-700 ring-success-200 dark:bg-success-950/60 dark:text-success-400 dark:ring-success-800': currentSummary.score >= 75,
@@ -1560,25 +1822,6 @@ function closeDocPreview() {
                         }"
                       >
                         {{ currentSummary.score }} pts
-                      </span>
-                      <button
-                        :disabled="isScoringIndividual"
-                        class="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
-                        :class="currentSummary.score != null
-                          ? 'text-surface-500 hover:text-brand-600 hover:bg-brand-50 dark:text-surface-400 dark:hover:text-brand-400 dark:hover:bg-brand-950/40'
-                          : 'text-brand-600 bg-brand-50 hover:bg-brand-100 dark:text-brand-400 dark:bg-brand-950/40 dark:hover:bg-brand-950/60 ring-1 ring-brand-200 dark:ring-brand-800'"
-                        @click="scoreIndividualCandidate(currentSummary.id)"
-                      >
-                        <Loader2 v-if="isScoringIndividual" class="size-3 animate-spin" />
-                        <Brain v-else class="size-3" />
-                        {{ isScoringIndividual ? 'Scoring…' : (currentSummary.score != null ? 'Re-score' : 'Score Candidate') }}
-                      </button>
-                      <TimelineDateLink :date="currentSummary.createdAt" class="inline-flex items-center gap-1 text-[11px] text-surface-400 dark:text-surface-500">
-                        <Clock class="size-3" />
-                        Applied {{ new Date(currentSummary.createdAt).toLocaleDateString() }}
-                      </TimelineDateLink>
-                      <span v-if="currentSummary.updatedAt !== currentSummary.createdAt" class="inline-flex items-center gap-1 text-[11px] text-surface-400 dark:text-surface-500">
-                        · <TimelineDateLink :date="currentSummary.updatedAt">Updated {{ new Date(currentSummary.updatedAt).toLocaleDateString() }}</TimelineDateLink>
                       </span>
                     </div>
                   </div>
@@ -1603,6 +1846,15 @@ function closeDocPreview() {
                       <ArrowRight class="size-4" />
                     </button>
                   </div>
+                  <button
+                    class="hidden lg:flex cursor-pointer items-center justify-center rounded-lg border border-surface-200 p-1.5 text-surface-500 transition-all duration-150 hover:bg-white hover:border-surface-300 hover:text-surface-700 dark:border-surface-700 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:border-surface-600 dark:hover:text-surface-300"
+                    :aria-pressed="isWideDetail"
+                    :title="isWideDetail ? 'Use centered width' : 'Use full width'"
+                    @click="isWideDetail = !isWideDetail"
+                  >
+                    <FoldHorizontal v-if="isWideDetail" class="size-4" />
+                    <UnfoldHorizontal v-else class="size-4" />
+                  </button>
                   <NuxtLink
                     :to="$localePath(`/dashboard/applications/${currentSummary.id}`)"
                     class="flex items-center justify-center rounded-lg border border-surface-200 p-1.5 text-surface-500 transition-all duration-150 hover:bg-white hover:border-surface-300 hover:text-surface-700 dark:border-surface-700 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:border-surface-600 dark:hover:text-surface-300"
@@ -1617,8 +1869,8 @@ function closeDocPreview() {
 
             <!-- Detail tabs -->
             <div class="border-b border-surface-200/80 bg-white px-4 sm:px-6 dark:border-surface-800/60 dark:bg-surface-900">
-              <div class="mx-auto max-w-4xl flex gap-1 -mb-px scrollbar-none whitespace-nowrap" :class="showOverviewDropdown ? '' : 'overflow-x-auto'">
-                <div ref="overviewDropdownRef" class="relative">
+              <div ref="tabBar" class="relative mx-auto flex gap-1 -mb-px whitespace-nowrap" :class="detailWidthClass">
+                <div ref="overviewDropdownRef" class="relative shrink-0">
                   <div class="flex items-center border-b-2 transition-all duration-150" :class="detailTab === 'overview'
                     ? 'border-brand-600 dark:border-brand-400'
                     : 'border-transparent'">
@@ -1675,103 +1927,115 @@ function closeDocPreview() {
                         Responses
                       </label>
                       <label class="flex items-center gap-2.5 px-3.5 py-2 text-sm text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800/80 cursor-pointer select-none transition-colors">
+                        <input v-model="overviewSections.notes" type="checkbox" class="size-3.5 rounded border-surface-300 text-brand-600 focus:ring-brand-500 dark:border-surface-600 dark:bg-surface-800" />
+                        Notes
+                      </label>
+                      <label class="flex items-center gap-2.5 px-3.5 py-2 text-sm text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800/80 cursor-pointer select-none transition-colors">
                         <input v-model="overviewSections.properties" type="checkbox" class="size-3.5 rounded border-surface-300 text-brand-600 focus:ring-brand-500 dark:border-surface-600 dark:bg-surface-800" />
                         Properties
                       </label>
                     </div>
                   </Transition>
                 </div>
+                <!-- Tabs that fit the current pane width -->
                 <button
-                  v-if="hasCoverLetter"
-                  class="cursor-pointer px-3.5 py-2.5 text-sm font-medium transition-all duration-150 border-b-2 -mb-px flex items-center gap-1.5"
-                  :class="detailTab === 'cover-letter'
+                  v-for="tab in visibleTabs"
+                  :key="tab.key"
+                  class="shrink-0 cursor-pointer px-3.5 py-2.5 text-sm font-medium transition-all duration-150 border-b-2 -mb-px flex items-center gap-1.5"
+                  :class="detailTab === tab.key
                     ? 'border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300'
                     : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300 dark:text-surface-400 dark:hover:text-surface-300 dark:hover:border-surface-600'"
-                  @click="detailTab = 'cover-letter'"
+                  @click="detailTab = tab.key"
                 >
-                  <FileText class="size-3.5" />
-                  Cover Letter
-                </button>
-                <button
-                  class="cursor-pointer px-3.5 py-2.5 text-sm font-medium transition-all duration-150 border-b-2 -mb-px"
-                  :class="detailTab === 'ai-analysis'
-                    ? 'border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300'
-                    : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300 dark:text-surface-400 dark:hover:text-surface-300 dark:hover:border-surface-600'"
-                  @click="detailTab = 'ai-analysis'"
-                >
-                  AI Analysis
-                </button>
-                <button
-                  class="cursor-pointer px-3.5 py-2.5 text-sm font-medium transition-all duration-150 border-b-2 -mb-px"
-                  :class="detailTab === 'interviews'
-                    ? 'border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300'
-                    : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300 dark:text-surface-400 dark:hover:text-surface-300 dark:hover:border-surface-600'"
-                  @click="detailTab = 'interviews'"
-                >
-                  Interviews
-                  <span
-                    v-if="currentApplicationInterviews.length > 0"
-                    class="ml-1 text-xs text-surface-400"
-                  >
-                    ({{ currentApplicationInterviews.length }})
+                  <component :is="tab.icon" v-if="tab.icon" class="size-3.5" />
+                  {{ tab.label }}
+                  <span v-if="tab.count" class="ml-1 text-xs text-surface-400">
+                    ({{ tab.count }})
                   </span>
                 </button>
-                <button
-                  class="cursor-pointer px-3.5 py-2.5 text-sm font-medium transition-all duration-150 border-b-2 -mb-px"
-                  :class="detailTab === 'documents'
-                    ? 'border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300'
-                    : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300 dark:text-surface-400 dark:hover:text-surface-300 dark:hover:border-surface-600'"
-                  @click="detailTab = 'documents'"
-                >
-                  Documents
-                  <span
-                    v-if="resolvedCurrentApplication?.candidate.documents?.length"
-                    class="ml-1 text-xs text-surface-400"
+
+                <!-- Tabs that don't fit -->
+                <div v-if="overflowTabs.length > 0" ref="tabOverflowRef" class="relative ml-auto shrink-0">
+                  <button
+                    class="cursor-pointer px-3 py-2.5 text-sm font-medium transition-all duration-150 border-b-2 -mb-px flex items-center gap-1.5"
+                    :class="isOverflowTabActive
+                      ? 'border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300'
+                      : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300 dark:text-surface-400 dark:hover:text-surface-300 dark:hover:border-surface-600'"
+                    :aria-expanded="showTabOverflowMenu"
+                    aria-label="More tabs"
+                    @click.stop="showTabOverflowMenu = !showTabOverflowMenu"
                   >
-                    ({{ resolvedCurrentApplication.candidate.documents.length }})
-                  </span>
-                </button>
-                <button
-                  class="cursor-pointer px-3.5 py-2.5 text-sm font-medium transition-all duration-150 border-b-2 -mb-px"
-                  :class="detailTab === 'responses'
-                    ? 'border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300'
-                    : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300 dark:text-surface-400 dark:hover:text-surface-300 dark:hover:border-surface-600'"
-                  @click="detailTab = 'responses'"
-                >
-                  Responses
-                  <span
-                    v-if="resolvedCurrentApplication?.responses?.length"
-                    class="ml-1 text-xs text-surface-400"
+                    <MoreHorizontal class="size-4" />
+                    <span class="text-xs tabular-nums">{{ overflowTabs.length }}</span>
+                  </button>
+
+                  <Transition
+                    enter-active-class="transition duration-150 ease-out"
+                    enter-from-class="opacity-0 scale-95 -translate-y-1"
+                    enter-to-class="opacity-100 scale-100 translate-y-0"
+                    leave-active-class="transition duration-100 ease-in"
+                    leave-from-class="opacity-100 scale-100 translate-y-0"
+                    leave-to-class="opacity-0 scale-95 -translate-y-1"
                   >
-                    ({{ resolvedCurrentApplication.responses.length }})
+                    <div
+                      v-if="showTabOverflowMenu"
+                      class="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border border-surface-200 dark:border-surface-700/80 bg-white dark:bg-surface-900 shadow-xl shadow-surface-900/5 dark:shadow-black/20 py-1.5 origin-top-right"
+                    >
+                      <button
+                        v-for="tab in overflowTabs"
+                        :key="tab.key"
+                        class="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm transition-colors cursor-pointer hover:bg-surface-50 dark:hover:bg-surface-800/80"
+                        :class="detailTab === tab.key
+                          ? 'text-brand-700 dark:text-brand-300 font-medium'
+                          : 'text-surface-700 dark:text-surface-300'"
+                        @click="selectOverflowTab(tab.key)"
+                      >
+                        <component :is="tab.icon" v-if="tab.icon" class="size-3.5 shrink-0" />
+                        <span v-else class="size-3.5 shrink-0" />
+                        <span class="truncate">{{ tab.label }}</span>
+                        <span v-if="tab.count" class="ml-auto text-xs text-surface-400 tabular-nums">
+                          {{ tab.count }}
+                        </span>
+                      </button>
+                    </div>
+                  </Transition>
+                </div>
+
+                <!--
+                  Invisible measurement row: always renders every tab (plus the
+                  pinned Overview group and the overflow button) so widths stay
+                  known regardless of what is currently collapsed.
+                -->
+                <div
+                  ref="tabGhost"
+                  aria-hidden="true"
+                  class="pointer-events-none invisible absolute left-0 top-0 flex w-max gap-1"
+                >
+                  <div data-ghost-pinned class="flex items-center">
+                    <span class="px-3.5 py-2.5 text-sm font-medium">Overview</span>
+                    <span class="-ml-2 p-1"><ChevronDown class="size-3.5" /></span>
+                  </div>
+                  <span
+                    v-for="tab in detailTabDefs"
+                    :key="tab.key"
+                    data-ghost-tab
+                    class="px-3.5 py-2.5 text-sm font-medium flex items-center gap-1.5"
+                  >
+                    <component :is="tab.icon" v-if="tab.icon" class="size-3.5" />
+                    {{ tab.label }}
+                    <span v-if="tab.count" class="ml-1 text-xs">({{ tab.count }})</span>
                   </span>
-                </button>
-                <button
-                  class="cursor-pointer px-3.5 py-2.5 text-sm font-medium transition-all duration-150 border-b-2 -mb-px flex items-center gap-1.5"
-                  :class="detailTab === 'timeline'
-                    ? 'border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300'
-                    : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300 dark:text-surface-400 dark:hover:text-surface-300 dark:hover:border-surface-600'"
-                  @click="detailTab = 'timeline'"
-                >
-                  <History class="size-3.5" />
-                  Timeline
-                </button>
-                <button
-                  class="cursor-pointer px-3.5 py-2.5 text-sm font-medium transition-all duration-150 border-b-2 -mb-px flex items-center gap-1.5"
-                  :class="detailTab === 'properties'
-                    ? 'border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300'
-                    : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300 dark:text-surface-400 dark:hover:text-surface-300 dark:hover:border-surface-600'"
-                  @click="detailTab = 'properties'"
-                >
-                  <SlidersHorizontal class="size-3.5" />
-                  Properties
-                </button>
+                  <span data-ghost-more class="px-3 py-2.5 text-sm font-medium flex items-center gap-1.5">
+                    <MoreHorizontal class="size-4" />
+                    <span class="text-xs tabular-nums">{{ detailTabDefs.length }}</span>
+                  </span>
+                </div>
               </div>
             </div>
 
             <!-- Detail content -->
             <div class="bg-surface-50/80 dark:bg-surface-950/80 px-4 sm:px-6 py-5 sm:py-8">
-              <div v-if="!resolvedCurrentApplication" class="space-y-5 max-w-4xl mx-auto animate-pulse" aria-label="Loading candidate details">
+              <div v-if="!resolvedCurrentApplication" class="space-y-5 mx-auto animate-pulse" :class="detailWidthClass" aria-label="Loading candidate details">
                 <div class="h-28 rounded-xl border border-surface-200/80 bg-white dark:border-surface-800/60 dark:bg-surface-900" />
                 <div class="h-40 rounded-xl border border-surface-200/80 bg-white dark:border-surface-800/60 dark:bg-surface-900" />
                 <div class="h-32 rounded-xl border border-surface-200/80 bg-white dark:border-surface-800/60 dark:bg-surface-900" />
@@ -1782,7 +2046,7 @@ function closeDocPreview() {
 
 
               <!-- PROFILE SECTION (overview only) -->
-              <div v-if="showSection.profile" ref="overviewRef" class="space-y-5 max-w-4xl mx-auto">
+              <div v-if="showSection.profile" ref="overviewRef" class="space-y-5 mx-auto" :class="detailWidthClass">
                 <!-- Notes -->
                 <div class="rounded-xl border border-surface-200/80 bg-white p-5 shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
                   <div class="flex items-center gap-2.5 mb-4">
@@ -1809,7 +2073,7 @@ function closeDocPreview() {
               </div>
 
               <!-- COVER LETTER SECTION -->
-              <div v-if="showSection.coverLetter && hasCoverLetter" class="max-w-4xl mx-auto" :class="detailTab === 'overview' ? 'mt-5' : ''">
+              <div v-if="showSection.coverLetter && hasCoverLetter" class="mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-5' : '']">
                 <div class="rounded-xl border border-surface-200/80 bg-white p-5 shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
                   <div class="flex items-center gap-2.5 mb-4">
                     <div class="flex size-7 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-950/40">
@@ -1825,7 +2089,7 @@ function closeDocPreview() {
               </div>
 
               <!-- AI SCORE BREAKDOWN -->
-              <div v-if="showSection.aiAnalysis" class="max-w-4xl mx-auto" :class="detailTab === 'overview' ? 'mt-5' : ''">
+              <div v-if="showSection.aiAnalysis" class="mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-5' : '']">
                 <ScoreBreakdown
                   v-if="currentSummary"
                   :application-id="currentSummary.id"
@@ -1834,7 +2098,7 @@ function closeDocPreview() {
               </div>
 
               <!-- INTERVIEWS SECTION -->
-              <div v-if="showSection.interviews" ref="interviewsRef" class="space-y-3 max-w-4xl mx-auto" :class="detailTab === 'overview' ? 'mt-10' : ''">
+              <div v-if="showSection.interviews" ref="interviewsRef" class="space-y-3 mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-10' : '']">
                 <div class="flex items-center justify-between mb-3">
                   <h2 class="text-sm font-semibold text-surface-800 dark:text-surface-200 flex items-center gap-2">
                     <Calendar class="size-4 text-surface-400 dark:text-surface-500" />
@@ -2192,7 +2456,7 @@ function closeDocPreview() {
               </div>
 
               <!-- DOCUMENTS SECTION -->
-              <div v-if="showSection.documents" ref="documentsRef" class="space-y-3 max-w-4xl mx-auto" :class="detailTab === 'overview' ? 'mt-10' : ''">
+              <div v-if="showSection.documents" ref="documentsRef" class="space-y-3 mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-10' : '']">
                 <h2 class="text-sm font-semibold text-surface-800 dark:text-surface-200 flex items-center gap-2 mb-3">
                   <Paperclip class="size-4 text-surface-400 dark:text-surface-500" />
                   Documents
@@ -2244,7 +2508,7 @@ function closeDocPreview() {
               </div>
 
               <!-- RESPONSES SECTION -->
-              <div v-if="showSection.responses" ref="responsesRef" class="space-y-3 max-w-4xl mx-auto" :class="detailTab === 'overview' ? 'mt-10' : ''">
+              <div v-if="showSection.responses" ref="responsesRef" class="space-y-3 mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-10' : '']">
                 <h2 class="text-sm font-semibold text-surface-800 dark:text-surface-200 flex items-center gap-2 mb-3">
                   <MessageSquare class="size-4 text-surface-400 dark:text-surface-500" />
                   Responses
@@ -2274,7 +2538,7 @@ function closeDocPreview() {
               </div>
 
               <!-- PROPERTIES SECTION -->
-              <div v-if="showSection.properties && resolvedCurrentApplication" class="max-w-4xl mx-auto" :class="detailTab === 'overview' ? 'mt-10' : ''">
+              <div v-if="showSection.properties && resolvedCurrentApplication" class="mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-10' : '']">
                 <div class="rounded-xl border border-surface-200/80 bg-white p-5 shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
                   <div class="flex items-center gap-2.5 mb-4">
                     <div class="flex size-7 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-950/40">
@@ -2292,8 +2556,163 @@ function closeDocPreview() {
                 </div>
               </div>
 
+              <!-- NOTES SECTION -->
+              <div v-if="showSection.notes" class="space-y-3 mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-10' : '']">
+                <h2 class="text-sm font-semibold text-surface-800 dark:text-surface-200 flex items-center gap-2 mb-3">
+                  <StickyNote class="size-4 text-surface-400 dark:text-surface-500" />
+                  Notes
+                </h2>
+
+                <!-- Composer -->
+                <div v-if="canCreateNote" class="rounded-xl border border-surface-200/80 bg-white p-4 shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
+                  <textarea
+                    v-model="noteDraft"
+                    rows="3"
+                    :maxlength="NOTE_MAX_LENGTH"
+                    placeholder="Add a note about this candidate…"
+                    class="w-full resize-y rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 placeholder:text-surface-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100 dark:placeholder:text-surface-500"
+                    @keydown.enter.meta.prevent="addNote"
+                    @keydown.enter.ctrl.prevent="addNote"
+                  />
+                  <div class="mt-2 flex items-center justify-between gap-3">
+                    <span class="text-[11px] text-surface-400 dark:text-surface-500">
+                      Only your team can see notes. <kbd class="font-mono">⌘</kbd>+<kbd class="font-mono">Enter</kbd> to save.
+                    </span>
+                    <button
+                      type="button"
+                      class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-brand-500 dark:hover:bg-brand-400"
+                      :disabled="!noteDraft.trim() || isSavingNote"
+                      @click="addNote"
+                    >
+                      <Plus class="size-3.5" />
+                      {{ isSavingNote ? 'Saving…' : 'Add note' }}
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Loading -->
+                <div v-if="notesLoading" class="text-center py-12 text-surface-400">
+                  <div class="size-6 rounded-full border-2 border-brand-200 border-t-brand-600 dark:border-brand-800 dark:border-t-brand-400 animate-spin mx-auto mb-3" />
+                  <p class="text-sm">Loading notes…</p>
+                </div>
+
+                <!-- Error -->
+                <div
+                  v-else-if="notesError"
+                  class="rounded-xl border border-danger-200 bg-danger-50/60 p-6 text-center dark:border-danger-900/60 dark:bg-danger-950/30"
+                >
+                  <AlertTriangle class="size-6 text-danger-400 mx-auto mb-2" />
+                  <p class="text-sm text-danger-700 dark:text-danger-400">{{ notesError }}</p>
+                  <button
+                    type="button"
+                    class="mt-3 cursor-pointer rounded-lg border border-danger-200 px-3 py-1.5 text-xs font-medium text-danger-700 transition-colors hover:bg-danger-100 dark:border-danger-800 dark:text-danger-400 dark:hover:bg-danger-950/60"
+                    @click="loadNotes()"
+                  >
+                    Try again
+                  </button>
+                </div>
+
+                <!-- Empty -->
+                <div
+                  v-else-if="notes.length === 0"
+                  class="rounded-xl border border-surface-200/80 bg-white p-10 text-center shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none"
+                >
+                  <div class="flex size-14 items-center justify-center rounded-2xl bg-surface-100 dark:bg-surface-800/60 mx-auto mb-3">
+                    <StickyNote class="size-6 text-surface-400 dark:text-surface-500" />
+                  </div>
+                  <p class="text-sm font-medium text-surface-600 dark:text-surface-300">No notes yet</p>
+                  <p class="mt-1 text-xs text-surface-400 dark:text-surface-500">Notes you and your team write about this candidate appear here.</p>
+                </div>
+
+                <!-- List -->
+                <div v-else class="space-y-3">
+                  <div
+                    v-for="note in notes"
+                    :key="note.id"
+                    class="rounded-xl border border-surface-200/80 bg-white p-4 shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none"
+                  >
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="flex items-center gap-2.5 min-w-0">
+                        <img
+                          v-if="note.authorImage"
+                          :src="note.authorImage"
+                          :alt="noteAuthorLabel(note)"
+                          class="size-7 shrink-0 rounded-full object-cover"
+                        >
+                        <div v-else class="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-50 text-[11px] font-semibold text-brand-700 dark:bg-brand-950/40 dark:text-brand-400">
+                          {{ noteAuthorLabel(note).charAt(0).toUpperCase() }}
+                        </div>
+                        <div class="min-w-0">
+                          <p class="truncate text-[13px] font-medium text-surface-800 dark:text-surface-100">
+                            {{ noteAuthorLabel(note) }}
+                          </p>
+                          <p class="text-[11px] text-surface-400 dark:text-surface-500">
+                            <TimelineDateLink :date="note.createdAt">{{ timeAgo(note.createdAt) }}</TimelineDateLink>
+                            <span v-if="note.updatedAt !== note.createdAt"> · edited</span>
+                          </p>
+                        </div>
+                      </div>
+                      <div v-if="editingNoteId !== note.id" class="flex shrink-0 items-center gap-1">
+                        <button
+                          v-if="canEditNote(note)"
+                          type="button"
+                          class="cursor-pointer rounded-lg p-1.5 text-surface-400 transition-colors hover:bg-surface-100 hover:text-surface-600 dark:hover:bg-surface-800 dark:hover:text-surface-300"
+                          title="Edit note"
+                          @click="startEditNote(note)"
+                        >
+                          <Pencil class="size-3.5" />
+                        </button>
+                        <button
+                          v-if="canRemoveNote(note)"
+                          type="button"
+                          class="cursor-pointer rounded-lg p-1.5 text-surface-400 transition-colors hover:bg-danger-50 hover:text-danger-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-danger-950/40 dark:hover:text-danger-400"
+                          :disabled="deletingNoteId === note.id"
+                          title="Delete note"
+                          @click="deleteNote(note)"
+                        >
+                          <Trash2 class="size-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <template v-if="editingNoteId === note.id">
+                      <textarea
+                        v-model="editingNoteBody"
+                        rows="3"
+                        :maxlength="NOTE_MAX_LENGTH"
+                        class="mt-3 w-full resize-y rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+                        @keydown.enter.meta.prevent="saveNote"
+                        @keydown.enter.ctrl.prevent="saveNote"
+                        @keydown.esc="cancelEditNote"
+                      />
+                      <div class="mt-2 flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          class="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium text-surface-500 transition-colors hover:bg-surface-100 dark:text-surface-400 dark:hover:bg-surface-800"
+                          @click="cancelEditNote"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-brand-500 dark:hover:bg-brand-400"
+                          :disabled="!editingNoteBody.trim() || isUpdatingNote"
+                          @click="saveNote"
+                        >
+                          <Save class="size-3" />
+                          {{ isUpdatingNote ? 'Saving…' : 'Save' }}
+                        </button>
+                      </div>
+                    </template>
+                    <p v-else class="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-surface-700 dark:text-surface-300">
+                      {{ note.body }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <!-- TIMELINE SECTION -->
-              <div v-if="showSection.timeline" class="space-y-3 max-w-4xl mx-auto">
+              <div v-if="showSection.timeline" class="space-y-3 mx-auto" :class="detailWidthClass">
                 <h2 class="text-sm font-semibold text-surface-800 dark:text-surface-200 flex items-center gap-2 mb-3">
                   <History class="size-4 text-surface-400 dark:text-surface-500" />
                   Timeline
@@ -2528,10 +2947,6 @@ function closeDocPreview() {
           </div>
         </div>
       </div>
-    </Teleport>
-  </div>
-</template>
-/div>
     </Teleport>
   </div>
 </template>
