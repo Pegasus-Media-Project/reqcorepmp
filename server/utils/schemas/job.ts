@@ -5,8 +5,8 @@ import { createCriterionSchema } from './scoring'
 export { JOB_STATUS_TRANSITIONS } from '../../../shared/status-transitions'
 
 /**
- * Which candidate data sources the AI analysis reads, beyond the resume.
- * The resume is always included; these toggle the optional extras.
+ * Which optional candidate data sources the AI analysis reads.
+ * A resume is included automatically when present.
  */
 export const analysisContextSchema = z.object({
   coverLetter: z.boolean(),
@@ -98,7 +98,7 @@ export const updateJobSchema = z.object({
   requireCoverLetter: z.boolean().optional(),
   /** Whether to automatically run AI scoring when a candidate applies */
   autoScoreOnApply: z.boolean().optional(),
-  /** Which candidate data sources the AI analysis reads (resume is always included) */
+  /** Which optional candidate data sources the AI analysis reads */
   analysisContext: analysisContextSchema.optional(),
   /** Experience level required for this role */
   experienceLevel: z.enum(['junior', 'mid', 'senior', 'lead']).nullable().optional(),

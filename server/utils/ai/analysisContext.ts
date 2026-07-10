@@ -1,6 +1,7 @@
 /**
  * Helpers for the per-job "analysis context" setting — which candidate data
- * sources the AI scoring engine is allowed to read beyond the resume.
+ * optional sources the AI scoring engine is allowed to read. A resume is used
+ * when available but is not required when another enabled source has evidence.
  */
 import { eq, and, asc } from 'drizzle-orm'
 import { jobQuestion, questionResponse } from '../../database/schema'
@@ -13,7 +14,7 @@ export interface AnalysisContext {
 
 /**
  * Fallback used for legacy rows written before the column existed. Mirrors the
- * column default in the schema. The resume is always included regardless.
+ * column default in the schema. The resume is included automatically when present.
  */
 export const DEFAULT_ANALYSIS_CONTEXT: AnalysisContext = {
   coverLetter: true,

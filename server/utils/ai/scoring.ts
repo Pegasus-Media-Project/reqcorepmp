@@ -40,6 +40,23 @@ export interface CriterionDefinition {
   weight: number
 }
 
+export interface CandidateScoringMaterials {
+  resumeText?: string | null
+  coverLetterText?: string | null
+  applicationNotes?: string | null
+  screeningAnswers?: { question: string, answer: string }[] | null
+}
+
+/** Whether the application contains any usable evidence for an AI evaluation. */
+export function hasScorableCandidateMaterial(materials: CandidateScoringMaterials): boolean {
+  return Boolean(
+    materials.resumeText?.trim()
+    || materials.coverLetterText?.trim()
+    || materials.applicationNotes?.trim()
+    || materials.screeningAnswers?.some(answer => answer.answer.trim()),
+  )
+}
+
 // ─── Pre-made Criteria Templates ──────────────────────────────────
 
 export const PREMADE_CRITERIA: Record<string, CriterionDefinition[]> = {
@@ -216,13 +233,12 @@ export async function scoreApplication(
     jobTitle: string
     jobDescription: string
     criteria: CriterionDefinition[]
-    resumeText: string
-    coverLetterText?: string | null
-    applicationNotes?: string | null
-    /** Applicant answers to the job's custom screening questions. */
-    screeningAnswers?: { question: string, answer: string }[] | null
-  },
+  } & CandidateScoringMaterials,
 ): Promise<{ scoring: ScoringResponse; usage: { promptTokens: number; completionTokens: number } }> {
+  if (!hasScorableCandidateMaterial(params)) {
+    throw new Error('Candidate analysis requires at least one non-empty source of application material')
+  }
+
   const criteriaBlock = params.criteria
     .map((c, i) => `${i + 1}. **${c.name}** (key: "${c.key}", max: ${c.maxScore})\n   ${c.description ?? 'No description provided.'}`)
     .join('\n\n')
@@ -232,7 +248,7 @@ export async function scoreApplication(
     : ''
 
   const candidateInfo = [
-    `RESUME:\n${params.resumeText}`,
+    params.resumeText ? `RESUME:\n${params.resumeText}` : '',
     params.coverLetterText ? `\nCOVER LETTER:\n${params.coverLetterText}` : '',
     screeningBlock,
     params.applicationNotes ? `\nRECRUITER NOTES:\n${params.applicationNotes}` : '',
@@ -245,6 +261,7 @@ Your task is to objectively evaluate a candidate against specific scoring criter
 IMPORTANT RULES:
 - Score ONLY based on evidence found in the provided materials (which may include resume, cover letter, screening answers, recruiter notes)
 - If information for a criterion is missing, give a low score and note it in gaps
+- Do not infer qualifications from missing materials; reduce confidence when the available evidence is limited
 - Be fair and consistent — avoid bias based on name, gender, age, or background
 - Confidence reflects how much relevant information was available (0–100)
 - Evidence must cite specific details from the candidate's materials

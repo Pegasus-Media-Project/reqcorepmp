@@ -3,7 +3,7 @@ import {
   application, scoringCriterion, criterionScore,
   analysisRun, document,
 } from '../../../database/schema'
-import { scoreApplication, computeCompositeScore } from '../../../utils/ai/scoring'
+import { scoreApplication, computeCompositeScore, hasScorableCandidateMaterial } from '../../../utils/ai/scoring'
 import type { CriterionDefinition } from '../../../utils/ai/scoring'
 import { resolveAnalysisProvider } from '../../../utils/ai/resolveProvider'
 import { assertPlatformBudget, BudgetExceededError, budgetErrorToHttp } from '../../../utils/ai/budget'
@@ -100,21 +100,6 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  if (!resumeText) {
-    // Resume document exists but parsing failed or was incomplete
-    if (resumeDoc) {
-      throw createError({
-        statusCode: 422,
-        statusMessage: 'Resume was uploaded but text extraction failed. Try re-parsing the document.',
-        data: { code: 'PARSE_FAILED', documentId: resumeDoc.id },
-      })
-    }
-    throw createError({
-      statusCode: 422,
-      statusMessage: 'No resume found for this candidate. Upload a resume first.',
-    })
-  }
-
   if (!app.job.description) {
     throw createError({
       statusCode: 422,
@@ -142,11 +127,31 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // Which optional data sources the recruiter enabled for this job (resume is always in).
+  // Resume is included when available; the job controls the other evidence sources.
   const analysisContext = app.job.analysisContext ?? DEFAULT_ANALYSIS_CONTEXT
   const screeningAnswers = analysisContext.screeningAnswers
     ? await fetchScreeningAnswers(applicationId, orgId)
     : null
+  const materials = {
+    resumeText,
+    coverLetterText: analysisContext.coverLetter ? app.coverLetterText : null,
+    applicationNotes: analysisContext.recruiterNotes ? app.notes : null,
+    screeningAnswers,
+  }
+
+  if (!hasScorableCandidateMaterial(materials)) {
+    if (resumeDoc) {
+      throw createError({
+        statusCode: 422,
+        statusMessage: 'No usable candidate material found. Resume text extraction failed and the other enabled sources are empty.',
+        data: { code: 'PARSE_FAILED', documentId: resumeDoc.id },
+      })
+    }
+    throw createError({
+      statusCode: 422,
+      statusMessage: 'No usable candidate material found. Add a resume, cover letter, screening response, or enabled recruiter note.',
+    })
+  }
 
   const startedAt = Date.now()
   let result
@@ -155,10 +160,7 @@ export default defineEventHandler(async (event) => {
       jobTitle: app.job.title,
       jobDescription: app.job.description,
       criteria: criteriaDefinitions,
-      resumeText,
-      coverLetterText: analysisContext.coverLetter ? app.coverLetterText : null,
-      applicationNotes: analysisContext.recruiterNotes ? app.notes : null,
-      screeningAnswers,
+      ...materials,
     })
   } catch (err: any) {
     // Record failed analysis run

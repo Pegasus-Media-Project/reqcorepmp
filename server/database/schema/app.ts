@@ -98,9 +98,8 @@ export const job = pgTable('job', {
   // ── AI scoring settings ──
   autoScoreOnApply: boolean('auto_score_on_apply').notNull().default(false),
   /**
-   * Which candidate data sources the AI analysis reads, beyond the resume.
-   * The resume is always included (analysis requires it); these are the
-   * optional extras the recruiter can toggle per job.
+   * Which optional candidate data sources the AI analysis reads. A resume is
+   * always included when present, but another enabled source is sufficient.
    */
   analysisContext: jsonb('analysis_context').$type<{
     coverLetter: boolean
