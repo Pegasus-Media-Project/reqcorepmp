@@ -1,5 +1,5 @@
 import { asc, eq, and, desc, inArray, notInArray, or, ilike, gte, lt, isNull, count, sql } from 'drizzle-orm'
-import { application, candidate, interview, job } from '../../database/schema'
+import { application, applicationStatusEnum, candidate, interview, job } from '../../database/schema'
 import { applicationQuerySchema } from '../../utils/schemas/application'
 import { propertyFiltersArraySchema } from '../../utils/schemas/property'
 import {
@@ -7,6 +7,16 @@ import {
   loadPropertyEntriesForEntities,
   type PropertyFilter,
 } from '../../utils/properties'
+
+type StatusCountRow = { status: (typeof applicationStatusEnum.enumValues)[number], count: number }
+
+function tallyStatusCounts(rows: StatusCountRow[]) {
+  const counts = { new: 0, screening: 0, interview: 0, offer: 0, hired: 0, rejected: 0 }
+  for (const row of rows) {
+    counts[row.status] = Number(row.count)
+  }
+  return counts
+}
 
 /**
  * GET /api/applications
@@ -85,14 +95,36 @@ export default defineEventHandler(async (event) => {
     }
     propertyFilters = result.data as PropertyFilter[]
   }
+
+  // Job-wide per-status totals for the pipeline tab badges. Intentionally ignores
+  // every active filter so the badges stay put as the user narrows the list.
+  const statusCountsPromise: Promise<StatusCountRow[]> = query.jobId
+    ? db
+        .select({ status: application.status, count: count() })
+        .from(application)
+        .where(and(eq(application.organizationId, orgId), eq(application.jobId, query.jobId)))
+        .groupBy(application.status)
+    : Promise.resolve([])
+
   if (propertyFilters.length > 0) {
-    const matching = await entityIdsMatchingFilters({
-      organizationId: orgId,
-      entityType: 'application',
-      filters: propertyFilters,
-    })
+    // Awaited together so a failing filter query doesn't leave the counts
+    // promise rejecting unobserved.
+    const [matching, statusCountRows] = await Promise.all([
+      entityIdsMatchingFilters({
+        organizationId: orgId,
+        entityType: 'application',
+        filters: propertyFilters,
+      }),
+      statusCountsPromise,
+    ])
     if (!matching || matching.size === 0) {
-      return { data: [], total: 0, page: query.page, limit: query.limit }
+      return {
+        data: [],
+        total: 0,
+        page: query.page,
+        limit: query.limit,
+        statusCounts: tallyStatusCounts(statusCountRows),
+      }
     }
     conditions.push(inArray(application.id, [...matching]))
   }
@@ -110,14 +142,6 @@ export default defineEventHandler(async (event) => {
       default: return [desc(application.createdAt)] as const
     }
   })()
-
-  const statusCountsPromise = query.jobId
-    ? db
-        .select({ status: application.status, count: count() })
-        .from(application)
-        .where(and(eq(application.organizationId, orgId), eq(application.jobId, query.jobId)))
-        .groupBy(application.status)
-    : Promise.resolve([])
 
   const [data, totalRows, statusCountRows] = await Promise.all([
     db
@@ -152,10 +176,7 @@ export default defineEventHandler(async (event) => {
     statusCountsPromise,
   ])
 
-  const statusCounts = { new: 0, screening: 0, interview: 0, offer: 0, hired: 0, rejected: 0 }
-  for (const row of statusCountRows) {
-    statusCounts[row.status] = Number(row.count)
-  }
+  const statusCounts = tallyStatusCounts(statusCountRows)
 
   // Bulk-attach properties for the current page (org-global + per-job)
   const ids = data.map((a) => a.id)
