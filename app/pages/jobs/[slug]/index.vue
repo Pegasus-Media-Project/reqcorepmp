@@ -7,8 +7,17 @@ definePageMeta({
 
 const route = useRoute()
 const jobSlug = route.params.slug as string
+const requestURL = useRequestURL()
 const { track } = useTrack()
 const { t, locale } = useI18n()
+
+// Canonical + JobPosting URL are built from the real request origin rather than
+// the i18n `baseUrl` (which can point at the marketing host if the env var is
+// unset). The canonical self-references the current path so it never conflicts
+// with the noindex that localized variants inherit; `jobUrl` is the unprefixed
+// default-locale URL — the single page Google for Jobs should dedupe to.
+const canonicalUrl = computed(() => `${requestURL.origin}${route.path}`)
+const jobUrl = computed(() => `${requestURL.origin}/jobs/${jobSlug}`)
 
 /** Forward source-tracking query params (?ref=, utm_*) to the apply page */
 const applyQuery = computed(() => {
@@ -67,6 +76,7 @@ useSeoMeta({
     return `${t('jobs.detail.metaApplyFor')} ${job.value.title}${org}. ${job.value.location ?? t('career.remote.remote')}.`
   }),
   ogType: 'website',
+  ogUrl: () => canonicalUrl.value,
   ogImage: '/reqcore-banner-github.jpeg',
   twitterCard: 'summary_large_image',
   twitterTitle: computed(() => job.value?.title ?? t('jobs.detail.metaTitleFallback')),
@@ -74,6 +84,14 @@ useSeoMeta({
     if (!job.value) return t('jobs.detail.metaDescriptionFallback')
     return `${t('jobs.detail.metaApplyFor')} ${job.value.title}. ${job.value.location ?? t('career.remote.remote')}.`
   }),
+  // A closed/expired or missing job 404s at the API and renders a "not found"
+  // body with a 200 status — opt it out of indexing so it isn't kept as a soft
+  // 404, and so Google for Jobs drops the expired posting.
+  robots: () => (fetchError.value ? 'noindex, nofollow' : 'index, follow'),
+})
+
+useHead({
+  link: () => [{ rel: 'canonical', href: canonicalUrl.value }],
 })
 
 // ─────────────────────────────────────────────
@@ -103,6 +121,9 @@ watchEffect(() => {
     'datePosted': j.createdAt,
     'employmentType': mapEmploymentType(j.type),
     'directApply': true,
+    // Canonical, unprefixed job URL so Google for Jobs treats the locale
+    // variants as one posting instead of duplicates.
+    'url': jobUrl.value,
   }
 
   // Hiring organization

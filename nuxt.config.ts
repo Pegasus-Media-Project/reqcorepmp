@@ -60,29 +60,24 @@ const localizedPricingRedirectRules = Object.fromEntries(
     ]),
 );
 
-// Allow search-engine indexing for localized public marketing pages.
-// Branded career pages (/career/**) are indexable too; individual disabled or
-// missing pages opt back out with a page-level noindex meta tag.
+// Allow search-engine indexing for localized public *marketing* pages only.
+// Pricing is genuinely translated, so its localized variants are indexable.
+//
+// Job postings and career pages are NOT listed here on purpose: their content
+// (job title/description, org headline) is recruiter-authored in a single
+// language and served verbatim under every locale prefix — the surrounding UI
+// chrome is the only thing translated. Indexing /es/jobs/x, /fr/career/x, … as
+// separate URLs would publish 6× near-duplicate, untranslated pages with
+// hreflang claiming translations that don't exist. Instead these localized
+// variants inherit the default "noindex, nofollow" (the `/**` rule below), so
+// only the unprefixed default-locale URL is indexed while applicants can still
+// browse/apply in their language. See app/pages/{jobs,career}/[slug]/index.vue.
 const localizedPublicRobotsRules = Object.fromEntries(
   i18nLocales
     .filter((locale) => locale.code !== i18nDefaultLocale)
-    .flatMap((locale) => [
-      [
-        `/${locale.code}/pricing`,
-        { headers: { "X-Robots-Tag": "index, follow" } },
-      ],
-      [
-        `/${locale.code}/jobs`,
-        { headers: { "X-Robots-Tag": "index, follow" } },
-      ],
-      [
-        `/${locale.code}/jobs/**`,
-        { headers: { "X-Robots-Tag": "index, follow" } },
-      ],
-      [
-        `/${locale.code}/career/**`,
-        { headers: { "X-Robots-Tag": "index, follow" } },
-      ],
+    .map((locale) => [
+      `/${locale.code}/pricing`,
+      { headers: { "X-Robots-Tag": "index, follow" } },
     ]),
 );
 
