@@ -1,5 +1,5 @@
-import { eq, and, desc, inArray } from 'drizzle-orm'
-import { application, candidate, job } from '../../database/schema'
+import { asc, eq, and, desc, inArray, notInArray, or, ilike, gte, lt, isNull, count, sql } from 'drizzle-orm'
+import { application, candidate, interview, job } from '../../database/schema'
 import { applicationQuerySchema } from '../../utils/schemas/application'
 import { propertyFiltersArraySchema } from '../../utils/schemas/property'
 import {
@@ -31,6 +31,44 @@ export default defineEventHandler(async (event) => {
   if (query.status) {
     conditions.push(eq(application.status, query.status))
   }
+  if (query.search) {
+    // Escape LIKE meta-characters to keep this a literal substring search.
+    const escaped = query.search.replace(/[%_\\]/g, '\\$&')
+    const pattern = `%${escaped}%`
+    conditions.push(or(
+      ilike(candidate.firstName, pattern),
+      ilike(candidate.lastName, pattern),
+      ilike(sql`${candidate.firstName} || ' ' || ${candidate.lastName}`, pattern),
+      ilike(candidate.email, pattern),
+    )!)
+  }
+  if (query.score) {
+    switch (query.score) {
+      case 'high':
+        conditions.push(gte(application.score, 75))
+        break
+      case 'medium':
+        conditions.push(and(gte(application.score, 40), lt(application.score, 75))!)
+        break
+      case 'low':
+        conditions.push(lt(application.score, 40))
+        break
+      case 'none':
+        conditions.push(isNull(application.score))
+        break
+    }
+  }
+  if (query.interview) {
+    const interviewApplicationIds = db
+      .select({ applicationId: interview.applicationId })
+      .from(interview)
+      .where(eq(interview.organizationId, orgId))
+    conditions.push(
+      query.interview === 'has-interview'
+        ? inArray(application.id, interviewApplicationIds)
+        : notInArray(application.id, interviewApplicationIds),
+    )
+  }
 
   // ── Custom property filters ──
   let propertyFilters: PropertyFilter[] = []
@@ -61,7 +99,27 @@ export default defineEventHandler(async (event) => {
 
   const where = and(...conditions)
 
-  const [data, total] = await Promise.all([
+  const orderBy = (() => {
+    switch (query.sort) {
+      case 'date-asc': return [asc(application.createdAt)] as const
+      case 'name-asc': return [asc(candidate.firstName), asc(candidate.lastName)] as const
+      case 'name-desc': return [desc(candidate.firstName), desc(candidate.lastName)] as const
+      case 'score-desc': return [sql`${application.score} DESC NULLS LAST`, desc(application.createdAt)] as const
+      case 'score-asc': return [sql`COALESCE(${application.score}, -1) ASC`, desc(application.createdAt)] as const
+      case 'updated-desc': return [desc(application.updatedAt)] as const
+      default: return [desc(application.createdAt)] as const
+    }
+  })()
+
+  const statusCountsPromise = query.jobId
+    ? db
+        .select({ status: application.status, count: count() })
+        .from(application)
+        .where(and(eq(application.organizationId, orgId), eq(application.jobId, query.jobId)))
+        .groupBy(application.status)
+    : Promise.resolve([])
+
+  const [data, totalRows, statusCountRows] = await Promise.all([
     db
       .select({
         id: application.id,
@@ -82,11 +140,22 @@ export default defineEventHandler(async (event) => {
       .innerJoin(candidate, eq(candidate.id, application.candidateId))
       .innerJoin(job, eq(job.id, application.jobId))
       .where(where)
-      .orderBy(desc(application.createdAt))
+      .orderBy(...orderBy)
       .limit(query.limit)
       .offset(offset),
-    db.$count(application, where),
+    db
+      .select({ count: count() })
+      .from(application)
+      .innerJoin(candidate, eq(candidate.id, application.candidateId))
+      .innerJoin(job, eq(job.id, application.jobId))
+      .where(where),
+    statusCountsPromise,
   ])
+
+  const statusCounts = { new: 0, screening: 0, interview: 0, offer: 0, hired: 0, rejected: 0 }
+  for (const row of statusCountRows) {
+    statusCounts[row.status] = Number(row.count)
+  }
 
   // Bulk-attach properties for the current page (org-global + per-job)
   const ids = data.map((a) => a.id)
@@ -99,11 +168,24 @@ export default defineEventHandler(async (event) => {
     jobIds,
     entityJobIds,
   })
+  const interviewedApplicationIds = ids.length > 0
+    ? await db
+        .selectDistinct({ applicationId: interview.applicationId })
+        .from(interview)
+        .where(and(eq(interview.organizationId, orgId), inArray(interview.applicationId, ids)))
+    : []
+  const interviewedIds = new Set(interviewedApplicationIds.map(row => row.applicationId))
   const enriched = data.map((a) => ({
     ...a,
     properties: propertyMap.get(a.id) ?? [],
+    hasInterview: interviewedIds.has(a.id),
   }))
 
-  return { data: enriched, total, page: query.page, limit: query.limit }
+  return {
+    data: enriched,
+    total: Number(totalRows[0]?.count ?? 0),
+    page: query.page,
+    limit: query.limit,
+    statusCounts,
+  }
 })
-

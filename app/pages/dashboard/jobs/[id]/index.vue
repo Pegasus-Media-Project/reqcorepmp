@@ -6,6 +6,7 @@ import {
   Video, Building2, Code2, UsersRound, Save, Check, MapPin, Users, Plus,
   CheckCircle2, XCircle, AlertTriangle, ArrowUpDown, ListFilter,
   Maximize2, Minimize2, Brain, Loader2, History, SlidersHorizontal,
+  ChevronLeft, ChevronRight,
 } from 'lucide-vue-next'
 import type { PropertyEntry, PropertyFilter } from '~~/shared/properties'
 import { usePreviewReadOnly } from '~/composables/usePreviewReadOnly'
@@ -34,34 +35,23 @@ const { job: jobData, status: jobFetchStatus, error: jobError } = useJob(jobId)
 // Applications data
 // ─────────────────────────────────────────────
 
-const {
-  data: appData,
-  status: appFetchStatus,
-  error: appError,
-  refresh: refreshApps,
-} = useFetch('/api/applications', {
-  key: `pipeline-apps-${jobId}`,
-  query: { jobId, limit: 100 },
-  headers: useRequestHeaders(['cookie']),
-})
-
 const PIPELINE_STATUSES = ['new', 'screening', 'interview', 'offer', 'hired', 'rejected'] as const
 type PipelineStatus = typeof PIPELINE_STATUSES[number]
-
-const applications = computed(() => appData.value?.data ?? [])
 
 // Read initial pipeline stage from URL query param (?stage=screening)
 const initialStage = PIPELINE_STATUSES.includes(route.query.stage as any)
   ? (route.query.stage as PipelineStatus)
   : 'new'
 const focusStatus = ref<PipelineStatus>(initialStage)
-
-const focusedApplications = computed(() =>
-  applications.value.filter((application) => application.status === focusStatus.value),
-)
-
-// Search within the focused list
 const searchTerm = ref('')
+const debouncedSearchTerm = ref('')
+let searchDebounceTimer: ReturnType<typeof setTimeout>
+watch(searchTerm, (value) => {
+  clearTimeout(searchDebounceTimer)
+  searchDebounceTimer = setTimeout(() => {
+    debouncedSearchTerm.value = value.trim()
+  }, 250)
+})
 
 // ─────────────────────────────────────────────
 // Filters & Sorting
@@ -126,93 +116,44 @@ function selectSort(option: SortOption) {
   showSortPanel.value = false
 }
 
+const PIPELINE_PAGE_SIZE = 50
+const page = ref(1)
+const applicationQuery = computed(() => ({
+  jobId,
+  status: focusStatus.value,
+  page: page.value,
+  limit: PIPELINE_PAGE_SIZE,
+  ...(debouncedSearchTerm.value && { search: debouncedSearchTerm.value }),
+  ...(scoreFilter.value !== 'all' && { score: scoreFilter.value }),
+  ...(interviewFilter.value !== 'all' && { interview: interviewFilter.value }),
+  ...(propertyFilters.value.length > 0 && { propertyFilters: JSON.stringify(propertyFilters.value) }),
+  sort: sortBy.value,
+}))
+
+const {
+  data: appData,
+  status: appFetchStatus,
+  error: appError,
+  refresh: refreshApps,
+} = useFetch('/api/applications', {
+  key: `pipeline-apps-${jobId}`,
+  query: applicationQuery,
+  headers: useRequestHeaders(['cookie']),
+})
+
+const applications = computed(() => appData.value?.data ?? [])
+const focusedApplicationTotal = computed(() => appData.value?.total ?? 0)
+const totalPages = computed(() => Math.max(1, Math.ceil(focusedApplicationTotal.value / PIPELINE_PAGE_SIZE)))
+const pageStart = computed(() => focusedApplicationTotal.value === 0 ? 0 : ((page.value - 1) * PIPELINE_PAGE_SIZE) + 1)
+const pageEnd = computed(() => Math.min(focusedApplicationTotal.value, page.value * PIPELINE_PAGE_SIZE))
+
 function closePanels() {
   showSortPanel.value = false
   showFilterPanel.value = false
   showOverviewDropdown.value = false
 }
 
-const filteredApplications = computed(() => {
-  let result = focusedApplications.value
-
-  // Text search
-  if (searchTerm.value.trim()) {
-    const term = searchTerm.value.toLowerCase()
-    result = result.filter((app) => {
-      const name = `${app.candidateFirstName} ${app.candidateLastName}`.toLowerCase()
-      const email = (app.candidateEmail ?? '').toLowerCase()
-      return name.includes(term) || email.includes(term)
-    })
-  }
-
-  // Score filter
-  if (scoreFilter.value !== 'all') {
-    result = result.filter((app) => {
-      switch (scoreFilter.value) {
-        case 'high': return app.score != null && app.score >= 75
-        case 'medium': return app.score != null && app.score >= 40 && app.score < 75
-        case 'low': return app.score != null && app.score < 40
-        case 'none': return app.score == null
-        default: return true
-      }
-    })
-  }
-
-  // Interview filter
-  if (interviewFilter.value !== 'all') {
-    result = result.filter((app) => {
-      const hasInterview = applicationsWithInterviews.value.has(app.id)
-      return interviewFilter.value === 'has-interview' ? hasInterview : !hasInterview
-    })
-  }
-
-  // Property filters
-  if (propertyFilters.value.length > 0) {
-    result = result.filter((app) => {
-      const props = (app as any).properties as PropertyEntry[] | undefined ?? []
-      return propertyFilters.value.every((pf) => {
-        const entry = props.find((e) => e.definition.id === pf.propertyDefinitionId)
-        const val = entry?.value ?? null
-        switch (pf.op) {
-          case 'isEmpty': return val === null || val === '' || (Array.isArray(val) && val.length === 0)
-          case 'isNotEmpty': return val !== null && val !== '' && !(Array.isArray(val) && val.length === 0)
-          case 'equals': return String(val ?? '') === String(pf.value ?? '')
-          case 'contains': return String(val ?? '').toLowerCase().includes(String(pf.value ?? '').toLowerCase())
-          case 'in': return Array.isArray(pf.value) && Array.isArray(val)
-            ? (pf.value as string[]).some((v) => (val as string[]).includes(v))
-            : Array.isArray(pf.value) && (pf.value as string[]).includes(String(val ?? ''))
-          default: return true
-        }
-      })
-    })
-  }
-  return [...result].sort((a, b) => {
-    switch (sortBy.value) {
-      case 'date-desc':
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      case 'date-asc':
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      case 'name-asc': {
-        const nameA = `${a.candidateFirstName} ${a.candidateLastName}`.toLowerCase()
-        const nameB = `${b.candidateFirstName} ${b.candidateLastName}`.toLowerCase()
-        return nameA.localeCompare(nameB)
-      }
-      case 'name-desc': {
-        const nameA = `${a.candidateFirstName} ${a.candidateLastName}`.toLowerCase()
-        const nameB = `${b.candidateFirstName} ${b.candidateLastName}`.toLowerCase()
-        return nameB.localeCompare(nameA)
-      }
-      case 'score-desc':
-        return (b.score ?? -1) - (a.score ?? -1)
-      case 'score-asc':
-        return (a.score ?? -1) - (b.score ?? -1)
-      case 'updated-desc':
-        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      default:
-        return 0
-    }
-  })
-})
+const filteredApplications = computed(() => applications.value)
 
 type StatusCountMap = {
   new: number
@@ -225,45 +166,58 @@ type StatusCountMap = {
 
 const statusCounts = computed(() => {
   const counts: StatusCountMap = { new: 0, screening: 0, interview: 0, offer: 0, hired: 0, rejected: 0 }
-  for (const application of applications.value) {
-    if (application.status in counts) {
-      counts[application.status as PipelineStatus] += 1
+  const apiCounts = appData.value?.statusCounts
+  if (apiCounts) {
+    for (const status of PIPELINE_STATUSES) {
+      counts[status] = apiCounts[status] ?? 0
     }
   }
   return counts
 })
 
-const currentIndex = ref(0)
+const selectedApplicationId = ref<string | null>(null)
+const pendingPageSelection = ref<'first' | 'last' | null>(null)
+
+const currentIndex = computed({
+  get: () => filteredApplications.value.findIndex(app => app.id === selectedApplicationId.value),
+  set: (index: number) => {
+    selectedApplicationId.value = filteredApplications.value[index]?.id ?? null
+  },
+})
 
 // Mobile: toggle between candidate list and detail view
 const showMobileDetail = ref(false)
 
-watch(focusedApplications, () => {
-  if (focusedApplications.value.length === 0) {
-    currentIndex.value = 0
-    return
-  }
-  if (currentIndex.value >= focusedApplications.value.length) {
-    currentIndex.value = focusedApplications.value.length - 1
-  }
-}, { immediate: true })
-
-// Also clamp when property/score/interview filters change and shrink filteredApplications
 watch(filteredApplications, (apps) => {
   if (apps.length === 0) {
-    currentIndex.value = 0
+    selectedApplicationId.value = null
     return
   }
-  if (currentIndex.value >= apps.length) {
-    currentIndex.value = apps.length - 1
+
+  if (!apps.some(app => app.id === selectedApplicationId.value)) {
+    selectedApplicationId.value = pendingPageSelection.value === 'last'
+      ? apps[apps.length - 1]!.id
+      : apps[0]!.id
   }
-})
+  pendingPageSelection.value = null
+}, { immediate: true })
 
 watch(focusStatus, () => {
-  currentIndex.value = 0
   searchTerm.value = ''
+  debouncedSearchTerm.value = ''
   propertyFilters.value = []
   closePanels()
+  page.value = 1
+  selectedApplicationId.value = null
+})
+
+watch([debouncedSearchTerm, sortBy, scoreFilter, interviewFilter, propertyFilters], () => {
+  page.value = 1
+  selectedApplicationId.value = null
+}, { deep: true })
+
+watch(totalPages, (next) => {
+  if (page.value > next) page.value = next
 })
 
 // Auto-scroll mobile bottom bar to keep selected candidate visible
@@ -276,7 +230,9 @@ watch(currentIndex, () => {
   })
 })
 
-const currentSummary = computed(() => filteredApplications.value[currentIndex.value] ?? null)
+const currentSummary = computed(() =>
+  filteredApplications.value.find(app => app.id === selectedApplicationId.value) ?? null,
+)
 
 // Detail tab for center panel
 type DetailTab = 'overview' | 'cover-letter' | 'interviews' | 'documents' | 'responses' | 'ai-analysis' | 'timeline' | 'properties'
@@ -465,7 +421,6 @@ watch(currentSummary, (summary) => {
 
 const {
   data: currentApplication,
-  status: detailFetchStatus,
   execute: executeDetailFetch,
 } = useFetch<SwipeApplicationDetail | null>(
   () => `/api/applications/${currentApplicationId.value}`,
@@ -477,25 +432,24 @@ const {
   },
 )
 
-// Cache the last successfully loaded detail so switching candidates doesn't flash a loading spinner
-const cachedApplication = ref<SwipeApplicationDetail | null>(null)
-
 const resolvedCurrentApplication = computed(() => {
   if (currentApplication.value && currentApplication.value.id === currentApplicationId.value) {
     return currentApplication.value
   }
-  // Show cached (previous) data while the new detail is loading
-  return cachedApplication.value
+  return null
 })
 
-watch(currentApplication, (val) => {
-  if (val && val.id === currentApplicationId.value) {
-    cachedApplication.value = val
+const hasCoverLetter = computed(() => Boolean(resolvedCurrentApplication.value?.coverLetterText?.trim()))
+
+watch(hasCoverLetter, (hasLetter) => {
+  if (!hasLetter && detailTab.value === 'cover-letter') {
+    detailTab.value = 'overview'
   }
 })
 
 watch(currentApplicationId, () => {
   timelineItems.value = []
+  timelineLoading.value = false
   timelineLoaded.value = false
   timelineError.value = null
 })
@@ -514,12 +468,16 @@ async function loadTimeline() {
     const result = await $fetch<{ items: TimelineEntry[] }>('/api/activity-log/candidate-timeline', {
       query: { candidateId: candId },
     })
+    if (candId !== timelineCandidateId.value) return
     timelineItems.value = result.items
     timelineLoaded.value = true
   } catch (err: any) {
+    if (candId !== timelineCandidateId.value) return
     timelineError.value = err?.data?.statusMessage ?? 'Failed to load timeline'
   } finally {
-    timelineLoading.value = false
+    if (candId === timelineCandidateId.value) {
+      timelineLoading.value = false
+    }
   }
 }
 
@@ -674,8 +632,9 @@ async function handleInterviewScheduled() {
       if (scheduledApplicationId) {
         focusStatus.value = 'interview'
         await nextTick()
-        const idx = filteredApplications.value.findIndex(a => a.id === scheduledApplicationId)
-        if (idx !== -1) currentIndex.value = idx
+        if (filteredApplications.value.some(app => app.id === scheduledApplicationId)) {
+          selectedApplicationId.value = scheduledApplicationId
+        }
       }
     }
   }
@@ -686,19 +645,17 @@ async function handleInterviewScheduled() {
 // ─────────────────────────────────────────────
 
 const { data: jobInterviewsData, refresh: refreshJobInterviews } = useFetch<{ data: Interview[] }>('/api/interviews', {
-  key: `pipeline-job-interviews-${jobId}`,
-  query: { jobId, limit: 100 },
+  key: computed(() => `pipeline-application-interviews-${currentApplicationId.value}`),
+  query: computed(() => ({ applicationId: currentApplicationId.value, limit: 100 })),
   headers: useRequestHeaders(['cookie']),
 })
 
 const jobInterviews = computed(() => jobInterviewsData.value?.data ?? [])
 
-const currentApplicationInterviews = computed(() =>
-  jobInterviews.value.filter(i => i.applicationId === currentApplicationId.value),
-)
+const currentApplicationInterviews = computed(() => jobInterviews.value)
 
 const applicationsWithInterviews = computed(() =>
-  new Set(jobInterviews.value.map(i => i.applicationId)),
+  new Set(applications.value.filter(app => app.hasInterview).map(app => app.id)),
 )
 
 const interviewTypeIcons: Record<string, any> = {
@@ -929,6 +886,10 @@ async function handleReschedule() {
 async function changeStatus(status: string) {
   if (!currentSummary.value || isMutating.value) return
   const applicationId = currentSummary.value.id
+  const selectedIndex = currentIndex.value
+  const nextApplicationId = filteredApplications.value[selectedIndex + 1]?.id
+    ?? filteredApplications.value[selectedIndex - 1]?.id
+    ?? null
 
   isMutating.value = true
 
@@ -945,14 +906,8 @@ async function changeStatus(status: string) {
 
     await refreshApps()
 
-    // After the moved candidate disappears from the list, the items that came after
-    // it shift up by one index. currentIndex now naturally points to the next
-    // candidate — no change needed. We only clamp if currentIndex is now out of
-    // bounds (i.e. the moved candidate was the last item in the filtered list).
-    const newLen = filteredApplications.value.length
-    if (newLen > 0 && currentIndex.value >= newLen) {
-      currentIndex.value = newLen - 1
-    }
+    // Move to the next visible candidate when the selected application leaves this stage.
+    selectedApplicationId.value = nextApplicationId
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
     toast.error('Failed to update status', { message: err?.data?.statusMessage, statusCode: err?.data?.statusCode })
@@ -961,14 +916,26 @@ async function changeStatus(status: string) {
   }
 }
 
-function goToPreviousCard() {
-  if (currentIndex.value === 0) return
-  currentIndex.value -= 1
+async function goToPreviousCard() {
+  if (currentIndex.value > 0) {
+    currentIndex.value -= 1
+    return
+  }
+  if (page.value > 1) {
+    pendingPageSelection.value = 'last'
+    page.value -= 1
+  }
 }
 
-function goToNextCard() {
-  if (currentIndex.value >= filteredApplications.value.length - 1) return
-  currentIndex.value += 1
+async function goToNextCard() {
+  if (currentIndex.value < filteredApplications.value.length - 1) {
+    currentIndex.value += 1
+    return
+  }
+  if (page.value < totalPages.value) {
+    pendingPageSelection.value = 'first'
+    page.value += 1
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -1406,14 +1373,32 @@ function closeDocPreview() {
           <!-- Count bar -->
           <div class="shrink-0 px-3.5 pb-2 flex items-center justify-between">
             <span class="text-xs font-medium text-surface-500 dark:text-surface-400">
-              {{ filteredApplications.length }} candidate{{ filteredApplications.length === 1 ? '' : 's' }}
+              Showing {{ pageStart }}-{{ pageEnd }} of {{ focusedApplicationTotal }} candidate{{ focusedApplicationTotal === 1 ? '' : 's' }}
               <span v-if="searchTerm.trim() || hasActiveFilters" class="text-surface-400 dark:text-surface-500">
                 {{ hasActiveFilters ? ' filtered' : ' matching' }}
               </span>
             </span>
-            <span v-if="hasActiveFilters && filteredApplications.length !== focusedApplications.length" class="text-[10px] text-surface-400 dark:text-surface-500">
-              of {{ focusedApplications.length }}
-            </span>
+            <div v-if="totalPages > 1" class="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                class="inline-flex size-6 items-center justify-center rounded-md text-surface-500 hover:bg-surface-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-surface-400 dark:hover:bg-surface-800"
+                :disabled="page <= 1"
+                title="Previous page"
+                @click="page--"
+              >
+                <ChevronLeft class="size-3.5" />
+              </button>
+              <span class="text-[10px] tabular-nums text-surface-400 dark:text-surface-500">{{ page }}/{{ totalPages }}</span>
+              <button
+                type="button"
+                class="inline-flex size-6 items-center justify-center rounded-md text-surface-500 hover:bg-surface-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-surface-400 dark:hover:bg-surface-800"
+                :disabled="page >= totalPages"
+                title="Next page"
+                @click="page++"
+              >
+                <ChevronRight class="size-3.5" />
+              </button>
+            </div>
           </div>
 
           <!-- Scrollable list -->
@@ -1601,17 +1586,17 @@ function closeDocPreview() {
                 <div class="flex items-center gap-2 shrink-0">
                   <div class="flex items-center gap-1.5 mr-2">
                     <button
-                      :disabled="currentIndex === 0"
+                      :disabled="currentIndex <= 0 && page <= 1"
                       class="flex cursor-pointer items-center justify-center rounded-lg border border-surface-200 p-1.5 text-surface-500 transition-all duration-150 hover:bg-white hover:border-surface-300 hover:text-surface-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-surface-700 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:border-surface-600 dark:hover:text-surface-300"
                       @click="goToPreviousCard"
                     >
                       <ArrowLeft class="size-4" />
                     </button>
                     <span class="text-xs font-medium text-surface-500 dark:text-surface-400 tabular-nums px-0.5">
-                      {{ currentIndex + 1 }}/{{ filteredApplications.length }}
+                      {{ pageStart + currentIndex }}/{{ focusedApplicationTotal }}
                     </span>
                     <button
-                      :disabled="currentIndex >= filteredApplications.length - 1"
+                      :disabled="currentIndex >= filteredApplications.length - 1 && page >= totalPages"
                       class="flex cursor-pointer items-center justify-center rounded-lg border border-surface-200 p-1.5 text-surface-500 transition-all duration-150 hover:bg-white hover:border-surface-300 hover:text-surface-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-surface-700 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:border-surface-600 dark:hover:text-surface-300"
                       @click="goToNextCard"
                     >
@@ -1669,7 +1654,7 @@ function closeDocPreview() {
                       class="absolute left-0 top-full z-50 mt-1 w-44 rounded-xl border border-surface-200 dark:border-surface-700/80 bg-white dark:bg-surface-900 shadow-xl shadow-surface-900/5 dark:shadow-black/20 py-1.5 origin-top-left"
                     >
                       <span class="block px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500">Sections</span>
-                      <label class="flex items-center gap-2.5 px-3.5 py-2 text-sm text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800/80 cursor-pointer select-none transition-colors">
+                      <label v-if="hasCoverLetter" class="flex items-center gap-2.5 px-3.5 py-2 text-sm text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800/80 cursor-pointer select-none transition-colors">
                         <input v-model="overviewSections.coverLetter" type="checkbox" class="size-3.5 rounded border-surface-300 text-brand-600 focus:ring-brand-500 dark:border-surface-600 dark:bg-surface-800" />
                         Cover Letter
                       </label>
@@ -1697,6 +1682,7 @@ function closeDocPreview() {
                   </Transition>
                 </div>
                 <button
+                  v-if="hasCoverLetter"
                   class="cursor-pointer px-3.5 py-2.5 text-sm font-medium transition-all duration-150 border-b-2 -mb-px flex items-center gap-1.5"
                   :class="detailTab === 'cover-letter'
                     ? 'border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300'
@@ -1785,9 +1771,10 @@ function closeDocPreview() {
 
             <!-- Detail content -->
             <div class="bg-surface-50/80 dark:bg-surface-950/80 px-4 sm:px-6 py-5 sm:py-8">
-              <div v-if="detailFetchStatus === 'pending' && !resolvedCurrentApplication" class="flex flex-col items-center justify-center py-12">
-                <div class="size-8 rounded-full border-2 border-brand-200 border-t-brand-600 dark:border-brand-800 dark:border-t-brand-400 animate-spin" />
-                <p class="mt-3 text-sm text-surface-400">Loading details…</p>
+              <div v-if="!resolvedCurrentApplication" class="space-y-5 max-w-4xl mx-auto animate-pulse" aria-label="Loading candidate details">
+                <div class="h-28 rounded-xl border border-surface-200/80 bg-white dark:border-surface-800/60 dark:bg-surface-900" />
+                <div class="h-40 rounded-xl border border-surface-200/80 bg-white dark:border-surface-800/60 dark:bg-surface-900" />
+                <div class="h-32 rounded-xl border border-surface-200/80 bg-white dark:border-surface-800/60 dark:bg-surface-900" />
               </div>
 
               <template v-else>
@@ -1822,8 +1809,8 @@ function closeDocPreview() {
               </div>
 
               <!-- COVER LETTER SECTION -->
-              <div v-if="showSection.coverLetter" class="max-w-4xl mx-auto" :class="detailTab === 'overview' ? 'mt-5' : ''">
-                <div v-if="resolvedCurrentApplication?.coverLetterText" class="rounded-xl border border-surface-200/80 bg-white p-5 shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
+              <div v-if="showSection.coverLetter && hasCoverLetter" class="max-w-4xl mx-auto" :class="detailTab === 'overview' ? 'mt-5' : ''">
+                <div class="rounded-xl border border-surface-200/80 bg-white p-5 shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
                   <div class="flex items-center gap-2.5 mb-4">
                     <div class="flex size-7 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-950/40">
                       <FileText class="size-3.5 text-brand-600 dark:text-brand-400" />
@@ -1831,17 +1818,10 @@ function closeDocPreview() {
                     <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">Cover letter</h3>
                   </div>
                   <p class="text-sm leading-relaxed text-surface-600 dark:text-surface-300 whitespace-pre-wrap">
-                    {{ resolvedCurrentApplication.coverLetterText }}
+                    {{ resolvedCurrentApplication?.coverLetterText }}
                   </p>
                 </div>
 
-                <div v-else class="rounded-xl border border-surface-200/80 bg-white p-10 text-center shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
-                  <div class="flex size-14 items-center justify-center rounded-2xl bg-surface-100 dark:bg-surface-800/60 mx-auto mb-3">
-                    <FileText class="size-6 text-surface-400 dark:text-surface-500" />
-                  </div>
-                  <p class="text-sm font-medium text-surface-600 dark:text-surface-300">No cover letter</p>
-                  <p class="mt-1 text-xs text-surface-400 dark:text-surface-500">This candidate did not include a cover letter.</p>
-                </div>
               </div>
 
               <!-- AI SCORE BREAKDOWN -->
@@ -2463,14 +2443,14 @@ function closeDocPreview() {
         <!-- Position indicator -->
         <div class="flex items-center justify-center pb-1.5">
           <span class="text-[10px] font-medium text-surface-400 dark:text-surface-500 tabular-nums">
-            {{ currentIndex + 1 }} / {{ filteredApplications.length }}
+            {{ pageStart + currentIndex }} / {{ focusedApplicationTotal }}
           </span>
         </div>
       </div>
 
       <!-- Mobile empty state for bottom bar -->
       <div
-        v-else-if="focusedApplications.length === 0"
+        v-else-if="focusedApplicationTotal === 0"
         class="md:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-surface-200/80 bg-white dark:border-surface-800/60 dark:bg-surface-900 px-4 py-3 text-center"
         :style="{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }"
       >
@@ -2548,6 +2528,10 @@ function closeDocPreview() {
           </div>
         </div>
       </div>
+    </Teleport>
+  </div>
+</template>
+/div>
     </Teleport>
   </div>
 </template>
