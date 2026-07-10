@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { MapPin, Briefcase, Building2, ArrowLeft, ExternalLink, Calendar } from 'lucide-vue-next'
+import { MapPin, Briefcase, Building2, ArrowLeft, ExternalLink, Calendar, ChevronRight } from 'lucide-vue-next'
 
 definePageMeta({
   layout: 'public',
@@ -10,6 +10,7 @@ const jobSlug = route.params.slug as string
 const requestURL = useRequestURL()
 const { track } = useTrack()
 const { t, locale, defaultLocale } = useI18n()
+const organizationLogoFailed = ref(false)
 
 // Canonical + JobPosting URL are built from the real request origin rather than
 // the i18n `baseUrl` (which can point at the marketing host if the env var is
@@ -341,14 +342,36 @@ function formatSalary(min?: number | null, max?: number | null, currency?: strin
             <p class="text-xs text-surface-400">{{ t('jobs.detail.applyTime') }}</p>
           </div>
 
-          <!-- Back to the org's branded career page (all their open roles) -->
+          <!-- Branded path to the organization's career page and other roles -->
           <NuxtLink
             v-if="job.careerPageSlug"
             :to="{ path: $localePath(`/career/${job.careerPageSlug}`), query: applyQuery }"
-            class="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 dark:text-brand-400 hover:underline"
+            class="group mt-6 flex w-full items-center gap-3 border-t border-surface-100 pt-5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-4 dark:border-surface-800 dark:focus-visible:ring-offset-surface-900"
           >
-            <Building2 class="size-3.5" />
-            {{ t('jobs.detail.seeAllRoles', { name: job.organizationName }) }}
+            <span
+              class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border shadow-sm"
+              :class="job.organizationLogo && !organizationLogoFailed
+                ? 'border-surface-200 bg-white dark:border-surface-700 dark:bg-surface-800'
+                : 'border-brand-200 bg-brand-50 dark:border-brand-800 dark:bg-brand-950'"
+            >
+              <img
+                v-if="job.organizationLogo && !organizationLogoFailed"
+                :src="job.organizationLogo"
+                :alt="t('jobs.detail.companyLogoAlt', { name: job.organizationName })"
+                class="size-full object-contain p-1.5"
+                @error="organizationLogoFailed = true"
+              >
+              <Building2 v-else class="size-6 text-brand-700 dark:text-brand-300" />
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="block text-sm font-semibold text-surface-900 transition-colors group-hover:text-brand-700 dark:text-surface-100 dark:group-hover:text-brand-300">
+                {{ t('jobs.detail.careerPageTitle', { name: job.organizationName }) }}
+              </span>
+              <span class="mt-0.5 block text-xs leading-5 text-surface-500 dark:text-surface-400">
+                {{ t('jobs.detail.careerPageDescription') }}
+              </span>
+            </span>
+            <ChevronRight class="size-5 shrink-0 text-brand-500 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-700 dark:text-brand-400 dark:group-hover:text-brand-300" />
           </NuxtLink>
         </div>
       </div>

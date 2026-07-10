@@ -136,7 +136,7 @@ async function copyUrl() {
 // ─────────────────────────────────────────────
 const ASSET_MAX_BYTES: Record<'logo' | 'banner', number> = {
   logo: 2 * 1024 * 1024,
-  banner: 5 * 1024 * 1024,
+  banner: 15 * 1024 * 1024,
 }
 const ASSET_ACCEPT = 'image/png,image/jpeg,image/webp'
 
@@ -578,7 +578,7 @@ async function handleSave() {
                     Remove
                   </button>
                 </div>
-                <p class="mt-1.5 text-xs text-surface-400">PNG, JPEG or WebP · up to 5 MB. Wide images work best.</p>
+                <p class="mt-1.5 text-xs text-surface-400">PNG, JPEG or WebP · up to 15 MB. Optimized automatically.</p>
               </div>
 
               <!-- Asset upload error -->

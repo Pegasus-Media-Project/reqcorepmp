@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { fileTypeFromBuffer } from 'file-type'
 import { careerPage } from '../../database/schema'
+import { optimizeCareerBanner } from '../../utils/careerAssetImage'
 import {
   careerAssetKindSchema,
   CAREER_ASSET_MIME_TYPES,
@@ -13,7 +14,7 @@ import {
  * POST /api/career-page/asset
  *
  * Upload a career-page image (logo or hero banner). Multipart form with:
- *   - `file`: the image (PNG / JPEG / WebP)
+ *   - `file`: the image (PNG / JPEG / WebP; banners are converted to WebP)
  *   - `kind`: "logo" | "banner"
  *
  * Available on every plan, including free — see FEATURE_MIN_TIER.
@@ -65,6 +66,20 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  let assetBuffer = fileBuffer
+  let assetMimeType = mimeType as CareerAssetMime
+  if (kind === 'banner') {
+    try {
+      assetBuffer = await optimizeCareerBanner(fileBuffer)
+      assetMimeType = 'image/webp'
+    } catch {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'The banner could not be processed. Try a different PNG, JPEG, or WebP image.',
+      })
+    }
+  }
+
   // ── Upload to S3 under a fresh, server-generated key ────────────────
   const keyColumn = kind === 'logo' ? 'logoStorageKey' : 'bannerStorageKey'
   const existing = await db.query.careerPage.findFirst({
@@ -73,10 +88,10 @@ export default defineEventHandler(async (event) => {
   })
   const previousKey = existing?.[keyColumn]
 
-  const extension = CAREER_ASSET_MIME_TO_EXTENSION[mimeType as CareerAssetMime]
+  const extension = CAREER_ASSET_MIME_TO_EXTENSION[assetMimeType]
   const storageKey = `career-page/${orgId}/${kind}-${crypto.randomUUID()}.${extension}`
 
-  await uploadToS3(storageKey, fileBuffer, mimeType)
+  await uploadToS3(storageKey, assetBuffer, assetMimeType)
 
   // ── Persist the key (upsert), cleaning up the previous object ───────
   try {

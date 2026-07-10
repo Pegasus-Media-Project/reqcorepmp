@@ -73,14 +73,19 @@ export default defineEventHandler(async (event) => {
   // to the full list of open roles. Only surfaces when the org's plan includes
   // the careerPage feature and the page isn't disabled.
   let careerPageSlug: string | null = null
+  let organizationLogo = result.organization?.logo ?? null
   const tier = await resolveOrgPlanId(result.organizationId)
   if (tierHasFeature(tier, 'careerPage')) {
     const cp = await db.query.careerPage.findFirst({
       where: eq(careerPage.organizationId, result.organizationId),
-      columns: { slug: true, enabled: true },
+      columns: { slug: true, enabled: true, logoStorageKey: true, updatedAt: true },
     })
     if (cp?.enabled ?? true) {
       careerPageSlug = cp?.slug ?? result.organization?.slug ?? null
+      if (cp?.logoStorageKey && careerPageSlug) {
+        const version = new Date(cp.updatedAt).getTime()
+        organizationLogo = `/api/public/career-page/${careerPageSlug}/asset?kind=logo&v=${version}`
+      }
     }
   }
 
@@ -89,7 +94,7 @@ export default defineEventHandler(async (event) => {
   return {
     ...jobData,
     organizationName: org?.name ?? null,
-    organizationLogo: org?.logo ?? null,
+    organizationLogo,
     careerPageSlug,
     privacyPolicyUrl: settings?.privacyPolicyUrl ?? null,
     privacyPolicyText: settings?.privacyPolicyText ?? null,

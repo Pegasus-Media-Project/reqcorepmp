@@ -63,6 +63,7 @@
     "postgres": "^3.4.8",
     "posthog-node": "^5.28.0",
     "resend": "^6.12.2",
+    "sharp": "^0.35.3",
     "stripe": "^22.2.2",
     "tailwindcss": "^4.1.18",
     "vue": "^3.5.33",

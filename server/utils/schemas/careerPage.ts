@@ -73,5 +73,5 @@ export const CAREER_ASSET_MIME_TO_EXTENSION: Record<CareerAssetMime, string> = {
 /** Per-slot upload size caps — logos are small, banners are wide. */
 export const CAREER_ASSET_MAX_BYTES: Record<CareerAssetKind, number> = {
   logo: 2 * 1024 * 1024, // 2 MB
-  banner: 5 * 1024 * 1024, // 5 MB
+  banner: 15 * 1024 * 1024, // 15 MB; banners are optimized before storage
 }
