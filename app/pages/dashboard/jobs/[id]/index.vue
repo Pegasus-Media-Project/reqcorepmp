@@ -1801,31 +1801,80 @@ function closeDocPreview() {
             <!-- Candidate header -->
             <div class="border-b border-surface-200 bg-surface-50 px-4 sm:px-6 py-3 sm:py-4 dark:border-surface-800 dark:bg-surface-900/80">
               <div class="mx-auto" :class="detailWidthClass">
-              <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                <div class="flex items-start gap-4 min-w-0">
+                <div class="flex items-start gap-4">
                   <div class="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 text-lg font-bold text-white shadow-lg shadow-brand-500/20 dark:from-brand-500 dark:to-brand-700 dark:shadow-brand-500/10">
                     {{ getCandidateInitials(currentSummary.candidateFirstName, currentSummary.candidateLastName) }}
                   </div>
-                  <div class="min-w-0">
-                    <div class="flex items-center gap-2.5">
-                      <h2 class="text-xl font-semibold tracking-tight text-surface-900 dark:text-surface-50 truncate">
-                        {{ formatPersonName(currentSummary.candidateFirstName, currentSummary.candidateLastName) }}
-                      </h2>
-                      <span
-                        class="inline-flex shrink-0 items-center rounded-lg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ring-1 ring-inset"
-                        :class="{
-                          'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:ring-blue-800': currentSummary.status === 'new',
-                          'bg-violet-50 text-violet-700 ring-violet-200 dark:bg-violet-950/50 dark:text-violet-400 dark:ring-violet-800': currentSummary.status === 'screening',
-                          'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:ring-amber-800': currentSummary.status === 'interview',
-                          'bg-teal-50 text-teal-700 ring-teal-200 dark:bg-teal-950/50 dark:text-teal-400 dark:ring-teal-800': currentSummary.status === 'offer',
-                          'bg-green-50 text-green-700 ring-green-200 dark:bg-green-950/50 dark:text-green-400 dark:ring-green-800': currentSummary.status === 'hired',
-                          'bg-surface-100 text-surface-500 ring-surface-200 dark:bg-surface-800/50 dark:text-surface-400 dark:ring-surface-700': currentSummary.status === 'rejected',
-                        }"
-                      >
-                        {{ currentSummary.status }}
-                      </span>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div class="flex min-w-0 flex-wrap items-center gap-2.5">
+                        <h2 class="truncate text-xl font-semibold tracking-tight text-surface-900 dark:text-surface-50">
+                          {{ formatPersonName(currentSummary.candidateFirstName, currentSummary.candidateLastName) }}
+                        </h2>
+                        <span
+                          class="inline-flex shrink-0 items-center rounded-lg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ring-1 ring-inset"
+                          :class="{
+                            'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:ring-blue-800': currentSummary.status === 'new',
+                            'bg-violet-50 text-violet-700 ring-violet-200 dark:bg-violet-950/50 dark:text-violet-400 dark:ring-violet-800': currentSummary.status === 'screening',
+                            'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:ring-amber-800': currentSummary.status === 'interview',
+                            'bg-teal-50 text-teal-700 ring-teal-200 dark:bg-teal-950/50 dark:text-teal-400 dark:ring-teal-800': currentSummary.status === 'offer',
+                            'bg-green-50 text-green-700 ring-green-200 dark:bg-green-950/50 dark:text-green-400 dark:ring-green-800': currentSummary.status === 'hired',
+                            'bg-surface-100 text-surface-500 ring-surface-200 dark:bg-surface-800/50 dark:text-surface-400 dark:ring-surface-700': currentSummary.status === 'rejected',
+                          }"
+                        >
+                          {{ currentSummary.status }}
+                        </span>
+                        <span
+                          v-if="currentSummary.score != null"
+                          class="inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset"
+                          :class="{
+                            'bg-success-50 text-success-700 ring-success-200 dark:bg-success-950/60 dark:text-success-400 dark:ring-success-800': currentSummary.score >= 75,
+                            'bg-warning-50 text-warning-700 ring-warning-200 dark:bg-warning-950/60 dark:text-warning-400 dark:ring-warning-800': currentSummary.score >= 40 && currentSummary.score < 75,
+                            'bg-danger-50 text-danger-700 ring-danger-200 dark:bg-danger-950/60 dark:text-danger-400 dark:ring-danger-800': currentSummary.score < 40,
+                          }"
+                        >
+                          {{ currentSummary.score }} pts
+                        </span>
+                      </div>
+                      <div class="flex shrink-0 items-center gap-2">
+                        <div class="mr-2 flex items-center gap-1.5">
+                          <button
+                            :disabled="currentIndex <= 0 && page <= 1"
+                            class="flex cursor-pointer items-center justify-center rounded-lg border border-surface-200 p-1.5 text-surface-500 transition-all duration-150 hover:border-surface-300 hover:bg-white hover:text-surface-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-surface-700 dark:text-surface-400 dark:hover:border-surface-600 dark:hover:bg-surface-800 dark:hover:text-surface-300"
+                            @click="goToPreviousCard"
+                          >
+                            <ArrowLeft class="size-4" />
+                          </button>
+                          <span class="px-0.5 text-xs font-medium tabular-nums text-surface-500 dark:text-surface-400">
+                            {{ pageStart + currentIndex }}/{{ focusedApplicationTotal }}
+                          </span>
+                          <button
+                            :disabled="currentIndex >= filteredApplications.length - 1 && page >= totalPages"
+                            class="flex cursor-pointer items-center justify-center rounded-lg border border-surface-200 p-1.5 text-surface-500 transition-all duration-150 hover:border-surface-300 hover:bg-white hover:text-surface-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-surface-700 dark:text-surface-400 dark:hover:border-surface-600 dark:hover:bg-surface-800 dark:hover:text-surface-300"
+                            @click="goToNextCard"
+                          >
+                            <ArrowRight class="size-4" />
+                          </button>
+                        </div>
+                        <button
+                          class="hidden cursor-pointer items-center justify-center rounded-lg border border-surface-200 p-1.5 text-surface-500 transition-all duration-150 hover:border-surface-300 hover:bg-white hover:text-surface-700 dark:border-surface-700 dark:text-surface-400 dark:hover:border-surface-600 dark:hover:bg-surface-800 dark:hover:text-surface-300 lg:flex"
+                          :aria-pressed="isWideDetail"
+                          :title="isWideDetail ? 'Use centered width' : 'Use full width'"
+                          @click="isWideDetail = !isWideDetail"
+                        >
+                          <FoldHorizontal v-if="isWideDetail" class="size-4" />
+                          <UnfoldHorizontal v-else class="size-4" />
+                        </button>
+                        <NuxtLink
+                          :to="$localePath(`/dashboard/applications/${currentSummary.id}`)"
+                          class="flex items-center justify-center rounded-lg border border-surface-200 p-1.5 text-surface-500 transition-all duration-150 hover:border-surface-300 hover:bg-white hover:text-surface-700 dark:border-surface-700 dark:text-surface-400 dark:hover:border-surface-600 dark:hover:bg-surface-800 dark:hover:text-surface-300"
+                          title="Full application page"
+                        >
+                          <ExternalLink class="size-4" />
+                        </NuxtLink>
+                      </div>
                     </div>
-                    <div class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-surface-500 dark:text-surface-400">
+                    <div class="mt-2 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-surface-500 dark:text-surface-400">
                       <a
                         :href="`mailto:${currentSummary.candidateEmail}`"
                         target="_blank"
@@ -1846,58 +1895,8 @@ function closeDocPreview() {
                         · <TimelineDateLink :date="currentSummary.updatedAt">Updated {{ new Date(currentSummary.updatedAt).toLocaleDateString() }}</TimelineDateLink>
                       </span>
                     </div>
-                    <div v-if="currentSummary.score != null" class="mt-2 flex flex-wrap items-center gap-2">
-                      <span
-                        class="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset"
-                        :class="{
-                          'bg-success-50 text-success-700 ring-success-200 dark:bg-success-950/60 dark:text-success-400 dark:ring-success-800': currentSummary.score >= 75,
-                          'bg-warning-50 text-warning-700 ring-warning-200 dark:bg-warning-950/60 dark:text-warning-400 dark:ring-warning-800': currentSummary.score >= 40 && currentSummary.score < 75,
-                          'bg-danger-50 text-danger-700 ring-danger-200 dark:bg-danger-950/60 dark:text-danger-400 dark:ring-danger-800': currentSummary.score < 40,
-                        }"
-                      >
-                        {{ currentSummary.score }} pts
-                      </span>
-                    </div>
                   </div>
                 </div>
-                <div class="flex items-center gap-2 shrink-0">
-                  <div class="flex items-center gap-1.5 mr-2">
-                    <button
-                      :disabled="currentIndex <= 0 && page <= 1"
-                      class="flex cursor-pointer items-center justify-center rounded-lg border border-surface-200 p-1.5 text-surface-500 transition-all duration-150 hover:bg-white hover:border-surface-300 hover:text-surface-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-surface-700 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:border-surface-600 dark:hover:text-surface-300"
-                      @click="goToPreviousCard"
-                    >
-                      <ArrowLeft class="size-4" />
-                    </button>
-                    <span class="text-xs font-medium text-surface-500 dark:text-surface-400 tabular-nums px-0.5">
-                      {{ pageStart + currentIndex }}/{{ focusedApplicationTotal }}
-                    </span>
-                    <button
-                      :disabled="currentIndex >= filteredApplications.length - 1 && page >= totalPages"
-                      class="flex cursor-pointer items-center justify-center rounded-lg border border-surface-200 p-1.5 text-surface-500 transition-all duration-150 hover:bg-white hover:border-surface-300 hover:text-surface-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-surface-700 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:border-surface-600 dark:hover:text-surface-300"
-                      @click="goToNextCard"
-                    >
-                      <ArrowRight class="size-4" />
-                    </button>
-                  </div>
-                  <button
-                    class="hidden lg:flex cursor-pointer items-center justify-center rounded-lg border border-surface-200 p-1.5 text-surface-500 transition-all duration-150 hover:bg-white hover:border-surface-300 hover:text-surface-700 dark:border-surface-700 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:border-surface-600 dark:hover:text-surface-300"
-                    :aria-pressed="isWideDetail"
-                    :title="isWideDetail ? 'Use centered width' : 'Use full width'"
-                    @click="isWideDetail = !isWideDetail"
-                  >
-                    <FoldHorizontal v-if="isWideDetail" class="size-4" />
-                    <UnfoldHorizontal v-else class="size-4" />
-                  </button>
-                  <NuxtLink
-                    :to="$localePath(`/dashboard/applications/${currentSummary.id}`)"
-                    class="flex items-center justify-center rounded-lg border border-surface-200 p-1.5 text-surface-500 transition-all duration-150 hover:bg-white hover:border-surface-300 hover:text-surface-700 dark:border-surface-700 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:border-surface-600 dark:hover:text-surface-300"
-                    title="Full application page"
-                  >
-                    <ExternalLink class="size-4" />
-                  </NuxtLink>
-                </div>
-              </div>
               </div>
             </div>
 
