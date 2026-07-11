@@ -277,7 +277,6 @@ watch(showOverviewDropdown, (val) => {
 
 // Which sections to display based on active tab
 const showSection = computed(() => ({
-  profile: detailTab.value === 'overview',
   coverLetter: detailTab.value === 'overview' ? overviewSections.coverLetter : detailTab.value === 'cover-letter',
   aiAnalysis: detailTab.value === 'overview' ? overviewSections.aiAnalysis : detailTab.value === 'ai-analysis',
   interviews: detailTab.value === 'overview' ? overviewSections.interviews : detailTab.value === 'interviews',
@@ -378,7 +377,6 @@ function describeTimelineItem(item: TimelineEntry): string {
 }
 
 // Section refs
-const overviewRef = ref<HTMLElement | null>(null)
 const interviewsRef = ref<HTMLElement | null>(null)
 const documentsRef = ref<HTMLElement | null>(null)
 const responsesRef = ref<HTMLElement | null>(null)
@@ -2077,33 +2075,6 @@ function closeDocPreview() {
               <template v-else>
 
 
-
-              <!-- PROFILE SECTION (overview only) -->
-              <div v-if="showSection.profile" ref="overviewRef" class="space-y-5 mx-auto" :class="detailWidthClass">
-                <!-- Notes -->
-                <div class="rounded-xl border border-surface-200/80 bg-white p-5 shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
-                  <div class="flex items-center gap-2.5 mb-4">
-                    <div class="flex size-7 items-center justify-center rounded-lg bg-warning-50 dark:bg-warning-950/40">
-                      <MessageSquare class="size-3.5 text-warning-600 dark:text-warning-400" />
-                    </div>
-                    <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">Notes</h3>
-                  </div>
-                  <p class="text-sm leading-relaxed text-surface-600 dark:text-surface-300 whitespace-pre-wrap">
-                    {{ currentSummary.notes || 'No notes yet.' }}
-                  </p>
-                </div>
-
-                <!-- Quick links -->
-                <div class="flex items-center gap-4 pt-1">
-                  <NuxtLink
-                    :to="$localePath(`/dashboard/applications/${currentSummary.id}`)"
-                    class="inline-flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 font-medium transition-colors group"
-                  >
-                    <ExternalLink class="size-3.5 transition-transform group-hover:translate-x-0.5" />
-                    Full application page
-                  </NuxtLink>
-                </div>
-              </div>
 
               <!-- COVER LETTER SECTION -->
               <div v-if="showSection.coverLetter && hasCoverLetter" class="mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-5' : '']">
