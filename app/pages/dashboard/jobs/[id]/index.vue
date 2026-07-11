@@ -228,13 +228,19 @@ watch(totalPages, (next) => {
   if (page.value > next) page.value = next
 })
 
-// Auto-scroll mobile bottom bar to keep selected candidate visible
+// Auto-scroll mobile bottom bar and sidebar list to keep selected candidate visible
 watch(currentIndex, () => {
   nextTick(() => {
-    const container = mobileBottomBar.value
-    if (!container) return
-    const selected = container.querySelector(`[data-candidate-idx="${currentIndex.value}"]`) as HTMLElement | null
-    selected?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+    const bottomBar = mobileBottomBar.value
+    if (bottomBar) {
+      const selected = bottomBar.querySelector(`[data-candidate-idx="${currentIndex.value}"]`) as HTMLElement | null
+      selected?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+    }
+    const list = sidebarList.value
+    if (list) {
+      const selected = list.querySelector(`[data-candidate-idx="${currentIndex.value}"]`) as HTMLElement | null
+      selected?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
   })
 })
 
@@ -378,6 +384,7 @@ const documentsRef = ref<HTMLElement | null>(null)
 const responsesRef = ref<HTMLElement | null>(null)
 const detailScrollContainer = ref<HTMLElement | null>(null)
 const mobileBottomBar = ref<HTMLElement | null>(null)
+const sidebarList = ref<HTMLElement | null>(null)
 
 type SwipeDocument = {
   id: string
@@ -438,11 +445,37 @@ const {
   },
 )
 
-const resolvedCurrentApplication = computed(() => {
-  if (currentApplication.value && currentApplication.value.id === currentApplicationId.value) {
-    return currentApplication.value
+// Keep the last successfully loaded application visible while the next one is
+// being fetched, so switching candidates swaps the detail in place instead of
+// flashing the skeleton (and header fields don't vanish/reappear). Only before
+// the very first load is this null.
+const resolvedCurrentApplication = computed(() => currentApplication.value ?? null)
+
+// True while what we're showing no longer belongs to the selected candidate,
+// i.e. a fetch for the newly selected candidate is still in flight.
+const isDetailStale = computed(() =>
+  !currentApplication.value || currentApplication.value.id !== currentApplicationId.value,
+)
+
+// Fall back to the skeleton only when a fetch is genuinely slow. Fast/cached
+// navigations resolve before this fires, so the content simply swaps in place.
+const showDetailSkeleton = ref(false)
+let detailSkeletonTimer: ReturnType<typeof setTimeout> | null = null
+watch(isDetailStale, (stale) => {
+  if (detailSkeletonTimer) {
+    clearTimeout(detailSkeletonTimer)
+    detailSkeletonTimer = null
   }
-  return null
+  if (stale) {
+    detailSkeletonTimer = setTimeout(() => {
+      showDetailSkeleton.value = true
+    }, 180)
+  } else {
+    showDetailSkeleton.value = false
+  }
+})
+onBeforeUnmount(() => {
+  if (detailSkeletonTimer) clearTimeout(detailSkeletonTimer)
 })
 
 const hasCoverLetter = computed(() => Boolean(resolvedCurrentApplication.value?.coverLetterText?.trim()))
@@ -1658,7 +1691,7 @@ function closeDocPreview() {
           </div>
 
           <!-- Scrollable list -->
-          <div class="flex-1 overflow-y-auto scrollbar-thin border-t border-surface-100 dark:border-surface-800/60">
+          <div ref="sidebarList" class="flex-1 overflow-y-auto scrollbar-thin border-t border-surface-100 dark:border-surface-800/60">
             <div v-if="filteredApplications.length === 0" class="p-8 text-center">
               <div class="flex size-12 items-center justify-center rounded-xl bg-surface-100 dark:bg-surface-800/60 mx-auto mb-3">
                 <UserRound class="size-5 text-surface-400 dark:text-surface-500" />
@@ -1681,6 +1714,7 @@ function closeDocPreview() {
             <button
               v-for="(app, idx) in filteredApplications"
               :key="app.id"
+              :data-candidate-idx="idx"
               class="pipeline-candidate-card group flex w-full cursor-pointer items-start gap-3 px-3.5 py-3 text-left transition-all duration-150"
               :class="currentIndex === idx
                 ? 'bg-brand-50/70 dark:bg-brand-950/20 border-l-[3px] border-l-brand-500 dark:border-l-brand-400'
@@ -2035,7 +2069,7 @@ function closeDocPreview() {
 
             <!-- Detail content -->
             <div class="bg-surface-50/80 dark:bg-surface-950/80 px-4 sm:px-6 py-5 sm:py-8">
-              <div v-if="!resolvedCurrentApplication" class="space-y-5 mx-auto animate-pulse" :class="detailWidthClass" aria-label="Loading candidate details">
+              <div v-if="!resolvedCurrentApplication || showDetailSkeleton" class="space-y-5 mx-auto animate-pulse" :class="detailWidthClass" aria-label="Loading candidate details">
                 <div class="h-28 rounded-xl border border-surface-200/80 bg-white dark:border-surface-800/60 dark:bg-surface-900" />
                 <div class="h-40 rounded-xl border border-surface-200/80 bg-white dark:border-surface-800/60 dark:bg-surface-900" />
                 <div class="h-32 rounded-xl border border-surface-200/80 bg-white dark:border-surface-800/60 dark:bg-surface-900" />
