@@ -211,7 +211,7 @@ onUnmounted(() => {
 <template>
   <header class="sticky top-0 z-50 w-full">
     <!-- Primary navigation bar -->
-    <div class="relative z-20 border-b border-surface-200/80 dark:border-surface-800/80 bg-white/80 dark:bg-surface-900/80 backdrop-blur-xl">
+  <div v-if="!activeJobId" class="relative z-20 border-b border-surface-200/80 dark:border-surface-800/80 bg-white/80 dark:bg-surface-900/80 backdrop-blur-xl">
       <div class="flex h-14 items-center justify-between px-4 lg:px-6">
         <!-- Left: Logo + Nav -->
         <div class="flex items-center gap-1 lg:gap-2">
@@ -258,7 +258,8 @@ onUnmounted(() => {
                   :class="showMoreNav ? 'rotate-180' : ''"
                 />
               </button>
-              <Transition
+  <Transition
+    v-if="!activeJobId"
                 enter-active-class="transition duration-150 ease-out"
                 enter-from-class="opacity-0 scale-95 -translate-y-1"
                 enter-to-class="opacity-100 scale-100 translate-y-0"
