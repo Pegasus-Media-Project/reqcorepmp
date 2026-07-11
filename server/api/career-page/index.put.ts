@@ -54,6 +54,7 @@ export default defineEventHandler(async (event) => {
       accentColor: accentColor ?? null,
       headline: headline ?? null,
       description: description ?? null,
+      ...(body.bannerPosition !== undefined && { bannerPosition: body.bannerPosition }),
     })
     .onConflictDoUpdate({
       target: careerPage.organizationId,
@@ -63,6 +64,7 @@ export default defineEventHandler(async (event) => {
         ...(accentColor !== undefined && { accentColor }),
         ...(headline !== undefined && { headline }),
         ...(description !== undefined && { description }),
+        ...(body.bannerPosition !== undefined && { bannerPosition: body.bannerPosition }),
         updatedAt: new Date(),
       },
     })
@@ -72,6 +74,7 @@ export default defineEventHandler(async (event) => {
       accentColor: careerPage.accentColor,
       headline: careerPage.headline,
       description: careerPage.description,
+      bannerPosition: careerPage.bannerPosition,
       updatedAt: careerPage.updatedAt,
     })
 

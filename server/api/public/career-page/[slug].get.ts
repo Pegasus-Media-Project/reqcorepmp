@@ -32,6 +32,7 @@ export default defineEventHandler(async (event) => {
   // Career-page logo overrides the org logo; banner has no org-level fallback.
   const logo = config?.logoStorageKey ? assetUrl('logo') : org.logo
   const banner = config?.bannerStorageKey ? assetUrl('banner') : null
+  const bannerPosition = config?.bannerPosition ?? 50
 
   const enabled = config?.enabled ?? true
   if (!enabled) {
@@ -41,6 +42,7 @@ export default defineEventHandler(async (event) => {
       name: org.name,
       logo,
       banner,
+      bannerPosition,
       accentColor: null,
       headline: null,
       description: null,
@@ -74,6 +76,7 @@ export default defineEventHandler(async (event) => {
     name: org.name,
     logo,
     banner,
+    bannerPosition,
     accentColor: config?.accentColor ?? null,
     headline: config?.headline ?? null,
     description: config?.description ?? null,

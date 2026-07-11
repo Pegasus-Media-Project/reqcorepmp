@@ -18,6 +18,7 @@ export function useCareerPage() {
   const accentColor = computed(() => data.value?.accentColor ?? null)
   const headline = computed(() => data.value?.headline ?? null)
   const description = computed(() => data.value?.description ?? null)
+  const bannerPosition = computed(() => data.value?.bannerPosition ?? 50)
 
   /**
    * The slug that resolves the public page: the custom slug if set, otherwise
@@ -70,6 +71,7 @@ export function useCareerPage() {
     accentColor?: string | null
     headline?: string | null
     description?: string | null
+    bannerPosition?: number
   }) {
     await $fetch('/api/career-page', { method: 'PUT', body: payload })
     await refresh()
@@ -84,6 +86,7 @@ export function useCareerPage() {
     accentColor,
     headline,
     description,
+    bannerPosition,
     status,
     careerPagePath,
     logoUrl,

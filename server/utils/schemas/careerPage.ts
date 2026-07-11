@@ -43,6 +43,8 @@ export const updateCareerPageSchema = z.object({
   accentColor,
   headline: z.string().max(140).nullish().or(z.literal('')),
   description: z.string().max(1000).nullish().or(z.literal('')),
+  /** Vertical focal point of the hero banner, 0–100 (percent). 50 = centered. */
+  bannerPosition: z.number().int().min(0).max(100).optional(),
 })
 
 export type UpdateCareerPageInput = z.infer<typeof updateCareerPageSchema>

@@ -138,6 +138,7 @@ useHead({
     :name="data?.name"
     :logo="data?.logo"
     :banner="data?.banner"
+    :banner-position="data?.bannerPosition"
     :accent-color="data?.accentColor"
     :headline="data?.headline"
     :description="data?.description"

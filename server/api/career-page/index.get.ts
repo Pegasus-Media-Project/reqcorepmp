@@ -26,6 +26,7 @@ export default defineEventHandler(async (event) => {
       description: true,
       logoStorageKey: true,
       bannerStorageKey: true,
+      bannerPosition: true,
       updatedAt: true,
     },
   })
@@ -39,6 +40,7 @@ export default defineEventHandler(async (event) => {
     description: config?.description ?? null,
     hasLogo: !!config?.logoStorageKey,
     hasBanner: !!config?.bannerStorageKey,
+    bannerPosition: config?.bannerPosition ?? 50,
     updatedAt: config?.updatedAt ?? null,
   }
 })

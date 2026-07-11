@@ -39,6 +39,7 @@ const form = reactive({
   accentColor: '',
   headline: '',
   description: '',
+  bannerPosition: 50,
 })
 
 const isSaving = ref(false)
@@ -53,6 +54,7 @@ watch(config, (c) => {
   form.accentColor = c.accentColor ?? ''
   form.headline = c.headline ?? ''
   form.description = c.description ?? ''
+  form.bannerPosition = c.bannerPosition ?? 50
 }, { immediate: true })
 
 const accentPresets = [
@@ -87,6 +89,7 @@ const isDirty = computed(() => {
     || (form.accentColor.trim() || null) !== (c.accentColor ?? null)
     || (form.headline.trim() || null) !== (c.headline ?? null)
     || (form.description.trim() || null) !== (c.description ?? null)
+    || form.bannerPosition !== (c.bannerPosition ?? 50)
 })
 
 function revert() {
@@ -97,6 +100,7 @@ function revert() {
   form.accentColor = c.accentColor ?? ''
   form.headline = c.headline ?? ''
   form.description = c.description ?? ''
+  form.bannerPosition = c.bannerPosition ?? 50
   saveError.value = ''
 }
 
@@ -221,6 +225,7 @@ async function handleSave() {
       accentColor: form.accentColor.trim() || null,
       headline: form.headline.trim() || null,
       description: form.description.trim() || null,
+      bannerPosition: form.bannerPosition,
     })
     track('career_page_updated')
     saveSuccess.value = true
@@ -366,6 +371,7 @@ async function handleSave() {
               :name="activeOrg?.name"
               :logo="previewLogo"
               :banner="bannerUrl"
+              :banner-position="form.bannerPosition"
               :accent-color="previewAccent"
               :headline="form.headline"
               :description="form.description"
@@ -543,7 +549,13 @@ async function handleSave() {
                 <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Hero banner</label>
                 <div class="rounded-xl overflow-hidden border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800">
                   <div class="aspect-[16/6] w-full flex items-center justify-center">
-                    <img v-if="bannerUrl" :src="bannerUrl" alt="Banner" class="size-full object-cover">
+                    <img
+                      v-if="bannerUrl"
+                      :src="bannerUrl"
+                      alt="Banner"
+                      class="size-full object-cover"
+                      :style="{ objectPosition: `center ${form.bannerPosition}%` }"
+                    >
                     <ImageUp v-else class="size-6 text-surface-300" />
                   </div>
                 </div>
@@ -579,6 +591,37 @@ async function handleSave() {
                   </button>
                 </div>
                 <p class="mt-1.5 text-xs text-surface-400">PNG, JPEG or WebP · up to 15 MB. Optimized automatically.</p>
+
+                <!-- Vertical reposition — only meaningful once a banner is set. -->
+                <div v-if="bannerUrl" class="mt-3">
+                  <div class="flex items-center justify-between">
+                    <label for="banner-position" class="text-xs font-medium text-surface-600 dark:text-surface-300">Vertical position</label>
+                    <button
+                      v-if="form.bannerPosition !== 50"
+                      type="button"
+                      :disabled="!canManage"
+                      class="text-xs text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 disabled:opacity-50"
+                      @click="form.bannerPosition = 50"
+                    >
+                      Center
+                    </button>
+                  </div>
+                  <input
+                    id="banner-position"
+                    v-model.number="form.bannerPosition"
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    :disabled="!canManage"
+                    class="mt-1.5 w-full accent-brand-600 disabled:opacity-50"
+                    aria-label="Banner vertical position"
+                  >
+                  <div class="flex justify-between text-[10px] uppercase tracking-wide text-surface-400">
+                    <span>Top</span>
+                    <span>Bottom</span>
+                  </div>
+                </div>
               </div>
 
               <!-- Asset upload error -->

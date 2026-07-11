@@ -32,6 +32,8 @@ const props = withDefaults(defineProps<{
   name?: string | null
   logo?: string | null
   banner?: string | null
+  /** Vertical focal point of the banner, 0–100 (percent). 50 = centered. */
+  bannerPosition?: number | null
   accentColor?: string | null
   headline?: string | null
   description?: string | null
@@ -46,6 +48,7 @@ const props = withDefaults(defineProps<{
   name: '',
   logo: null,
   banner: null,
+  bannerPosition: 50,
   accentColor: null,
   headline: null,
   description: null,
@@ -62,6 +65,13 @@ const localePath = useLocalePath()
 const BRAND_FALLBACK = '#4f46e5'
 const accent = computed(() => props.accentColor?.trim() || null)
 const accentVar = computed(() => accent.value ?? BRAND_FALLBACK)
+
+// Vertical focal point for the object-cover banner. Clamped to 0–100 so a bad
+// value can't push the crop off-frame; horizontal stays centered.
+const bannerObjectPosition = computed(() => {
+  const y = Math.min(100, Math.max(0, props.bannerPosition ?? 50))
+  return `center ${y}%`
+})
 
 const resolvedName = computed(() => props.name?.trim() || 'Your company')
 const resolvedHeadline = computed(
@@ -212,7 +222,12 @@ function clearFilters() {
       <header class="relative overflow-hidden rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900">
         <!-- Hero banner image, when set — otherwise a thin accent bar. -->
         <div v-if="banner" class="relative w-full h-36 sm:h-52 bg-surface-100 dark:bg-surface-800">
-          <img :src="banner" :alt="`${resolvedName} banner`" class="size-full object-cover">
+          <img
+            :src="banner"
+            :alt="`${resolvedName} banner`"
+            class="size-full object-cover"
+            :style="{ objectPosition: bannerObjectPosition }"
+          >
           <div
             class="absolute inset-x-0 bottom-0 h-1"
             :class="!accent && 'bg-brand-600'"

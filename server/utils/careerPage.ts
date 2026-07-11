@@ -19,6 +19,7 @@ export interface CareerPageConfig {
   description: string | null
   logoStorageKey: string | null
   bannerStorageKey: string | null
+  bannerPosition: number
   updatedAt: Date
 }
 
@@ -38,6 +39,7 @@ const CONFIG_COLUMNS = {
   description: true,
   logoStorageKey: true,
   bannerStorageKey: true,
+  bannerPosition: true,
   updatedAt: true,
 } as const
 
@@ -84,6 +86,7 @@ export async function resolveCareerPageBySlug(slug: string): Promise<ResolvedCar
         description: row.description,
         logoStorageKey: row.logoStorageKey,
         bannerStorageKey: row.bannerStorageKey,
+        bannerPosition: row.bannerPosition,
         updatedAt: row.updatedAt,
       }
     : undefined

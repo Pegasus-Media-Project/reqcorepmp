@@ -1166,6 +1166,12 @@ export const careerPage = pgTable('career_page', {
    * hero. Served publicly via /api/public/career-page/:slug/asset.
    */
   bannerStorageKey: text('banner_storage_key'),
+  /**
+   * Vertical focal point for the hero banner, 0–100 (percent). Controls the CSS
+   * object-position so admins can reposition which slice of a wide image shows.
+   * 50 = centered (default).
+   */
+  bannerPosition: integer('banner_position').notNull().default(50),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (t) => ([
