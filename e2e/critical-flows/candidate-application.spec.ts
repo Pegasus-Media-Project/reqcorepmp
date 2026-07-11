@@ -311,6 +311,10 @@ test.describe('Candidate Application Flow — All Custom Question Field Types', 
     })
     await expect(candidatePage.getByRole('heading', { name: 'Application Submitted!' })).toBeVisible()
     await expect(candidatePage.getByText(JOB_TITLE)).toBeVisible()
+    await expect(candidatePage.getByRole('link', { name: /Back to .+ careers/ })).toHaveAttribute(
+      'href',
+      /\/career\//,
+    )
 
     await candidatePage.close()
     await candidateContext.close()

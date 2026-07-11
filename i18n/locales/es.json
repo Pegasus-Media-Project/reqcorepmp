@@ -224,10 +224,11 @@
     },
     "confirmation": {
       "metaTitle": "Solicitud enviada — Reqcore",
-      "title": "¡Solicitud enviada!",
-      "thanksWithTitle": "Gracias por postularte a la vacante de {title}.",
-      "thanksPlain": "Gracias por postularte.",
-      "received": "Tu solicitud ha sido recibida. El equipo de contratación la revisará y se pondrá en contacto contigo si hay compatibilidad.",
+      "title": "Solicitud recibida",
+      "thanksWithTitle": "Gracias por postularte a {title}. El equipo de contratación ya tiene tus datos.",
+      "thanksPlain": "Gracias por postularte. El equipo de contratación ya tiene tus datos.",
+      "received": "Enviada correctamente",
+      "backToCareerPage": "Volver a empleos en {name}",
       "browseMore": "Ver más vacantes",
       "backHome": "Volver al inicio"
     },

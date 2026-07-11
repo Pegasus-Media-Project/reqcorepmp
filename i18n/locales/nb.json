@@ -224,10 +224,11 @@
     },
     "confirmation": {
       "metaTitle": "Søknad sendt — Reqcore",
-      "title": "Søknad sendt!",
-      "thanksWithTitle": "Takk for at du søkte på stillingen {title}.",
-      "thanksPlain": "Takk for søknaden.",
-      "received": "Søknaden din er mottatt. Rekrutteringsteamet vil vurdere den og ta kontakt hvis det er en match.",
+      "title": "Søknaden er mottatt",
+      "thanksWithTitle": "Takk for at du søkte på {title}. Opplysningene dine er nå hos rekrutteringsteamet.",
+      "thanksPlain": "Takk for søknaden. Opplysningene dine er nå hos rekrutteringsteamet.",
+      "received": "Sendt",
+      "backToCareerPage": "Tilbake til karrieresiden til {name}",
       "browseMore": "Se flere stillinger",
       "backHome": "Tilbake til forsiden"
     },
