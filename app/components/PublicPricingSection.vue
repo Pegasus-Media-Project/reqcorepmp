@@ -105,7 +105,6 @@ const paidPlanFeatures: Record<BillingPlanId, { heading: string; features: strin
       'SSO, SAML and SCIM',
       'Audit log and retention controls',
       'DPA and SLA',
-      'Bring your own AI key (BYOK)',
       'Dedicated onboarding',
     ],
   },

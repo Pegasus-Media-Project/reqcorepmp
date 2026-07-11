@@ -93,7 +93,8 @@ export const member = ac.newRole({
   candidate: ['create', 'read', 'update'],
   application: ['create', 'read', 'update'],
   document: ['create', 'read'],
-  comment: ['create', 'read', 'delete'],
+  // update/delete are author-scoped in server/api/comments/[id].{patch,delete}.ts
+  comment: ['create', 'read', 'update', 'delete'],
   interview: ['create', 'read', 'update'],
   emailTemplate: ['create', 'read', 'update'],
   activityLog: ['read'],

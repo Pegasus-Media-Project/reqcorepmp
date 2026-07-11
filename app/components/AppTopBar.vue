@@ -166,7 +166,7 @@ function isActiveRoute(to: string, exact: boolean) {
   return route.path === localizedTo || route.path.startsWith(`${localizedTo}/`)
 }
 
-const primaryNavLabels = ['Dashboard', 'Jobs', 'Candidates', 'Applications', 'Interviews']
+const primaryNavLabels = ['Dashboard', 'Jobs', 'Candidates', 'Applications', 'Interviews', 'Settings']
 const primaryNavItems = computed(() => navItems.value.filter(i => primaryNavLabels.includes(i.label)))
 const moreNavItems = computed(() => navItems.value.filter(i => !primaryNavLabels.includes(i.label)))
 
@@ -211,7 +211,7 @@ onUnmounted(() => {
 <template>
   <header class="sticky top-0 z-50 w-full">
     <!-- Primary navigation bar -->
-    <div class="relative z-20 border-b border-surface-200/80 dark:border-surface-800/80 bg-white/80 dark:bg-surface-900/80 backdrop-blur-xl">
+  <div v-if="!activeJobId" class="relative z-20 border-b border-surface-200/80 dark:border-surface-800/80 bg-white/80 dark:bg-surface-900/80 backdrop-blur-xl">
       <div class="flex h-14 items-center justify-between px-4 lg:px-6">
         <!-- Left: Logo + Nav -->
         <div class="flex items-center gap-1 lg:gap-2">
@@ -258,7 +258,8 @@ onUnmounted(() => {
                   :class="showMoreNav ? 'rotate-180' : ''"
                 />
               </button>
-              <Transition
+  <Transition
+    v-if="!activeJobId"
                 enter-active-class="transition duration-150 ease-out"
                 enter-from-class="opacity-0 scale-95 -translate-y-1"
                 enter-to-class="opacity-100 scale-100 translate-y-0"
@@ -383,10 +384,10 @@ onUnmounted(() => {
             >
               <div
                 v-if="showUserMenu"
-                class="absolute right-0 top-[calc(100%+6px)] w-64 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 shadow-xl shadow-surface-900/8 dark:shadow-surface-950/30 overflow-hidden"
+                class="absolute right-0 top-[calc(100%+6px)] w-64 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 shadow-xl shadow-surface-900/8 dark:shadow-surface-950/30"
               >
                 <!-- User info header -->
-                <div class="px-4 py-3 border-b border-surface-100 dark:border-surface-800">
+                <div class="rounded-t-xl overflow-hidden px-4 py-3 border-b border-surface-100 dark:border-surface-800">
                   <div class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ userName }}</div>
                   <div class="text-xs text-surface-500 dark:text-surface-400 truncate mt-0.5">{{ userEmail }}</div>
                 </div>
@@ -472,7 +473,7 @@ onUnmounted(() => {
                 </div>
 
                 <!-- Sign out -->
-                <div class="py-1">
+                <div class="rounded-b-xl overflow-hidden py-1">
                   <button
                     class="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800 hover:text-surface-900 dark:hover:text-surface-100 transition-colors cursor-pointer border-0 bg-transparent text-left"
                     :disabled="isSigningOut"

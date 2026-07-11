@@ -1,4 +1,4 @@
-import { test, expect, declineAnalyticsConsent } from '../fixtures'
+import { test, expect, declineAnalyticsConsent, getPublishedApplicationLink } from '../fixtures'
 
 /**
  * Critical flow: Candidate applies to a published job that contains every
@@ -193,7 +193,7 @@ test.describe('Candidate Application Flow — All Custom Question Field Types', 
 
     // Read the application link from the readonly input in the success card.
     // The link has the form: https://<host>/jobs/<slug>/apply
-    const applicationLink = await page.locator('input[readonly]').inputValue()
+    const applicationLink = await getPublishedApplicationLink(page)
     expect(applicationLink).toMatch(/\/jobs\/[^/]+\/apply(?:$|[?#])/)
     const slugMatch = applicationLink.match(/\/jobs\/([^/]+)\/apply(?:$|[?#])/)
     const jobSlug = slugMatch?.[1] ?? ''
@@ -517,7 +517,7 @@ test.describe('Candidate Application — Required Cover Letter Validation', () =
     await expect(page.getByRole('heading', { name: 'Your job is live!' })).toBeVisible({ timeout: 20_000 })
 
     // Capture the application link
-    const applicationLink = await page.locator('input[readonly]').inputValue()
+    const applicationLink = await getPublishedApplicationLink(page)
     expect(applicationLink).toMatch(/\/jobs\/[^/]+\/apply(?:$|[?#])/)
 
     // ── Candidate flow ────────────────────────────────────────────────────────

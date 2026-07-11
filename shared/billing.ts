@@ -88,7 +88,9 @@ export const BILLING_PLANS: BillingPlan[] = [
       'Up to 2 active roles',
       'Unlimited applicants and hires per role',
       'Unlimited AI shortlists on every role',
+      'Bring your own AI key (BYOK)',
       'Full shortlist workflow',
+      'Branded career page for your open roles',
       'Invite your whole team. No per-seat fees.',
       'Share and export shortlists',
       'Email support',
@@ -105,6 +107,7 @@ export const BILLING_PLANS: BillingPlan[] = [
       'Up to 8 active roles',
       'Unlimited AI shortlists on every role',
       'Deeper analysis on every shortlisted application',
+      'Bring your own AI key (BYOK)',
       'Your own domain. No Reqcore branding.',
       'Email and calendar integrations, pipeline, templates',
       'Your whole team included. No per-seat fees.',
@@ -124,7 +127,6 @@ export const BILLING_PLANS: BillingPlan[] = [
       'SSO, SAML, SCIM',
       'Audit log and retention controls',
       'DPA and SLA',
-      'Bring your own AI key (BYOK)',
       'Dedicated onboarding',
     ],
   },
@@ -160,6 +162,7 @@ export function activeRoleLimitForTier(tier: string): number {
  */
 export type PlanFeature =
   | 'interviews' // Interview scheduling — Solo and above
+  | 'careerPage' // Branded per-org career page — available on every plan
   | 'calendar' // Calendar (Google) sync on interviews — Team and above
   | 'sourceAnalytics' // Source attribution dashboard — Team and above
   | 'activityTimeline' // Org-wide activity timeline — Team and above
@@ -167,7 +170,7 @@ export type PlanFeature =
   | 'sso' // SSO / SAML / SCIM provider registration — Scale and above
   | 'auditLog' // The org-wide audit log — Scale and above
   | 'retention' // Data-retention policy controls — Scale and above
-  | 'byok' // Bring-your-own AI key configuration — Free (to go past the free run limit) and Scale and above
+  | 'byok' // Bring-your-own AI key configuration — available on every plan
 
 /** Tiers ordered cheapest → most capable. A tier is entitled to a feature when
  *  its rank is ≥ the feature's minimum tier rank. */
@@ -183,9 +186,17 @@ const TIER_DISPLAY_NAME: Record<BillingTier, string> = {
   agency: 'Agency',
 }
 
-/** Minimum tier required for each plan-gated feature. */
+/**
+ * Minimum tier required for each plan-gated feature.
+ *
+ * `careerPage` is deliberately free: a free org has no applicant flood to import,
+ * so the career page is its only route to a first shortlist — the moment the
+ * value-gated trial exists to reach. The Reqcore-branded page is also the
+ * acquisition surface; Team monetizes *removing* that branding, not having it.
+ */
 export const FEATURE_MIN_TIER: Record<PlanFeature, BillingTier> = {
   interviews: 'solo',
+  careerPage: 'free',
   calendar: 'team',
   sourceAnalytics: 'team',
   activityTimeline: 'team',
@@ -193,12 +204,13 @@ export const FEATURE_MIN_TIER: Record<PlanFeature, BillingTier> = {
   sso: 'scale',
   auditLog: 'scale',
   retention: 'scale',
-  byok: 'scale',
+  byok: 'free',
 }
 
 /** Short, user-facing label for each feature, used in upgrade prompts. */
 export const FEATURE_LABEL: Record<PlanFeature, string> = {
   interviews: 'Interview scheduling',
+  careerPage: 'Career page',
   calendar: 'Calendar integration',
   sourceAnalytics: 'Source analytics',
   activityTimeline: 'The activity timeline',
@@ -226,14 +238,8 @@ export function featureRequiredTierName(feature: PlanFeature): string {
 
 /** Whether `tier` is entitled to `feature`. Higher tiers inherit lower-tier features. */
 export function tierHasFeature(tier: BillingTier, feature: PlanFeature): boolean {
-  // Legacy hosted orgs get Team-equivalent access plus BYOK while remaining on
+  // Legacy hosted orgs get Team-equivalent access while remaining on
   // a free, non-Stripe tier. They do not inherit Scale features.
-  if (tier === 'grandfathered' && feature === 'byok') return true
-  // Free orgs can configure their own key to keep running AI analysis past the
-  // lifetime free-run limit (see FREE_PLAN_ANALYSIS_LIMIT) instead of being
-  // forced to upgrade. This is the Free plan's advertised "then bring your own
-  // key" — Solo/Team don't get this; they buy a bigger platform-paid budget.
-  if (tier === 'free' && feature === 'byok') return true
   return tierRank(tier) >= tierRank(FEATURE_MIN_TIER[feature])
 }
 

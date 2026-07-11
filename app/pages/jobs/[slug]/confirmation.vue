@@ -8,6 +8,7 @@ definePageMeta({
 const route = useRoute()
 const jobSlug = route.params.slug as string
 const { track } = useTrack()
+const { t } = useI18n()
 
 onMounted(() => track('application_confirmed', { slug: jobSlug }))
 
@@ -17,7 +18,7 @@ const { data: job } = useFetch(`/api/public/jobs/${jobSlug}`, {
 })
 
 useSeoMeta({
-  title: 'Application Submitted — Reqcore',
+  title: t('jobs.confirmation.metaTitle'),
   robots: 'noindex, nofollow',
 })
 </script>
@@ -29,18 +30,18 @@ useSeoMeta({
     </div>
 
     <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-2">
-      Application Submitted!
+      {{ t('jobs.confirmation.title') }}
     </h1>
 
     <p class="text-surface-600 dark:text-surface-400 max-w-md mx-auto mb-2">
-      Thank you for applying
-      <template v-if="job">
-        for the <strong>{{ job.title }}</strong> position
-      </template>.
+      <i18n-t v-if="job" keypath="jobs.confirmation.thanksWithTitle" tag="span">
+        <template #title><strong>{{ job.title }}</strong></template>
+      </i18n-t>
+      <template v-else>{{ t('jobs.confirmation.thanksPlain') }}</template>
     </p>
 
     <p class="text-sm text-surface-400 max-w-md mx-auto mb-8">
-      Your application has been received. The hiring team will review it and get back to you if there&rsquo;s a match.
+      {{ t('jobs.confirmation.received') }}
     </p>
 
     <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -48,13 +49,13 @@ useSeoMeta({
         :to="$localePath('/jobs')"
         class="inline-flex items-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
       >
-        Browse more positions
+        {{ t('jobs.confirmation.browseMore') }}
       </NuxtLink>
       <a
         :href="useRuntimeConfig().public.marketingUrl"
         class="inline-flex items-center rounded-lg border border-surface-300 dark:border-surface-700 px-4 py-2 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
       >
-        Back to Home
+        {{ t('jobs.confirmation.backHome') }}
       </a>
     </div>
   </div>

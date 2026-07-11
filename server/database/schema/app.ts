@@ -97,6 +97,15 @@ export const job = pgTable('job', {
   requireCoverLetter: boolean('require_cover_letter').notNull().default(false),
   // ── AI scoring settings ──
   autoScoreOnApply: boolean('auto_score_on_apply').notNull().default(false),
+  /**
+   * Which optional candidate data sources the AI analysis reads. A resume is
+   * always included when present, but another enabled source is sufficient.
+   */
+  analysisContext: jsonb('analysis_context').$type<{
+    coverLetter: boolean
+    screeningAnswers: boolean
+    recruiterNotes: boolean
+  }>().notNull().default({ coverLetter: true, screeningAnswers: true, recruiterNotes: false }),
   // ── Timestamps ──
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -727,6 +736,28 @@ export const aiConfig = pgTable('ai_config', {
 ]))
 
 /**
+ * Per-organization overrides for the platform-paid OpenRouter fallback.
+ * This deliberately does not store an API key: the key remains server-owned,
+ * so analysis runs through this config stay `billingMode = platform`.
+ */
+export const platformAiConfig = pgTable('platform_ai_config', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  name: text('name').notNull().default('Platform (OpenRouter)'),
+  provider: text('provider').notNull().default('openrouter'),
+  model: text('model').notNull().default('openai/gpt-5.4-mini'),
+  maxTokens: integer('max_tokens').notNull().default(4096),
+  inputPricePer1m: numeric('input_price_per_1m', { precision: 10, scale: 4 }),
+  outputPricePer1m: numeric('output_price_per_1m', { precision: 10, scale: 4 }),
+  isDefaultAnalysis: boolean('is_default_analysis').notNull().default(true),
+  isEnabled: boolean('is_enabled').notNull().default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (t) => ([
+  uniqueIndex('platform_ai_config_organization_id_idx').on(t.organizationId),
+]))
+
+/**
  * Per-job scoring criteria. Each criterion defines one dimension of evaluation.
  * Weights are user-adjustable via sliders and used to compute weighted composite scores.
  */
@@ -1088,4 +1119,67 @@ export const chatbotConversationRelations = relations(chatbotConversation, ({ on
 
 export const chatbotMessageRelations = relations(chatbotMessage, ({ one }) => ({
   conversation: one(chatbotConversation, { fields: [chatbotMessage.conversationId], references: [chatbotConversation.id] }),
+}))
+
+// ─────────────────────────────────────────────
+// Career Page
+// ─────────────────────────────────────────────
+
+/**
+ * Per-organization branded career page configuration.
+ *
+ * Customization is deliberately guardrailed: the org supplies identity only —
+ * its logo and name (already on `organization`), one accent color, an optional
+ * headline and short description, and an on/off switch. Reqcore owns the
+ * layout. No fonts, CSS, or layout controls are exposed. Custom domain is a
+ * later paid upgrade, not this table.
+ *
+ * One row per organization — upserted on first edit. Absence of a row means the
+ * org has never customized its page and defaults apply (accent = brand, headline
+ * derived from the org name). Every plan includes the `careerPage` feature, so
+ * the page is live unless the org has explicitly disabled it.
+ */
+export const careerPage = pgTable('career_page', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  /**
+   * Optional custom public slug for the /career/:slug URL. NULL falls back to the
+   * organization slug. Shares the /career namespace with organization slugs, so
+   * uniqueness is enforced across both on save.
+   */
+  slug: text('slug'),
+  /** Master switch — when false the public career page shows an "unavailable" state. */
+  enabled: boolean('enabled').notNull().default(true),
+  /** Single accent color as a hex string (e.g. "#4f46e5"). NULL falls back to the brand color. */
+  accentColor: text('accent_color'),
+  /** Optional hero headline. NULL -> "Open roles at {org name}". */
+  headline: text('headline'),
+  /** Optional short company intro shown under the headline. */
+  description: text('description'),
+  /**
+   * S3 storage key for a career-page-specific logo. NULL falls back to the
+   * organization logo. Served publicly via /api/public/career-page/:slug/asset.
+   */
+  logoStorageKey: text('logo_storage_key'),
+  /**
+   * S3 storage key for the hero banner image. NULL renders the plain accent
+   * hero. Served publicly via /api/public/career-page/:slug/asset.
+   */
+  bannerStorageKey: text('banner_storage_key'),
+  /**
+   * Vertical focal point for the hero banner, 0–100 (percent). Controls the CSS
+   * object-position so admins can reposition which slice of a wide image shows.
+   * 50 = centered (default).
+   */
+  bannerPosition: integer('banner_position').notNull().default(50),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (t) => ([
+  uniqueIndex('career_page_organization_id_idx').on(t.organizationId),
+  // Nullable unique: Postgres allows many NULLs, so orgs without a custom slug coexist.
+  uniqueIndex('career_page_slug_idx').on(t.slug),
+]))
+
+export const careerPageRelations = relations(careerPage, ({ one }) => ({
+  organization: one(organization, { fields: [careerPage.organizationId], references: [organization.id] }),
 }))
