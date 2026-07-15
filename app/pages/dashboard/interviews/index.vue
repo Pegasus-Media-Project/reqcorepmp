@@ -13,7 +13,7 @@ definePageMeta({
 })
 
 useSeoMeta({
-  title: 'Interviews — Reqcore',
+  title: 'Interviews — Pegasus Media Project',
   description: 'Manage all scheduled interviews',
   robots: 'noindex, nofollow',
 })

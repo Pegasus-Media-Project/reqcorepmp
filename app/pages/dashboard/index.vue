@@ -12,7 +12,7 @@ definePageMeta({
 })
 
 useSeoMeta({
-  title: 'Dashboard — Reqcore',
+  title: 'Dashboard — Pegasus Media Project',
   description: 'Your recruiting command center',
 })
 
@@ -204,7 +204,7 @@ const isEmpty = computed(() =>
           </div>
 
           <h2 class="text-2xl font-bold tracking-tight text-surface-900 dark:text-surface-50">
-            Welcome to Reqcore
+            Welcome to Pegasus Media Project
           </h2>
           <p class="mx-auto mt-2.5 max-w-[17rem] text-sm leading-relaxed text-surface-500 dark:text-surface-400">
             Post a role, let the applicants roll in, and we'll surface your shortlist.

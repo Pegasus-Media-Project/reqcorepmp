@@ -7,7 +7,7 @@ definePageMeta({
 })
 
 useSeoMeta({
-  title: 'Applications — Reqcore',
+  title: 'Applications — Pegasus Media Project',
   description: 'Manage applications across all jobs',
 })
 

@@ -7,8 +7,8 @@ definePageMeta({
 });
 
 useSeoMeta({
-    title: "Sign Up — Reqcore",
-    description: "Create your Reqcore account",
+    title: "Sign Up — Pegasus Media Project",
+    description: "Create your Pegasus Media Project account",
     robots: "noindex, nofollow",
 });
 

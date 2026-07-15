@@ -45,12 +45,12 @@ export const FEATURE_FLAGS = {
   /**
    * New AI chatbot experience embedded in the dashboard.
    *
-   * Off by default everywhere. Enable on the cloud version via PostHog
-   * (gradual rollout), or self-hosters can force it on with
-   * `FEATURE_FLAG_CHATBOT_EXPERIENCE=true`.
+   * On by default on this self-hosted instance (all features enabled). It can
+   * still be forced off with `FEATURE_FLAG_CHATBOT_EXPERIENCE=false`, or
+   * per-user on the cloud version via PostHog.
    */
   'chatbot-experience': {
-    defaultValue: false,
+    defaultValue: true,
     description: 'New AI chatbot experience in the dashboard.',
   },
 } as const satisfies Record<string, FeatureFlagDefinition>

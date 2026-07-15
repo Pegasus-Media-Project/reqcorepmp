@@ -699,7 +699,7 @@ async function deleteNote(note: ApplicationNote) {
 
 useSeoMeta({
   title: computed(() =>
-    jobData.value ? `Pipeline — ${jobData.value.title} — Reqcore` : 'Pipeline — Reqcore',
+    jobData.value ? `Pipeline — ${jobData.value.title} — Pegasus Media Project` : 'Pipeline — Pegasus Media Project',
   ),
   robots: 'noindex, nofollow',
 })

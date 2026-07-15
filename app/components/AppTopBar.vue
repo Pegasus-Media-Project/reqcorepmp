@@ -2,11 +2,11 @@
 import {
   Briefcase, Plus, Bell,
   Kanban, FileText, LogOut, Table2,
-  Sun, Moon, MessageSquarePlus, Settings,
+  MessageSquarePlus, Settings,
   ChevronDown, Menu, X, Users, ChevronLeft,
   LayoutDashboard, Calendar, ArrowUpCircle,
   Sparkles, Radio, History,
-  MessageCircle, Languages, Lock,
+  MessageCircle, Lock,
 } from 'lucide-vue-next'
 import type { PlanFeature } from '~~/shared/billing'
 
@@ -15,7 +15,6 @@ const localePath = useLocalePath()
 const getRouteBaseName = useRouteBaseName()
 const { data: session } = await authClient.useSession(useFetch)
 const isSigningOut = ref(false)
-const { isDark, toggle: toggleColorMode } = useColorMode()
 
 const showFeedbackModal = ref(false)
 const showUserMenu = ref(false)
@@ -220,8 +219,7 @@ onUnmounted(() => {
             :href="useRuntimeConfig().public.marketingUrl"
             class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg no-underline hover:bg-surface-100/60 dark:hover:bg-surface-800/60 transition-colors mr-1 lg:mr-4"
           >
-            <img src="/eagle-mascot-logo.png" alt="Reqcore mascot" class="size-7 shrink-0 object-contain" />
-            <span class="text-[15px] font-bold text-surface-900 dark:text-surface-100 hidden sm:block tracking-tight">Reqcore</span>
+            <img src="/pegasus-logo.png" alt="Pegasus Media Project" class="h-7 w-auto shrink-0 object-contain" />
           </a>
 
           <!-- Desktop nav links -->
@@ -421,25 +419,6 @@ onUnmounted(() => {
                   <OrgSwitcher />
                 </div>
 
-                <!-- Preferences -->
-                <div class="border-b border-surface-100 dark:border-surface-800 py-1">
-                  <button
-                    class="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800 hover:text-surface-900 dark:hover:text-surface-100 transition-colors cursor-pointer border-0 bg-transparent text-left"
-                    @click="toggleColorMode"
-                  >
-                    <Sun v-if="isDark" class="size-4" />
-                    <Moon v-else class="size-4" />
-                    {{ isDark ? 'Light mode' : 'Dark mode' }}
-                  </button>
-                  <div class="flex items-center justify-between gap-2 px-4 py-2">
-                    <span class="flex items-center gap-2.5 text-sm text-surface-600 dark:text-surface-400">
-                      <Languages class="size-4" />
-                      Language
-                    </span>
-                    <LanguageSwitcher drop-up />
-                  </div>
-                </div>
-
                 <!-- Links -->
                 <div class="border-b border-surface-100 dark:border-surface-800 py-1">
                   <NuxtLink
@@ -612,7 +591,6 @@ onUnmounted(() => {
 
         <div class="px-4 pb-3 flex flex-col gap-2 border-t border-surface-100 dark:border-surface-800 pt-3 lg:hidden">
           <OrgSwitcher />
-          <LanguageSwitcher drop-up />
         </div>
       </div>
     </Transition>

@@ -25,8 +25,8 @@ const { interview, status: fetchStatus, error, updateInterview, deleteInterview,
 useSeoMeta({
   title: computed(() =>
     interview.value
-      ? `${interview.value.title} — Reqcore`
-      : 'Interview — Reqcore',
+      ? `${interview.value.title} — Pegasus Media Project`
+      : 'Interview — Pegasus Media Project',
   ),
   robots: 'noindex, nofollow',
 })

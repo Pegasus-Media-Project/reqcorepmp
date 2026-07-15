@@ -120,7 +120,7 @@ async function sendEmail(msg: EmailMessage): Promise<void> {
   }
 
   // 3. No provider configured — dev/test fallback
-  console.info(`[Reqcore] ${msg.logFallback}`)
+  console.info(`[Pegasus Media Project] ${msg.logFallback}`)
 }
 
 // ─── Public send functions ────────────────────────────────────────────────────
@@ -138,7 +138,7 @@ export async function sendVerificationEmail(data: {
   try {
     await sendEmail({
       to: data.user.email,
-      subject: 'Verify your email address — Reqcore',
+      subject: 'Verify your email address — Pegasus Media Project',
       html: buildVerificationHtml({ url: data.url }),
       text: buildVerificationText({ url: data.url }),
       resendTags: [{ name: 'category', value: 'verification' }],
@@ -164,7 +164,7 @@ export async function sendPasswordResetEmail(data: {
   try {
     await sendEmail({
       to: data.user.email,
-      subject: 'Reset your password — Reqcore',
+      subject: 'Reset your password — Pegasus Media Project',
       html: buildPasswordResetHtml({ url: data.url }),
       text: buildPasswordResetText({ url: data.url }),
       resendTags: [{ name: 'category', value: 'password-reset' }],
@@ -190,7 +190,7 @@ export async function sendOrgInvitationEmail(data: {
 }, inviteLink: string): Promise<void> {
   await sendEmail({
     to: data.email,
-    subject: `You're invited to join ${data.organization.name} on Reqcore`,
+    subject: `You're invited to join ${data.organization.name} on Pegasus Media Project`,
     html: buildInvitationHtml({
       inviteeName: data.email,
       inviterName: data.inviter.user.name,
@@ -248,7 +248,7 @@ function buildInvitationHtml(params: {
           <!-- Header -->
           <tr>
             <td style="padding:32px 32px 24px;text-align:center;border-bottom:1px solid #f4f4f5;">
-              <h1 style="margin:0;font-size:20px;font-weight:600;color:#09090b;">Reqcore</h1>
+              <h1 style="margin:0;font-size:20px;font-weight:600;color:#09090b;">Pegasus Media Project</h1>
             </td>
           </tr>
           <!-- Body -->
@@ -282,7 +282,7 @@ function buildInvitationHtml(params: {
           <tr>
             <td style="padding:16px 32px;text-align:center;border-top:1px solid #f4f4f5;background-color:#fafafa;">
               <p style="margin:0;font-size:12px;color:#a1a1aa;">
-                Sent by Reqcore &mdash; Open-source applicant tracking
+                Sent by Pegasus Media Project &mdash; Open-source applicant tracking
               </p>
             </td>
           </tr>
@@ -311,7 +311,7 @@ function buildInvitationText(params: {
     'This invitation expires in 48 hours.',
     'If you didn\'t expect this email, you can safely ignore it.',
     '',
-    '— Reqcore',
+    '— Pegasus Media Project',
   ].join('\n')
 }
 
@@ -346,7 +346,7 @@ function buildVerificationHtml(params: { url: string }): string {
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e4e4e7;">
           <tr>
             <td style="padding:32px 32px 24px;text-align:center;border-bottom:1px solid #f4f4f5;">
-              <h1 style="margin:0;font-size:20px;font-weight:600;color:#09090b;">Reqcore</h1>
+              <h1 style="margin:0;font-size:20px;font-weight:600;color:#09090b;">Pegasus Media Project</h1>
             </td>
           </tr>
           <tr>
@@ -372,7 +372,7 @@ function buildVerificationHtml(params: { url: string }): string {
           </tr>
           <tr>
             <td style="padding:16px 32px;text-align:center;border-top:1px solid #f4f4f5;background-color:#fafafa;">
-              <p style="margin:0;font-size:12px;color:#a1a1aa;">Sent by Reqcore &mdash; Open-source applicant tracking</p>
+              <p style="margin:0;font-size:12px;color:#a1a1aa;">Sent by Pegasus Media Project &mdash; Open-source applicant tracking</p>
             </td>
           </tr>
         </table>
@@ -387,12 +387,12 @@ function buildVerificationText(params: { url: string }): string {
   return [
     'Verify your email address',
     '',
-    'Click the link below to verify your email and activate your Reqcore account:',
+    'Click the link below to verify your email and activate your Pegasus Media Project account:',
     params.url,
     '',
     'If you didn\'t create an account, you can safely ignore this email.',
     '',
-    '— Reqcore',
+    '— Pegasus Media Project',
   ].join('\n')
 }
 
@@ -411,7 +411,7 @@ function buildPasswordResetHtml(params: { url: string }): string {
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e4e4e7;">
           <tr>
             <td style="padding:32px 32px 24px;text-align:center;border-bottom:1px solid #f4f4f5;">
-              <h1 style="margin:0;font-size:20px;font-weight:600;color:#09090b;">Reqcore</h1>
+              <h1 style="margin:0;font-size:20px;font-weight:600;color:#09090b;">Pegasus Media Project</h1>
             </td>
           </tr>
           <tr>
@@ -437,7 +437,7 @@ function buildPasswordResetHtml(params: { url: string }): string {
           </tr>
           <tr>
             <td style="padding:16px 32px;text-align:center;border-top:1px solid #f4f4f5;background-color:#fafafa;">
-              <p style="margin:0;font-size:12px;color:#a1a1aa;">Sent by Reqcore &mdash; Open-source applicant tracking</p>
+              <p style="margin:0;font-size:12px;color:#a1a1aa;">Sent by Pegasus Media Project &mdash; Open-source applicant tracking</p>
             </td>
           </tr>
         </table>
@@ -452,12 +452,12 @@ function buildPasswordResetText(params: { url: string }): string {
   return [
     'Reset your password',
     '',
-    'Click the link below to reset your Reqcore password:',
+    'Click the link below to reset your Pegasus Media Project password:',
     params.url,
     '',
     'If you didn\'t request this, you can safely ignore this email.',
     '',
-    '— Reqcore',
+    '— Pegasus Media Project',
   ].join('\n')
 }
 
@@ -627,7 +627,7 @@ function buildInterviewInvitationHtml(subject: string, bodyText: string, data: I
           <tr>
             <td style="padding:16px 32px;text-align:center;border-top:1px solid #f4f4f5;background-color:#fafafa;">
               <p style="margin:0;font-size:12px;color:#a1a1aa;">
-                Sent by ${escapeHtml(data.organizationName)} via Reqcore
+                Sent by ${escapeHtml(data.organizationName)} via Pegasus Media Project
               </p>
             </td>
           </tr>

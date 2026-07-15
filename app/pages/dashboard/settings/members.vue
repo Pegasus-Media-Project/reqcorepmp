@@ -10,7 +10,7 @@ import {
 definePageMeta({})
 
 useSeoMeta({
-  title: 'Team Members — Reqcore',
+  title: 'Team Members — Pegasus Media Project',
   description: 'Manage your team members and invitations',
 })
 

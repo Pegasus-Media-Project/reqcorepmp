@@ -20,7 +20,7 @@ const config = useRuntimeConfig()
           <a
             :href="config.public.marketingUrl"
             class="font-medium text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 underline underline-offset-2"
-          >Reqcore</a>
+          >Pegasus Media Project</a>
         </p>
       </div>
     </footer>

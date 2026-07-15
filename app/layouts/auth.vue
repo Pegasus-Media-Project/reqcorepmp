@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import {
-    Sun,
-    Moon,
     Check,
     ChevronDown,
 } from "lucide-vue-next";
@@ -12,7 +10,6 @@ import {
     type BillingTier,
 } from "~~/shared/billing";
 import type { BillingCadence } from "~/composables/useBillingCheckout";
-const { isDark, toggle: toggleColorMode } = useColorMode();
 
 const route = useRoute();
 
@@ -130,25 +127,6 @@ function setCadence(cadence: BillingCadence) {
 
 <template>
     <div class="relative min-h-screen bg-surface-50 dark:bg-surface-950">
-        <!-- Top-left controls -->
-        <div class="absolute left-4 top-4 z-20 flex items-center gap-2">
-            <ClientOnly>
-                <button
-                    class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent text-surface-500 transition-all duration-200 hover:bg-surface-100 hover:text-surface-700 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:text-surface-200"
-                    :title="
-                        isDark ? 'Switch to light mode' : 'Switch to dark mode'
-                    "
-                    @click="toggleColorMode"
-                >
-                    <Sun v-if="isDark" class="size-4" />
-                    <Moon v-else class="size-4" />
-                </button>
-                <template #fallback>
-                    <div class="size-8" aria-hidden="true" />
-                </template>
-            </ClientOnly>
-            <LanguageSwitcher align="left" />
-        </div>
 
         <!-- ── Brand panel (large screens) — pinned to the right edge so the form
          can sit dead-center of the screen while the branding stays on the
@@ -159,14 +137,10 @@ function setCadence(cadence: BillingCadence) {
             <!-- Logo mark -->
             <div class="relative flex items-center gap-3">
                 <img
-                    src="/eagle-mascot-logo.png"
-                    alt=""
-                    class="size-9 object-contain"
+                    src="/pegasus-logo.png"
+                    alt="Pegasus Media Project"
+                    class="h-10 w-auto object-contain"
                 />
-                <span
-                    class="text-lg font-semibold tracking-tight text-surface-900 dark:text-white"
-                    >Reqcore</span
-                >
             </div>
 
             <!-- Plan picker — a premium popover to choose or switch plan and cadence.
@@ -323,7 +297,7 @@ function setCadence(cadence: BillingCadence) {
                         : "Need help getting started?"
                 }}
                 <a
-                    href="mailto:support@reqcore.com?subject=Reqcore%20account%20help"
+                    href="mailto:support@reqcore.com?subject=Pegasus Media Project%20account%20help"
                     class="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                     >Contact support</a
                 >.
@@ -340,14 +314,10 @@ function setCadence(cadence: BillingCadence) {
                     class="mb-8 flex flex-col items-center gap-3 text-center xl:hidden"
                 >
                     <img
-                        src="/eagle-mascot-logo.png"
-                        alt="Reqcore mascot"
-                        class="size-12 object-contain"
+                        src="/pegasus-logo.png"
+                        alt="Pegasus Media Project"
+                        class="h-12 w-auto object-contain"
                     />
-                    <span
-                        class="text-lg font-semibold tracking-tight text-surface-900 dark:text-surface-100"
-                        >Reqcore</span
-                    >
                 </div>
 
                 <slot />

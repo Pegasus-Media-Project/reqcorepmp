@@ -4,7 +4,7 @@ import type { BillingCadence } from '~/composables/useBillingCheckout'
 import { BILLING_PLANS, getBillingPlan, tierDisplayName, type BillingPlanId, type BillingTier } from '~~/shared/billing'
 
 useSeoMeta({
-  title: 'Billing & Plans — Reqcore',
+  title: 'Billing & Plans — Pegasus Media Project',
   description: 'Manage your organization subscription and billing.',
 })
 
@@ -264,7 +264,7 @@ async function manageBilling() {
                 Renews on {{ formatDate(current.periodEnd) }}.
               </p>
               <p v-else-if="isGrandfatheredPlan" class="text-sm text-surface-500 dark:text-surface-400 mt-0.5">
-                Your workspace keeps Team access for free with BYOK. AI runs use your configured provider key, not Reqcore's platform key.
+                Your workspace keeps Team access for free with BYOK. AI runs use your configured provider key, not Pegasus Media Project's platform key.
               </p>
               <p v-else class="text-sm text-surface-500 dark:text-surface-400 mt-0.5">
                 You're on the free plan. Upgrade any time below.

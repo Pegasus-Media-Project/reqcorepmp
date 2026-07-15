@@ -8,7 +8,7 @@ definePageMeta({
 })
 
 useSeoMeta({
-  title: 'Welcome — Reqcore',
+  title: 'Welcome — Pegasus Media Project',
   description: 'A few quick questions to set up your workspace',
   robots: 'noindex, nofollow',
 })
@@ -165,7 +165,7 @@ async function finish() {
       </div>
       <div>
         <h2 class="text-2xl font-semibold tracking-tight text-surface-900 dark:text-surface-100">
-          Let's tailor Reqcore to you
+          Let's tailor Pegasus Media Project to you
         </h2>
         <p class="mt-1.5 text-sm text-surface-500 dark:text-surface-400">
           Five quick questions — skip any you'd rather not answer.

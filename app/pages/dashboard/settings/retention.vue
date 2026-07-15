@@ -5,7 +5,7 @@ definePageMeta({})
 const { t } = useI18n()
 
 useSeoMeta({
-  title: () => `${t('retention.title')} — Reqcore`,
+  title: () => `${t('retention.title')} — Pegasus Media Project`,
   description: () => t('retention.description'),
 })
 

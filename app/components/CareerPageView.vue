@@ -9,7 +9,7 @@ import {
  * dashboard live-preview editor, so the editor is truly WYSIWYG.
  *
  * Guardrails: the only brandable surfaces are the accent color, logo, name,
- * headline and description. Layout/typography are owned by Reqcore.
+ * headline and description. Layout/typography are owned by Pegasus Media Project.
  */
 
 interface Job {

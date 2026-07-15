@@ -7,7 +7,7 @@ import {
 definePageMeta({})
 
 useSeoMeta({
-  title: 'Integrations — Reqcore',
+  title: 'Integrations — Pegasus Media Project',
   description: 'Connect your calendar and other services',
 })
 

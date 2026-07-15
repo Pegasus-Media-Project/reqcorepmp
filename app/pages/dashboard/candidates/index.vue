@@ -7,7 +7,7 @@ definePageMeta({
 })
 
 useSeoMeta({
-  title: 'Candidates — Reqcore',
+  title: 'Candidates — Pegasus Media Project',
   description: 'Manage your candidate pool',
 })
 

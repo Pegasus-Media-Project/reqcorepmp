@@ -40,7 +40,7 @@ definePageMeta({
 })
 
 useSeoMeta({
-  title: 'Create Job — Reqcore',
+  title: 'Create Job — Pegasus Media Project',
   description: 'Create a new job posting',
 })
 

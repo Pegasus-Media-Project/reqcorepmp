@@ -12,7 +12,7 @@ definePageMeta({
 })
 
 useSeoMeta({
-  title: 'My Jobs — Reqcore',
+  title: 'My Jobs — Pegasus Media Project',
   description: 'Your active job postings',
 })
 

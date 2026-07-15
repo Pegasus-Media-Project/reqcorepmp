@@ -4,7 +4,7 @@ import { Globe, Save, Check, Loader2 } from 'lucide-vue-next'
 definePageMeta({})
 
 useSeoMeta({
-  title: 'Localization Settings — Reqcore',
+  title: 'Localization Settings — Pegasus Media Project',
   description: 'Configure name display format and date format for your organization',
 })
 
@@ -100,7 +100,7 @@ const previewDateFormatted = computed(() => {
             Interface language
           </label>
           <p class="text-xs text-surface-400 dark:text-surface-500 mb-3">
-            Switch the language used in Reqcore. Your current language is shown in the selector.
+            Switch the language used in Pegasus Media Project. Your current language is shown in the selector.
           </p>
           <div class="inline-flex">
             <LanguageSwitcher show-name prominent align="left" />

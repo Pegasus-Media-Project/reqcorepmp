@@ -98,7 +98,7 @@ export function generateInterviewICS(event: ICalEvent): string {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Reqcore//Interview Scheduling//EN',
+    'PRODID:-//Pegasus Media Project//Interview Scheduling//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:REQUEST',
     'BEGIN:VEVENT',
@@ -138,7 +138,7 @@ export function generateCancellationICS(event: Pick<ICalEvent, 'interviewId' | '
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Reqcore//Interview Scheduling//EN',
+    'PRODID:-//Pegasus Media Project//Interview Scheduling//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:CANCEL',
     'BEGIN:VEVENT',

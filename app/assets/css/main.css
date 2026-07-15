@@ -3,7 +3,7 @@
 @source "../../../shared/properties.ts";
 
 /* ─────────────────────────────────────────────────────────
-   Reqcore — Design System
+   Pegasus Media Project — Design System
    Modern, professional palette for a developer-first ATS.
    Built on Tailwind CSS v4 @theme — no tailwind.config.js.
    See: https://tailwindcss.com/docs/theme
@@ -16,36 +16,38 @@
 @theme {
 
   /* ── Brand / Primary ──────────────────────────────────
-     Cornflower blue — centered on #6389ff. A lighter,
-     friendlier blue that reads well on both light and dark
-     surfaces. Used for primary actions, active nav, links.
-     Inspired by Supabase's approach (green → blue swap). */
-  --color-brand-50:  oklch(97.0% 0.012 264);
-  --color-brand-100: oklch(93.5% 0.030 264);
-  --color-brand-200: oklch(87.0% 0.065 264);
-  --color-brand-300: oklch(79.0% 0.115 264);
-  --color-brand-400: oklch(72.0% 0.150 264);
-  --color-brand-500: oklch(63.0% 0.170 264);
-  --color-brand-600: oklch(54.0% 0.200 264);
-  --color-brand-700: oklch(46.0% 0.180 264);
-  --color-brand-800: oklch(38.0% 0.150 264);
-  --color-brand-900: oklch(30.0% 0.110 264);
-  --color-brand-950: oklch(18.0% 0.050 264);
+     Pegasus azure — electric cornflower blue sampled from the
+     dominant blue of the Pegasus wing. Vibrant but readable on
+     both light and dark surfaces. Used for primary actions
+     (buttons), active nav, and links. */
+  --color-brand-50:  oklch(97.0% 0.013 250);
+  --color-brand-100: oklch(93.5% 0.033 250);
+  --color-brand-200: oklch(87.0% 0.070 250);
+  --color-brand-300: oklch(79.0% 0.120 251);
+  --color-brand-400: oklch(72.0% 0.160 252);
+  --color-brand-500: oklch(63.0% 0.185 253);
+  --color-brand-600: oklch(55.0% 0.205 254);
+  --color-brand-700: oklch(47.0% 0.185 255);
+  --color-brand-800: oklch(39.0% 0.150 256);
+  --color-brand-900: oklch(31.0% 0.110 257);
+  --color-brand-950: oklch(19.0% 0.055 258);
 
   /* ── Accent ───────────────────────────────────────────
-     Teal — transparency and auditability. Used sparingly for
-     highlights, links, and AI-insight indicators. */
-  --color-accent-50:  oklch(97.5% 0.014 180);
-  --color-accent-100: oklch(94.0% 0.040 180);
-  --color-accent-200: oklch(88.0% 0.085 180);
-  --color-accent-300: oklch(80.0% 0.130 180);
-  --color-accent-400: oklch(72.0% 0.150 180);
-  --color-accent-500: oklch(65.0% 0.140 182);
-  --color-accent-600: oklch(55.0% 0.115 184);
-  --color-accent-700: oklch(46.0% 0.095 186);
-  --color-accent-800: oklch(39.0% 0.078 188);
-  --color-accent-900: oklch(33.0% 0.060 188);
-  --color-accent-950: oklch(18.0% 0.030 190);
+     Pegasus violet — electric purple from the wing's trailing
+     tip. Pairs with the azure brand to recreate the logo's
+     cyan→blue→violet sweep. Used for highlights, links, and
+     AI-insight indicators. */
+  --color-accent-50:  oklch(97.0% 0.014 300);
+  --color-accent-100: oklch(93.5% 0.038 300);
+  --color-accent-200: oklch(87.0% 0.080 298);
+  --color-accent-300: oklch(78.0% 0.130 296);
+  --color-accent-400: oklch(70.0% 0.175 294);
+  --color-accent-500: oklch(62.0% 0.205 293);
+  --color-accent-600: oklch(54.0% 0.220 292);
+  --color-accent-700: oklch(46.0% 0.195 292);
+  --color-accent-800: oklch(39.0% 0.158 292);
+  --color-accent-900: oklch(33.0% 0.122 292);
+  --color-accent-950: oklch(18.0% 0.055 293);
 
   /* ── Surface / neutrals ───────────────────────────────
      Near-neutral gray ramp modeled on Supabase's pure-gray

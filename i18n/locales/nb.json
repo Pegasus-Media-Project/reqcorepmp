@@ -21,7 +21,7 @@
     "hero": {
       "titleLine1": "Hiring software",
       "titleHighlight": "that starts free.",
-      "subtitle": "Track your first role in Reqcore with 1 active job and 300 applicants free. Upgrade only when your hiring pipeline grows.",
+      "subtitle": "Track your first role in Pegasus Media Project with 1 active job and 300 applicants free. Upgrade only when your hiring pipeline grows.",
       "goToDashboard": "Gå til kontrollpanel",
       "signIn": "Logg inn",
       "createAccount": "Opprett konto",
@@ -45,7 +45,7 @@
     },
     "footer": {
       "source": "Pricing",
-      "tagline": "Reqcore — applicant tracking that starts free"
+      "tagline": "Pegasus Media Project — applicant tracking that starts free"
     }
   },
   "retention": {
@@ -154,8 +154,8 @@
   "jobs": {
     "list": {
       "metaTitle": "Ledige stillinger — Stillingsbank",
-      "metaDescription": "Bla gjennom ledige stillinger hos Reqcore og søk direkte. Finn din neste karrieremulighet hos selskaper som verdsetter åpenhet.",
-      "ogTitle": "Ledige stillinger — Reqcore stillingsbank",
+      "metaDescription": "Bla gjennom ledige stillinger hos Pegasus Media Project og søk direkte. Finn din neste karrieremulighet hos selskaper som verdsetter åpenhet.",
+      "ogTitle": "Ledige stillinger — Pegasus Media Project stillingsbank",
       "ogDescription": "Bla gjennom ledige stillinger og søk direkte. Drevet av det åpen kildekode-ATS-et du faktisk eier.",
       "twitterDescription": "Bla gjennom ledige stillinger og søk direkte.",
       "title": "Ledige stillinger",
@@ -174,7 +174,7 @@
       "totalCount": "{count} ledig stilling | {count} ledige stillinger"
     },
     "detail": {
-      "metaTitleFallback": "Stillingsdetaljer — Reqcore",
+      "metaTitleFallback": "Stillingsdetaljer — Pegasus Media Project",
       "metaDescriptionFallback": "Se stillingsdetaljer og søk",
       "hiringNow": "Ansetter nå",
       "metaApplyFor": "Søk på",
@@ -202,7 +202,7 @@
     },
     "apply": {
       "metaApplyPrefix": "Søknad",
-      "metaTitleFallback": "Søk — Reqcore",
+      "metaTitleFallback": "Søk — Pegasus Media Project",
       "metaDescriptionFallback": "Send inn søknaden din",
       "notFoundTitle": "Stilling ikke funnet",
       "notFoundBody": "Denne stillingen kan ha blitt besatt eller tar ikke lenger imot søknader.",
@@ -223,7 +223,7 @@
       }
     },
     "confirmation": {
-      "metaTitle": "Søknad sendt — Reqcore",
+      "metaTitle": "Søknad sendt — Pegasus Media Project",
       "title": "Søknaden er mottatt",
       "thanksWithTitle": "Takk for at du søkte på {title}. Opplysningene dine er nå hos rekrutteringsteamet.",
       "thanksPlain": "Takk for søknaden. Opplysningene dine er nå hos rekrutteringsteamet.",

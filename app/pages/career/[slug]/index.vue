@@ -53,7 +53,7 @@ const canonicalPath = computed(() =>
   localePath(`/career/${data.value?.canonicalSlug ?? slug.value}`))
 const canonicalUrl = computed(() => absUrl(canonicalPath.value))
 
-// Share image: hero banner first, then logo, then the Reqcore default.
+// Share image: hero banner first, then logo, then the Pegasus Media Project default.
 const shareImage = computed(() =>
   absUrl(data.value?.banner) ?? absUrl(data.value?.logo) ?? absUrl('/reqcore-banner-github.jpeg'))
 

@@ -8,7 +8,7 @@ definePageMeta({
 })
 
 useSeoMeta({
-  title: 'Career Page — Reqcore',
+  title: 'Career Page — Pegasus Media Project',
   description: 'Customize your organization\'s public career page',
 })
 

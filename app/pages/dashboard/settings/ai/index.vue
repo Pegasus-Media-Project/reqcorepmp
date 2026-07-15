@@ -13,7 +13,7 @@ import {
 definePageMeta({})
 
 useSeoMeta({
-  title: 'AI Configuration — Reqcore',
+  title: 'AI Configuration — Pegasus Media Project',
   description: 'Configure AI providers and models for the chatbot and candidate analysis.',
 })
 
@@ -150,7 +150,7 @@ async function setPlatformEnabled(c: AiConfigRow, enabled: boolean) {
       headers: useRequestHeaders(['cookie']),
     })
     toast.success(
-      enabled ? 'Reqcore AI enabled' : 'Reqcore AI disabled',
+      enabled ? 'Pegasus Media Project AI enabled' : 'Pegasus Media Project AI disabled',
       enabled ? 'It can now score candidates for this workspace.' : 'It will no longer be used for this workspace.',
     )
     await refreshConfigs()
@@ -294,7 +294,7 @@ function statusClass(c: AiConfigRow): string {
                   v-if="c.source === 'platform'"
                   class="inline-flex items-center gap-1 rounded-full border border-brand-200 dark:border-brand-800 bg-white/70 dark:bg-brand-950/50 px-2 py-0.5 text-[11px] font-medium text-brand-700 dark:text-brand-300"
                 >
-                  <Building2 class="size-3" /> Reqcore
+                  <Building2 class="size-3" /> Pegasus Media Project
                 </span>
                 <span
                   v-if="c.isDefaultChatbot"
@@ -376,7 +376,7 @@ function statusClass(c: AiConfigRow): string {
               :class="c.isEnabled === false
                 ? 'border-brand-300 dark:border-brand-700 bg-brand-600 text-white hover:bg-brand-700'
                 : 'border-surface-200 dark:border-surface-700 bg-white/85 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:border-danger-300 dark:hover:border-danger-700 hover:text-danger-600 dark:hover:text-danger-400'"
-              :title="c.isEnabled === false ? 'Enable Reqcore AI for this workspace' : 'Disable Reqcore AI for this workspace'"
+              :title="c.isEnabled === false ? 'Enable Pegasus Media Project AI for this workspace' : 'Disable Pegasus Media Project AI for this workspace'"
               @click="setPlatformEnabled(c, c.isEnabled === false)"
             >
               <Loader2 v-if="togglingPlatformId === c.id" class="size-3.5 animate-spin" />

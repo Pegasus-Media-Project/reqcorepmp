@@ -5,8 +5,8 @@ definePageMeta({
 });
 
 useSeoMeta({
-    title: "Reset Password — Reqcore",
-    description: "Set a new password for your Reqcore account",
+    title: "Reset Password — Pegasus Media Project",
+    description: "Set a new password for your Pegasus Media Project account",
     robots: "noindex, nofollow",
 });
 

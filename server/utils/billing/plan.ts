@@ -31,24 +31,30 @@ import { STRIPE_BILLING_ENV_KEYS, isStripeBillingConfigured } from '../env'
 const PAID_ENTITLEMENT_STATUSES = ['active', 'trialing', 'past_due']
 
 /**
- * True only in a real production deployment — not local dev, CI, or test. Matches
- * the gate used elsewhere (e.g. api/public/jobs apply throttle). Used to decide
- * whether an unconfigured Stripe setup is a dev convenience or production drift.
+ * True when this instance has Stripe billing wired up. When it doesn't, the
+ * instance sells nothing, so it runs in "billing-off" mode (see below).
  */
-function isProductionDeployment(): boolean {
-  return (
-    process.env.NODE_ENV === 'production' &&
-    !process.env.CI &&
-    !process.env.GITHUB_ACTIONS
+function billingIsOff(): boolean {
+  const stripeBillingEnv = Object.fromEntries(
+    STRIPE_BILLING_ENV_KEYS.map(key => [key, process.env[key]]),
   )
+  return !isStripeBillingConfigured(stripeBillingEnv)
 }
 
 /**
  * Resolve an org's billing tier. Returns the persisted plan id for orgs with an
  * active subscription, otherwise `'free'`. Shared by the budget gate and the
  * active-role limit so both agree on what plan an org is on.
+ *
+ * Billing-off (self-hosted) mode: when Stripe is not configured this instance
+ * sells nothing, so every org is treated as the top `agency` tier — unlimited
+ * open roles and every plan-gated feature unlocked, in dev AND production.
+ * Configure the STRIPE_* variables to re-enable real per-plan billing; normal
+ * tier resolution resumes automatically with no code change.
  */
 export async function resolveOrgPlanId(orgId: string): Promise<BillingTier> {
+  if (billingIsOff()) return 'agency'
+
   const rows = await db
     .select({ plan: subscription.plan, status: subscription.status })
     .from(subscription)
@@ -134,31 +140,12 @@ export function assertTierFeature(tier: BillingTier, feature: PlanFeature): void
  * H3 402 if not. Returns the resolved tier so the caller can reuse it for
  * further per-tier decisions without a second lookup.
  *
- * Billing is always configured on the hosted SaaS, so an unconfigured Stripe
- * setup is only ever legitimate in local dev / CI — where there are no real
- * subscriptions and unlocking everything is the convenient default. In a real
- * production deployment an unconfigured (or partially configured) Stripe setup
- * is config drift, never a valid state, so we fail *closed*: enforce against the
- * org's stored subscription tier rather than silently granting every paid
- * feature, and log loudly so the drift is detectable.
+ * Tier resolution is centralized in resolveOrgPlanId, which already unlocks
+ * everything (top `agency` tier) when billing is off — so no Stripe-config
+ * branching is needed here. When Stripe IS configured, this enforces against
+ * the org's real stored subscription tier.
  */
 export async function assertPlanFeature(orgId: string, feature: PlanFeature): Promise<BillingTier> {
-  const stripeBillingEnv = Object.fromEntries(
-    STRIPE_BILLING_ENV_KEYS.map(key => [key, process.env[key]]),
-  )
-
-  if (!isStripeBillingConfigured(stripeBillingEnv)) {
-    // Dev/CI (no Stripe, no real subscriptions): unlock everything.
-    if (!isProductionDeployment()) return 'scale'
-    // Production drift: never unlock. Fall through to enforce by stored tier.
-    const missing = STRIPE_BILLING_ENV_KEYS.filter(key => !stripeBillingEnv[key])
-    console.error(
-      `[Reqcore] Stripe billing not fully configured in production (missing ${missing.join(', ')}); ` +
-        'enforcing plan features by stored subscription tier instead of unlocking. ' +
-        'Restore the missing Stripe variables to resume normal billing.',
-    )
-  }
-
   const tier = await resolveOrgPlanId(orgId)
   assertTierFeature(tier, feature)
   return tier

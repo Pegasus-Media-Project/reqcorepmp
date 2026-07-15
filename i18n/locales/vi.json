@@ -21,7 +21,7 @@
     "hero": {
       "titleLine1": "Hiring software",
       "titleHighlight": "that starts free.",
-      "subtitle": "Track your first role in Reqcore with 1 active job and 300 applicants free. Upgrade only when your hiring pipeline grows.",
+      "subtitle": "Track your first role in Pegasus Media Project with 1 active job and 300 applicants free. Upgrade only when your hiring pipeline grows.",
       "goToDashboard": "Đi đến bảng điều khiển",
       "signIn": "Đăng nhập",
       "createAccount": "Tạo tài khoản",
@@ -45,7 +45,7 @@
     },
     "footer": {
       "source": "Pricing",
-      "tagline": "Reqcore — applicant tracking that starts free"
+      "tagline": "Pegasus Media Project — applicant tracking that starts free"
     }
   },
   "retention": {
@@ -154,8 +154,8 @@
   "jobs": {
     "list": {
       "metaTitle": "Vị trí đang tuyển — Trang tuyển dụng",
-      "metaDescription": "Duyệt các vị trí đang tuyển trên Reqcore và ứng tuyển trực tiếp. Tìm cơ hội nghề nghiệp tiếp theo của bạn tại các công ty coi trọng sự minh bạch.",
-      "ogTitle": "Vị trí đang tuyển — Trang tuyển dụng Reqcore",
+      "metaDescription": "Duyệt các vị trí đang tuyển trên Pegasus Media Project và ứng tuyển trực tiếp. Tìm cơ hội nghề nghiệp tiếp theo của bạn tại các công ty coi trọng sự minh bạch.",
+      "ogTitle": "Vị trí đang tuyển — Trang tuyển dụng Pegasus Media Project",
       "ogDescription": "Duyệt các vị trí đang tuyển và ứng tuyển trực tiếp. Được vận hành bởi hệ thống ATS mã nguồn mở mà bạn thực sự sở hữu.",
       "twitterDescription": "Duyệt các vị trí đang tuyển và ứng tuyển trực tiếp.",
       "title": "Vị trí đang tuyển",
@@ -174,7 +174,7 @@
       "totalCount": "{count} vị trí đang tuyển | {count} vị trí đang tuyển"
     },
     "detail": {
-      "metaTitleFallback": "Chi tiết vị trí — Reqcore",
+      "metaTitleFallback": "Chi tiết vị trí — Pegasus Media Project",
       "metaDescriptionFallback": "Xem chi tiết vị trí và ứng tuyển",
       "hiringNow": "Đang tuyển",
       "metaApplyFor": "Ứng tuyển vị trí",
@@ -202,7 +202,7 @@
     },
     "apply": {
       "metaApplyPrefix": "Ứng tuyển",
-      "metaTitleFallback": "Ứng tuyển — Reqcore",
+      "metaTitleFallback": "Ứng tuyển — Pegasus Media Project",
       "metaDescriptionFallback": "Gửi hồ sơ ứng tuyển của bạn",
       "notFoundTitle": "Không tìm thấy vị trí",
       "notFoundBody": "Vị trí này có thể đã được tuyển hoặc không còn nhận hồ sơ ứng tuyển.",
@@ -223,7 +223,7 @@
       }
     },
     "confirmation": {
-      "metaTitle": "Đã gửi hồ sơ ứng tuyển — Reqcore",
+      "metaTitle": "Đã gửi hồ sơ ứng tuyển — Pegasus Media Project",
       "title": "Đã nhận hồ sơ ứng tuyển",
       "thanksWithTitle": "Cảm ơn bạn đã ứng tuyển vị trí {title}. Đội ngũ tuyển dụng hiện đã nhận được thông tin của bạn.",
       "thanksPlain": "Cảm ơn bạn đã ứng tuyển. Đội ngũ tuyển dụng hiện đã nhận được thông tin của bạn.",

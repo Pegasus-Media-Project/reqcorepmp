@@ -21,7 +21,7 @@
     "hero": {
       "titleLine1": "Hiring software",
       "titleHighlight": "that starts free.",
-      "subtitle": "Track your first role in Reqcore with 1 active job and 300 applicants free. Upgrade only when your hiring pipeline grows.",
+      "subtitle": "Track your first role in Pegasus Media Project with 1 active job and 300 applicants free. Upgrade only when your hiring pipeline grows.",
       "goToDashboard": "Zum Dashboard",
       "signIn": "Anmelden",
       "createAccount": "Konto erstellen",
@@ -45,7 +45,7 @@
     },
     "footer": {
       "source": "Pricing",
-      "tagline": "Reqcore — applicant tracking that starts free"
+      "tagline": "Pegasus Media Project — applicant tracking that starts free"
     }
   },
   "retention": {
@@ -153,8 +153,8 @@
   "jobs": {
     "list": {
       "metaTitle": "Offene Stellen — Stellenbörse",
-      "metaDescription": "Durchsuchen Sie offene Stellen bei Reqcore und bewerben Sie sich direkt. Finden Sie Ihre nächste Karrierechance bei Unternehmen, die Transparenz schätzen.",
-      "ogTitle": "Offene Stellen — Reqcore Stellenbörse",
+      "metaDescription": "Durchsuchen Sie offene Stellen bei Pegasus Media Project und bewerben Sie sich direkt. Finden Sie Ihre nächste Karrierechance bei Unternehmen, die Transparenz schätzen.",
+      "ogTitle": "Offene Stellen — Pegasus Media Project Stellenbörse",
       "ogDescription": "Durchsuchen Sie offene Stellen und bewerben Sie sich direkt. Unterstützt durch das Open-Source-ATS, das Ihnen wirklich gehört.",
       "twitterDescription": "Durchsuchen Sie offene Stellen und bewerben Sie sich direkt.",
       "title": "Offene Stellen",
@@ -173,7 +173,7 @@
       "totalCount": "{count} offene Stelle | {count} offene Stellen"
     },
     "detail": {
-      "metaTitleFallback": "Stellendetails — Reqcore",
+      "metaTitleFallback": "Stellendetails — Pegasus Media Project",
       "metaDescriptionFallback": "Stellendetails ansehen und bewerben",
       "hiringNow": "Wir stellen ein",
       "metaApplyFor": "Bewerben Sie sich für",
@@ -201,7 +201,7 @@
     },
     "apply": {
       "metaApplyPrefix": "Bewerbung",
-      "metaTitleFallback": "Bewerben — Reqcore",
+      "metaTitleFallback": "Bewerben — Pegasus Media Project",
       "metaDescriptionFallback": "Reichen Sie Ihre Bewerbung ein",
       "notFoundTitle": "Stelle nicht gefunden",
       "notFoundBody": "Diese Stelle wurde möglicherweise bereits besetzt oder nimmt keine Bewerbungen mehr an.",
@@ -222,7 +222,7 @@
       }
     },
     "confirmation": {
-      "metaTitle": "Bewerbung eingereicht — Reqcore",
+      "metaTitle": "Bewerbung eingereicht — Pegasus Media Project",
       "title": "Bewerbung eingegangen",
       "thanksWithTitle": "Vielen Dank für Ihre Bewerbung auf {title}. Ihre Angaben liegen nun dem Einstellungsteam vor.",
       "thanksPlain": "Vielen Dank für Ihre Bewerbung. Ihre Angaben liegen nun dem Einstellungsteam vor.",
