@@ -224,10 +224,11 @@
     },
     "confirmation": {
       "metaTitle": "Application Submitted — Reqcore",
-      "title": "Application Submitted!",
-      "thanksWithTitle": "Thank you for applying for the {title} position.",
-      "thanksPlain": "Thank you for applying.",
-      "received": "Your application has been received. The hiring team will review it and get back to you if there's a match.",
+      "title": "Application received",
+      "thanksWithTitle": "Thanks for applying for {title}. Your details are now with the hiring team.",
+      "thanksPlain": "Thanks for applying. Your details are now with the hiring team.",
+      "received": "Sent successfully",
+      "backToCareerPage": "Back to {name} careers",
       "browseMore": "Browse more positions",
       "backHome": "Back to Home"
     },

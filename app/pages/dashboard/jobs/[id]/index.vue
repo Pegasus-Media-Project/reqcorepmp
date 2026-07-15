@@ -277,7 +277,6 @@ watch(showOverviewDropdown, (val) => {
 
 // Which sections to display based on active tab
 const showSection = computed(() => ({
-  profile: detailTab.value === 'overview',
   coverLetter: detailTab.value === 'overview' ? overviewSections.coverLetter : detailTab.value === 'cover-letter',
   aiAnalysis: detailTab.value === 'overview' ? overviewSections.aiAnalysis : detailTab.value === 'ai-analysis',
   interviews: detailTab.value === 'overview' ? overviewSections.interviews : detailTab.value === 'interviews',
@@ -378,7 +377,6 @@ function describeTimelineItem(item: TimelineEntry): string {
 }
 
 // Section refs
-const overviewRef = ref<HTMLElement | null>(null)
 const interviewsRef = ref<HTMLElement | null>(null)
 const documentsRef = ref<HTMLElement | null>(null)
 const responsesRef = ref<HTMLElement | null>(null)
@@ -1901,14 +1899,14 @@ function closeDocPreview() {
             </div>
 
             <!-- Detail tabs -->
-            <div class="border-b border-surface-200/80 bg-white px-4 sm:px-6 dark:border-surface-800/60 dark:bg-surface-900">
-              <div ref="tabBar" class="relative mx-auto flex gap-1 -mb-px whitespace-nowrap" :class="detailWidthClass">
+            <div class="border-b border-surface-200/80 bg-white px-4 sm:px-6 py-1 dark:border-surface-800/60 dark:bg-surface-900">
+              <div ref="tabBar" class="relative mx-auto flex items-center gap-0.5 whitespace-nowrap" :class="detailWidthClass">
                 <div ref="overviewDropdownRef" class="relative shrink-0">
-                  <div class="flex items-center border-b-2 transition-all duration-150" :class="detailTab === 'overview'
-                    ? 'border-brand-600 dark:border-brand-400'
-                    : 'border-transparent'">
+                  <div class="flex items-center rounded-md transition-colors duration-150" :class="detailTab === 'overview'
+                    ? 'bg-brand-50 dark:bg-brand-500/15'
+                    : 'hover:bg-surface-100 dark:hover:bg-surface-800/60'">
                     <button
-                      class="cursor-pointer px-3.5 py-2.5 text-sm font-medium transition-all duration-150"
+                      class="cursor-pointer px-2.5 py-1 text-[13px] font-medium transition-colors duration-150"
                       :class="detailTab === 'overview'
                         ? 'text-brand-700 dark:text-brand-300'
                         : 'text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-300'"
@@ -1918,7 +1916,7 @@ function closeDocPreview() {
                     </button>
                     <button
                       v-if="detailTab === 'overview'"
-                      class="cursor-pointer -ml-2 p-1 rounded transition-colors duration-150 text-surface-400 hover:text-surface-600 dark:text-surface-500 dark:hover:text-surface-300"
+                      class="cursor-pointer -ml-1.5 pr-1.5 py-1 rounded transition-colors duration-150 text-brand-400 hover:text-brand-600 dark:text-brand-400/70 dark:hover:text-brand-300"
                       @click.stop="showOverviewDropdown = !showOverviewDropdown"
                     >
                       <ChevronDown class="size-3.5 transition-transform duration-150" :class="showOverviewDropdown ? 'rotate-180' : ''" />
@@ -1974,26 +1972,26 @@ function closeDocPreview() {
                 <button
                   v-for="tab in visibleTabs"
                   :key="tab.key"
-                  class="shrink-0 cursor-pointer px-3.5 py-2.5 text-sm font-medium transition-all duration-150 border-b-2 -mb-px flex items-center gap-1.5"
+                  class="shrink-0 cursor-pointer rounded-md px-2.5 py-1 text-[13px] font-medium transition-colors duration-150 flex items-center gap-1.5"
                   :class="detailTab === tab.key
-                    ? 'border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300'
-                    : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300 dark:text-surface-400 dark:hover:text-surface-300 dark:hover:border-surface-600'"
+                    ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300'
+                    : 'text-surface-500 hover:text-surface-700 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-surface-300 dark:hover:bg-surface-800/60'"
                   @click="detailTab = tab.key"
                 >
                   <component :is="tab.icon" v-if="tab.icon" class="size-3.5" />
                   {{ tab.label }}
-                  <span v-if="tab.count" class="ml-1 text-xs text-surface-400">
-                    ({{ tab.count }})
+                  <span v-if="tab.count" class="text-xs tabular-nums" :class="detailTab === tab.key ? 'text-brand-500/70 dark:text-brand-400/70' : 'text-surface-400'">
+                    {{ tab.count }}
                   </span>
                 </button>
 
                 <!-- Tabs that don't fit -->
                 <div v-if="overflowTabs.length > 0" ref="tabOverflowRef" class="relative ml-auto shrink-0">
                   <button
-                    class="cursor-pointer px-3 py-2.5 text-sm font-medium transition-all duration-150 border-b-2 -mb-px flex items-center gap-1.5"
+                    class="cursor-pointer rounded-md px-2 py-1 text-[13px] font-medium transition-colors duration-150 flex items-center gap-1"
                     :class="isOverflowTabActive
-                      ? 'border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300'
-                      : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300 dark:text-surface-400 dark:hover:text-surface-300 dark:hover:border-surface-600'"
+                      ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300'
+                      : 'text-surface-500 hover:text-surface-700 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-surface-300 dark:hover:bg-surface-800/60'"
                     :aria-expanded="showTabOverflowMenu"
                     aria-label="More tabs"
                     @click.stop="showTabOverflowMenu = !showTabOverflowMenu"
@@ -2045,20 +2043,20 @@ function closeDocPreview() {
                   class="pointer-events-none invisible absolute left-0 top-0 flex w-max gap-1"
                 >
                   <div data-ghost-pinned class="flex items-center">
-                    <span class="px-3.5 py-2.5 text-sm font-medium">Overview</span>
-                    <span class="-ml-2 p-1"><ChevronDown class="size-3.5" /></span>
+                    <span class="px-2.5 py-1 text-[13px] font-medium">Overview</span>
+                    <span class="-ml-1.5 pr-1.5 py-1"><ChevronDown class="size-3.5" /></span>
                   </div>
                   <span
                     v-for="tab in detailTabDefs"
                     :key="tab.key"
                     data-ghost-tab
-                    class="px-3.5 py-2.5 text-sm font-medium flex items-center gap-1.5"
+                    class="px-2.5 py-1 text-[13px] font-medium flex items-center gap-1.5"
                   >
                     <component :is="tab.icon" v-if="tab.icon" class="size-3.5" />
                     {{ tab.label }}
-                    <span v-if="tab.count" class="ml-1 text-xs">({{ tab.count }})</span>
+                    <span v-if="tab.count" class="text-xs tabular-nums">{{ tab.count }}</span>
                   </span>
-                  <span data-ghost-more class="px-3 py-2.5 text-sm font-medium flex items-center gap-1.5">
+                  <span data-ghost-more class="px-2 py-1 text-[13px] font-medium flex items-center gap-1">
                     <MoreHorizontal class="size-4" />
                     <span class="text-xs tabular-nums">{{ detailTabDefs.length }}</span>
                   </span>
@@ -2078,36 +2076,9 @@ function closeDocPreview() {
 
 
 
-              <!-- PROFILE SECTION (overview only) -->
-              <div v-if="showSection.profile" ref="overviewRef" class="space-y-5 mx-auto" :class="detailWidthClass">
-                <!-- Notes -->
-                <div class="rounded-xl border border-surface-200/80 bg-white p-5 shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
-                  <div class="flex items-center gap-2.5 mb-4">
-                    <div class="flex size-7 items-center justify-center rounded-lg bg-warning-50 dark:bg-warning-950/40">
-                      <MessageSquare class="size-3.5 text-warning-600 dark:text-warning-400" />
-                    </div>
-                    <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">Notes</h3>
-                  </div>
-                  <p class="text-sm leading-relaxed text-surface-600 dark:text-surface-300 whitespace-pre-wrap">
-                    {{ currentSummary.notes || 'No notes yet.' }}
-                  </p>
-                </div>
-
-                <!-- Quick links -->
-                <div class="flex items-center gap-4 pt-1">
-                  <NuxtLink
-                    :to="$localePath(`/dashboard/applications/${currentSummary.id}`)"
-                    class="inline-flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 font-medium transition-colors group"
-                  >
-                    <ExternalLink class="size-3.5 transition-transform group-hover:translate-x-0.5" />
-                    Full application page
-                  </NuxtLink>
-                </div>
-              </div>
-
               <!-- COVER LETTER SECTION -->
               <div v-if="showSection.coverLetter && hasCoverLetter" class="mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-5' : '']">
-                <div class="rounded-xl border border-surface-200/80 bg-white p-5 shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
+                <div class="rounded-xl border border-surface-200/80 bg-white p-4 shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
                   <div class="flex items-center gap-2.5 mb-4">
                     <div class="flex size-7 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-950/40">
                       <FileText class="size-3.5 text-brand-600 dark:text-brand-400" />
@@ -2131,7 +2102,7 @@ function closeDocPreview() {
               </div>
 
               <!-- INTERVIEWS SECTION -->
-              <div v-if="showSection.interviews" ref="interviewsRef" class="space-y-3 mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-10' : '']">
+              <div v-if="showSection.interviews" ref="interviewsRef" class="space-y-3 mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-6' : '']">
                 <div class="flex items-center justify-between mb-3">
                   <h2 class="text-sm font-semibold text-surface-800 dark:text-surface-200 flex items-center gap-2">
                     <Calendar class="size-4 text-surface-400 dark:text-surface-500" />
@@ -2157,12 +2128,12 @@ function closeDocPreview() {
                   >
                     <!-- Interview card header (always visible) -->
                     <button
-                      class="flex w-full cursor-pointer items-center justify-between gap-4 px-5 py-4 text-left"
+                      class="flex w-full cursor-pointer items-center justify-between gap-4 px-4 py-3 text-left"
                       @click="toggleInterviewExpand(iv.id)"
                     >
-                      <div class="flex items-center gap-3.5 min-w-0">
-                        <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 dark:bg-brand-950/40">
-                          <component :is="interviewTypeIcons[iv.type] ?? Calendar" class="size-4.5 text-brand-600 dark:text-brand-400" />
+                      <div class="flex items-center gap-3 min-w-0">
+                        <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-950/40">
+                          <component :is="interviewTypeIcons[iv.type] ?? Calendar" class="size-4 text-brand-600 dark:text-brand-400" />
                         </div>
                         <div class="min-w-0">
                           <p class="text-sm font-medium text-surface-800 dark:text-surface-100 truncate">
@@ -2471,10 +2442,16 @@ function closeDocPreview() {
                   </div>
                 </div>
 
+                <!-- Empty state (compact in overview) -->
+                <div v-else-if="detailTab === 'overview'" class="flex items-center gap-2.5 rounded-lg border border-dashed border-surface-200 px-3.5 py-2.5 dark:border-surface-800/70">
+                  <Calendar class="size-4 shrink-0 text-surface-300 dark:text-surface-600" />
+                  <p class="text-xs text-surface-400 dark:text-surface-500">No interviews scheduled yet.</p>
+                </div>
+
                 <!-- Empty state -->
-                <div v-else class="rounded-xl border border-surface-200/80 bg-white p-10 text-center shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
-                  <div class="flex size-14 items-center justify-center rounded-2xl bg-surface-100 dark:bg-surface-800/60 mx-auto mb-3">
-                    <Calendar class="size-6 text-surface-400 dark:text-surface-500" />
+                <div v-else class="rounded-xl border border-surface-200/80 bg-white px-6 py-9 text-center shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
+                  <div class="flex size-11 items-center justify-center rounded-xl bg-surface-100 dark:bg-surface-800/60 mx-auto mb-3">
+                    <Calendar class="size-5 text-surface-400 dark:text-surface-500" />
                   </div>
                   <p class="text-sm font-medium text-surface-600 dark:text-surface-300">No interviews scheduled</p>
                   <p class="mt-1 text-xs text-surface-400 dark:text-surface-500">Schedule an interview to start the process.</p>
@@ -2489,7 +2466,7 @@ function closeDocPreview() {
               </div>
 
               <!-- DOCUMENTS SECTION -->
-              <div v-if="showSection.documents" ref="documentsRef" class="space-y-3 mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-10' : '']">
+              <div v-if="showSection.documents" ref="documentsRef" class="space-y-3 mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-6' : '']">
                 <h2 class="text-sm font-semibold text-surface-800 dark:text-surface-200 flex items-center gap-2 mb-3">
                   <Paperclip class="size-4 text-surface-400 dark:text-surface-500" />
                   Documents
@@ -2498,11 +2475,11 @@ function closeDocPreview() {
                   <div
                     v-for="doc in resolvedCurrentApplication.candidate.documents"
                     :key="doc.id"
-                    class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-surface-200/80 bg-white px-5 py-4 shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none transition-colors hover:border-surface-300 dark:hover:border-surface-700"
+                    class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-surface-200/80 bg-white px-4 py-3 shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none transition-colors hover:border-surface-300 dark:hover:border-surface-700"
                   >
-                    <div class="flex items-center gap-3.5 min-w-0">
-                      <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-surface-100 dark:bg-surface-800/60">
-                        <FileText class="size-4.5 text-surface-500 dark:text-surface-400" />
+                    <div class="flex items-center gap-3 min-w-0">
+                      <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface-100 dark:bg-surface-800/60">
+                        <FileText class="size-4 text-surface-500 dark:text-surface-400" />
                       </div>
                       <div class="min-w-0">
                         <p class="text-sm font-medium text-surface-800 dark:text-surface-100 truncate">
@@ -2531,9 +2508,13 @@ function closeDocPreview() {
                     </div>
                   </div>
                 </div>
-                <div v-else class="rounded-xl border border-surface-200/80 bg-white p-10 text-center shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
-                  <div class="flex size-14 items-center justify-center rounded-2xl bg-surface-100 dark:bg-surface-800/60 mx-auto mb-3">
-                    <FileText class="size-6 text-surface-400 dark:text-surface-500" />
+                <div v-else-if="detailTab === 'overview'" class="flex items-center gap-2.5 rounded-lg border border-dashed border-surface-200 px-3.5 py-2.5 dark:border-surface-800/70">
+                  <FileText class="size-4 shrink-0 text-surface-300 dark:text-surface-600" />
+                  <p class="text-xs text-surface-400 dark:text-surface-500">No documents uploaded.</p>
+                </div>
+                <div v-else class="rounded-xl border border-surface-200/80 bg-white px-6 py-9 text-center shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
+                  <div class="flex size-11 items-center justify-center rounded-xl bg-surface-100 dark:bg-surface-800/60 mx-auto mb-3">
+                    <FileText class="size-5 text-surface-400 dark:text-surface-500" />
                   </div>
                   <p class="text-sm font-medium text-surface-600 dark:text-surface-300">No documents uploaded</p>
                   <p class="mt-1 text-xs text-surface-400 dark:text-surface-500">Documents will appear here once uploaded.</p>
@@ -2541,18 +2522,18 @@ function closeDocPreview() {
               </div>
 
               <!-- RESPONSES SECTION -->
-              <div v-if="showSection.responses" ref="responsesRef" class="space-y-3 mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-10' : '']">
+              <div v-if="showSection.responses" ref="responsesRef" class="space-y-3 mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-6' : '']">
                 <h2 class="text-sm font-semibold text-surface-800 dark:text-surface-200 flex items-center gap-2 mb-3">
                   <MessageSquare class="size-4 text-surface-400 dark:text-surface-500" />
                   Responses
                 </h2>                <template v-if="resolvedCurrentApplication?.responses?.length">
-                  <div class="space-y-3">
+                  <div class="divide-y divide-surface-100 rounded-xl border border-surface-200/80 bg-white shadow-sm shadow-surface-900/[0.03] dark:divide-surface-800/60 dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
                     <div
                       v-for="response in resolvedCurrentApplication.responses"
                       :key="response.id"
-                      class="rounded-xl border border-surface-200/80 bg-white p-5 shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none"
+                      class="px-4 py-3"
                     >
-                      <p class="text-xs font-semibold text-surface-400 dark:text-surface-500 uppercase tracking-wider mb-2">
+                      <p class="text-[11px] font-semibold text-surface-400 dark:text-surface-500 uppercase tracking-wider mb-1">
                         {{ response.question?.label ?? 'Unknown question' }}
                       </p>
                       <p class="text-sm text-surface-700 dark:text-surface-200 leading-relaxed">
@@ -2561,9 +2542,13 @@ function closeDocPreview() {
                     </div>
                   </div>
                 </template>
-                <div v-else class="rounded-xl border border-surface-200/80 bg-white p-10 text-center shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
-                  <div class="flex size-14 items-center justify-center rounded-2xl bg-surface-100 dark:bg-surface-800/60 mx-auto mb-3">
-                    <MessageSquare class="size-6 text-surface-400 dark:text-surface-500" />
+                <div v-else-if="detailTab === 'overview'" class="flex items-center gap-2.5 rounded-lg border border-dashed border-surface-200 px-3.5 py-2.5 dark:border-surface-800/70">
+                  <MessageSquare class="size-4 shrink-0 text-surface-300 dark:text-surface-600" />
+                  <p class="text-xs text-surface-400 dark:text-surface-500">No application form responses.</p>
+                </div>
+                <div v-else class="rounded-xl border border-surface-200/80 bg-white px-6 py-9 text-center shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
+                  <div class="flex size-11 items-center justify-center rounded-xl bg-surface-100 dark:bg-surface-800/60 mx-auto mb-3">
+                    <MessageSquare class="size-5 text-surface-400 dark:text-surface-500" />
                   </div>
                   <p class="text-sm font-medium text-surface-600 dark:text-surface-300">No responses</p>
                   <p class="mt-1 text-xs text-surface-400 dark:text-surface-500">Application form responses will appear here.</p>
@@ -2571,8 +2556,8 @@ function closeDocPreview() {
               </div>
 
               <!-- PROPERTIES SECTION -->
-              <div v-if="showSection.properties && resolvedCurrentApplication" class="mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-10' : '']">
-                <div class="rounded-xl border border-surface-200/80 bg-white p-5 shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
+              <div v-if="showSection.properties && resolvedCurrentApplication" class="mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-6' : '']">
+                <div class="rounded-xl border border-surface-200/80 bg-white p-4 shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
                   <div class="flex items-center gap-2.5 mb-4">
                     <div class="flex size-7 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-950/40">
                       <SlidersHorizontal class="size-3.5 text-brand-600 dark:text-brand-400" />
@@ -2590,7 +2575,7 @@ function closeDocPreview() {
               </div>
 
               <!-- NOTES SECTION -->
-              <div v-if="showSection.notes" class="space-y-3 mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-10' : '']">
+              <div v-if="showSection.notes" class="space-y-3 mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-6' : '']">
                 <h2 class="text-sm font-semibold text-surface-800 dark:text-surface-200 flex items-center gap-2 mb-3">
                   <StickyNote class="size-4 text-surface-400 dark:text-surface-500" />
                   Notes
@@ -2645,13 +2630,22 @@ function closeDocPreview() {
                   </button>
                 </div>
 
+                <!-- Empty (compact in overview) -->
+                <div
+                  v-else-if="notes.length === 0 && detailTab === 'overview'"
+                  class="flex items-center gap-2.5 rounded-lg border border-dashed border-surface-200 px-3.5 py-2.5 dark:border-surface-800/70"
+                >
+                  <StickyNote class="size-4 shrink-0 text-surface-300 dark:text-surface-600" />
+                  <p class="text-xs text-surface-400 dark:text-surface-500">No notes yet.</p>
+                </div>
+
                 <!-- Empty -->
                 <div
                   v-else-if="notes.length === 0"
-                  class="rounded-xl border border-surface-200/80 bg-white p-10 text-center shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none"
+                  class="rounded-xl border border-surface-200/80 bg-white px-6 py-9 text-center shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none"
                 >
-                  <div class="flex size-14 items-center justify-center rounded-2xl bg-surface-100 dark:bg-surface-800/60 mx-auto mb-3">
-                    <StickyNote class="size-6 text-surface-400 dark:text-surface-500" />
+                  <div class="flex size-11 items-center justify-center rounded-xl bg-surface-100 dark:bg-surface-800/60 mx-auto mb-3">
+                    <StickyNote class="size-5 text-surface-400 dark:text-surface-500" />
                   </div>
                   <p class="text-sm font-medium text-surface-600 dark:text-surface-300">No notes yet</p>
                   <p class="mt-1 text-xs text-surface-400 dark:text-surface-500">Notes you and your team write about this candidate appear here.</p>
@@ -2775,10 +2769,10 @@ function closeDocPreview() {
                 <!-- Empty -->
                 <div
                   v-else-if="timelineItems.length === 0"
-                  class="rounded-xl border border-surface-200/80 bg-white p-10 text-center shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none"
+                  class="rounded-xl border border-surface-200/80 bg-white px-6 py-9 text-center shadow-sm shadow-surface-900/[0.03] dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none"
                 >
-                  <div class="flex size-14 items-center justify-center rounded-2xl bg-surface-100 dark:bg-surface-800/60 mx-auto mb-3">
-                    <History class="size-6 text-surface-400 dark:text-surface-500" />
+                  <div class="flex size-11 items-center justify-center rounded-xl bg-surface-100 dark:bg-surface-800/60 mx-auto mb-3">
+                    <History class="size-5 text-surface-400 dark:text-surface-500" />
                   </div>
                   <p class="text-sm font-medium text-surface-600 dark:text-surface-300">No activity recorded yet.</p>
                   <p class="mt-1 text-xs text-surface-400 dark:text-surface-500">Activity for this candidate will appear here.</p>

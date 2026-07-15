@@ -224,10 +224,11 @@
     },
     "confirmation": {
       "metaTitle": "Candidature envoyée — Reqcore",
-      "title": "Candidature envoyée !",
-      "thanksWithTitle": "Merci d'avoir postulé pour le poste de {title}.",
-      "thanksPlain": "Merci pour votre candidature.",
-      "received": "Votre candidature a bien été reçue. L'équipe de recrutement l'examinera et vous recontactera en cas de correspondance.",
+      "title": "Candidature reçue",
+      "thanksWithTitle": "Merci d'avoir postulé au poste de {title}. Vos informations sont désormais entre les mains de l'équipe de recrutement.",
+      "thanksPlain": "Merci pour votre candidature. Vos informations sont désormais entre les mains de l'équipe de recrutement.",
+      "received": "Envoyée avec succès",
+      "backToCareerPage": "Retour aux carrières chez {name}",
       "browseMore": "Voir plus de postes",
       "backHome": "Retour à l'accueil"
     },

@@ -223,10 +223,11 @@
     },
     "confirmation": {
       "metaTitle": "Bewerbung eingereicht — Reqcore",
-      "title": "Bewerbung eingereicht!",
-      "thanksWithTitle": "Vielen Dank für Ihre Bewerbung auf die Stelle {title}.",
-      "thanksPlain": "Vielen Dank für Ihre Bewerbung.",
-      "received": "Ihre Bewerbung ist eingegangen. Das Team wird sie prüfen und sich bei einer Übereinstimmung bei Ihnen melden.",
+      "title": "Bewerbung eingegangen",
+      "thanksWithTitle": "Vielen Dank für Ihre Bewerbung auf {title}. Ihre Angaben liegen nun dem Einstellungsteam vor.",
+      "thanksPlain": "Vielen Dank für Ihre Bewerbung. Ihre Angaben liegen nun dem Einstellungsteam vor.",
+      "received": "Erfolgreich gesendet",
+      "backToCareerPage": "Zurück zur Karriereseite von {name}",
       "browseMore": "Weitere Stellen durchsuchen",
       "backHome": "Zurück zur Startseite"
     },

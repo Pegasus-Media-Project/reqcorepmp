@@ -309,8 +309,12 @@ test.describe('Candidate Application Flow — All Custom Question Field Types', 
       waitUntil: 'commit',
       timeout: 15_000,
     })
-    await expect(candidatePage.getByRole('heading', { name: 'Application Submitted!' })).toBeVisible()
-    await expect(candidatePage.getByText(JOB_TITLE)).toBeVisible()
+    await expect(candidatePage.getByRole('heading', { name: 'Application received' })).toBeVisible()
+    await expect(candidatePage.getByText(JOB_TITLE).first()).toBeVisible()
+    await expect(candidatePage.getByRole('link', { name: /Back to .+ careers/ })).toHaveAttribute(
+      'href',
+      /\/career\//,
+    )
 
     await candidatePage.close()
     await candidateContext.close()

@@ -297,7 +297,7 @@ async function assertUploadResult(
       waitUntil: 'commit',
       timeout: 15_000,
     })
-    await expect(page.getByRole('heading', { name: 'Application Submitted!' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Application received' })).toBeVisible()
   } else {
     // Server should reject with 400
     expect(status, `${fileConfig.label}: expected 400 but got ${status}`).toBe(400)

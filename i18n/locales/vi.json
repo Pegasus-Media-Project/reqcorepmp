@@ -224,10 +224,11 @@
     },
     "confirmation": {
       "metaTitle": "Đã gửi hồ sơ ứng tuyển — Reqcore",
-      "title": "Đã gửi hồ sơ ứng tuyển!",
-      "thanksWithTitle": "Cảm ơn bạn đã ứng tuyển vị trí {title}.",
-      "thanksPlain": "Cảm ơn bạn đã ứng tuyển.",
-      "received": "Hồ sơ ứng tuyển của bạn đã được tiếp nhận. Đội ngũ tuyển dụng sẽ xem xét và liên hệ lại nếu phù hợp.",
+      "title": "Đã nhận hồ sơ ứng tuyển",
+      "thanksWithTitle": "Cảm ơn bạn đã ứng tuyển vị trí {title}. Đội ngũ tuyển dụng hiện đã nhận được thông tin của bạn.",
+      "thanksPlain": "Cảm ơn bạn đã ứng tuyển. Đội ngũ tuyển dụng hiện đã nhận được thông tin của bạn.",
+      "received": "Đã gửi thành công",
+      "backToCareerPage": "Quay lại trang tuyển dụng của {name}",
       "browseMore": "Xem thêm vị trí khác",
       "backHome": "Về trang chủ"
     },

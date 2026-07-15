@@ -138,7 +138,7 @@ test.describe('Source Tracking — Query Parameter Propagation', () => {
       waitUntil: 'commit',
       timeout: 15_000,
     })
-    await expect(candidatePage.getByRole('heading', { name: 'Application Submitted!' })).toBeVisible()
+    await expect(candidatePage.getByRole('heading', { name: 'Application received' })).toBeVisible()
 
     await candidatePage.close()
     await candidateContext.close()
