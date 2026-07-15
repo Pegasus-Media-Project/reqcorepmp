@@ -466,6 +466,10 @@ function getAuth(): Auth {
                 subscription: {
                   enabled: true,
                   plans: buildStripePlans(env),
+                  // Let customers redeem Dashboard-managed promotion codes in Checkout.
+                  getCheckoutSessionParams: () => ({
+                    params: { allow_promotion_codes: true },
+                  }),
                   // Subscriptions are referenced by organization id; only
                   // members (owner/admin for mutations) of that org may act.
                   authorizeReference: async ({ user, referenceId, action }) =>
