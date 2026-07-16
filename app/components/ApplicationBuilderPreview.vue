@@ -6,8 +6,17 @@ type Question = {
   type: string
   label: string
   description?: string | null
+  content?: string | null
   required: boolean
   options?: string[] | null
+  sectionId?: string | null
+}
+
+type Section = {
+  id: string
+  title: string
+  description?: string | null
+  displayOrder: number
 }
 
 type ApplicationForm = {
@@ -15,6 +24,7 @@ type ApplicationForm = {
   requireResume: boolean
   requireCoverLetter: boolean
   questions: Question[]
+  sections?: Section[]
 }
 
 type JobDetails = {
@@ -169,6 +179,7 @@ const metadata = computed(() => {
           v-model:resume="previewResume"
           v-model:cover-letter="previewCover"
           :job="previewJob"
+          :sections="applicationForm.sections ?? []"
           mode="preview"
           @edit-field="emit('edit-field', $event)"
         />

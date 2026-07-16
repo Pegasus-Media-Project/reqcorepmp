@@ -405,6 +405,9 @@ type SwipeResponse = {
     label: string
     type: string
     options: string[] | null
+    sectionId?: string | null
+    displayOrder?: number | null
+    section?: { id: string, title: string, displayOrder: number } | null
   } | null
 }
 
@@ -453,6 +456,10 @@ const {
 // flashing the skeleton (and header fields don't vanish/reappear). Only before
 // the very first load is this null.
 const resolvedCurrentApplication = computed(() => currentApplication.value ?? null)
+
+// Group question responses by form page (section) to match the application form.
+const responseGroups = computed(() => groupResponsesBySection(resolvedCurrentApplication.value?.responses ?? []))
+const showResponsePages = computed(() => responseGroups.value.some(g => g.section))
 
 // True while what we're showing no longer belongs to the selected candidate,
 // i.e. a fetch for the newly selected candidate is still in flight.
@@ -2577,18 +2584,25 @@ function closeDocPreview() {
                   <MessageSquare class="size-4 text-surface-400 dark:text-surface-500" />
                   Responses
                 </h2>                <template v-if="resolvedCurrentApplication?.responses?.length">
-                  <div class="divide-y divide-surface-100 rounded-xl border border-surface-200/80 bg-white shadow-sm shadow-surface-900/[0.03] dark:divide-surface-800/60 dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
-                    <div
-                      v-for="response in resolvedCurrentApplication.responses"
-                      :key="response.id"
-                      class="px-4 py-3"
-                    >
-                      <p class="text-[11px] font-semibold text-surface-400 dark:text-surface-500 uppercase tracking-wider mb-1">
-                        {{ response.question?.label ?? 'Unknown question' }}
+                  <div class="space-y-4">
+                    <div v-for="grp in responseGroups" :key="grp.section?.id ?? '__default'">
+                      <p v-if="showResponsePages" class="text-[11px] font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider mb-1.5">
+                        {{ grp.section?.title ?? 'General' }}
                       </p>
-                      <p class="text-sm text-surface-700 dark:text-surface-200 leading-relaxed">
-                        {{ formatResponseValue(response.value) }}
-                      </p>
+                      <div class="divide-y divide-surface-100 rounded-xl border border-surface-200/80 bg-white shadow-sm shadow-surface-900/[0.03] dark:divide-surface-800/60 dark:border-surface-800/60 dark:bg-surface-900 dark:shadow-none">
+                        <div
+                          v-for="response in grp.responses"
+                          :key="response.id"
+                          class="px-4 py-3"
+                        >
+                          <p class="text-[11px] font-semibold text-surface-400 dark:text-surface-500 uppercase tracking-wider mb-1">
+                            {{ response.question?.label ?? 'Unknown question' }}
+                          </p>
+                          <p class="text-sm text-surface-700 dark:text-surface-200 leading-relaxed">
+                            {{ formatResponseValue(response.value) }}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </template>
