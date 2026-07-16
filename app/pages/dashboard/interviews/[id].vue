@@ -4,7 +4,7 @@ import {
   FileText, UsersRound, CheckCircle2, XCircle, AlertTriangle,
   UserRound, Briefcase, Pencil, MapPin, Users, MessageSquare,
   Save, X, Mail, Send, CheckCheck, ChevronDown, ExternalLink,
-  Check, AlertCircle, UserPlus,
+  Check, AlertCircle, UserPlus, Star,
 } from 'lucide-vue-next'
 
 definePageMeta({
@@ -515,6 +515,15 @@ const localePath = useLocalePath()
             </button>
           </li>
         </ul>
+      </div>
+
+      <!-- Reviewer ratings -->
+      <div class="mb-6 rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
+        <div class="flex items-center gap-2 mb-3">
+          <Star class="size-4 text-surface-500 dark:text-surface-400" />
+          <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Reviews</h2>
+        </div>
+        <ReviewPanel :application-id="interview.applicationId" status="interview" />
       </div>
 
       <!-- Quick actions -->

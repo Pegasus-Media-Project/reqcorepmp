@@ -64,10 +64,14 @@ const memberSearch = ref('')
 const membersPerPage = 20
 const visibleCount = ref(membersPerPage)
 
+// Guests are managed in their own section, not the team-members list.
+const teamMembers = computed(() => members.value.filter(m => m.role !== 'guest'))
+const guestMembers = computed(() => members.value.filter(m => m.role === 'guest'))
+
 const filteredMembers = computed(() => {
   const q = memberSearch.value.trim().toLowerCase()
-  if (!q) return members.value
-  return members.value.filter(m =>
+  if (!q) return teamMembers.value
+  return teamMembers.value.filter(m =>
     m.user.name?.toLowerCase().includes(q)
     || m.user.email?.toLowerCase().includes(q)
     || m.role.toLowerCase().includes(q),
@@ -164,6 +168,15 @@ async function fetchInvitations() {
   finally {
     isLoadingInvitations.value = false
   }
+}
+
+// Split pending invitations: guests get their own section.
+const teamInvitations = computed(() => pendingInvitations.value.filter(inv => inv.role !== 'guest'))
+const guestInvitations = computed(() => pendingInvitations.value.filter(inv => inv.role === 'guest'))
+
+function refreshGuestData() {
+  fetchMembers()
+  fetchInvitations()
 }
 
 onMounted(fetchInvitations)
@@ -656,7 +669,7 @@ onUnmounted(() => {
     </Transition>
 
     <!-- Pending invitations -->
-    <section v-if="canInvite && (isLoadingInvitations || pendingInvitations.length > 0)" class="mb-6 rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 overflow-hidden">
+    <section v-if="canInvite && (isLoadingInvitations || teamInvitations.length > 0)" class="mb-6 rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 overflow-hidden">
       <div class="px-4 sm:px-6 py-4 border-b border-surface-200 dark:border-surface-800">
         <div class="flex items-center gap-3">
           <div class="flex items-center justify-center size-8 rounded-lg bg-warning-50 dark:bg-warning-950 text-warning-600 dark:text-warning-400">
@@ -665,7 +678,7 @@ onUnmounted(() => {
           <div>
             <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Pending invitations</h2>
             <p class="text-xs text-surface-500 dark:text-surface-400">
-              {{ isLoadingInvitations ? 'Loading…' : `${pendingInvitations.length} pending` }}
+              {{ isLoadingInvitations ? 'Loading…' : `${teamInvitations.length} pending` }}
             </p>
           </div>
         </div>
@@ -689,7 +702,7 @@ onUnmounted(() => {
       <!-- Invitations list -->
       <div v-else class="divide-y divide-surface-100 dark:divide-surface-800">
         <div
-          v-for="inv in pendingInvitations"
+          v-for="inv in teamInvitations"
           :key="inv.id"
           class="px-4 sm:px-6 py-3.5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors"
         >
@@ -1060,7 +1073,7 @@ onUnmounted(() => {
             <div>
               <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">Team members</h2>
               <p class="text-sm text-surface-500 dark:text-surface-400">
-                {{ isLoadingMembers ? 'Loading…' : `${members.length} member${members.length !== 1 ? 's' : ''}` }}
+                {{ isLoadingMembers ? 'Loading…' : `${teamMembers.length} member${teamMembers.length !== 1 ? 's' : ''}` }}
               </p>
             </div>
           </div>
@@ -1218,6 +1231,14 @@ onUnmounted(() => {
         </div>
       </div>
     </section>
+
+    <!-- Guest reviewers (separate from team members) -->
+    <GuestManagementSection
+      v-if="canInvite"
+      :guests="guestMembers"
+      :pending="guestInvitations"
+      @changed="refreshGuestData"
+    />
 
     <!-- Remove member confirmation modal -->
     <Teleport to="body">

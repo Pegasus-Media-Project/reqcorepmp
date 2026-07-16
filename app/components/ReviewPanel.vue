@@ -16,6 +16,13 @@ const STAGES: { key: ReviewStage, label: string }[] = [
   { key: 'interview', label: 'Interview' },
 ]
 
+// The interview review only appears once the applicant has reached the
+// interview stage (interview / offer / hired). Screening is always available.
+const INTERVIEW_REACHED = new Set(['interview', 'offer', 'hired'])
+const visibleStages = computed(() =>
+  STAGES.filter(s => s.key !== 'interview' || INTERVIEW_REACHED.has(props.status ?? '')),
+)
+
 // Local editable state per stage, seeded from the user's existing review.
 interface Draft { rating: number | null, notes: string }
 const drafts = reactive<Record<ReviewStage, Draft>>({
@@ -67,7 +74,7 @@ function othersFor(stage: ReviewStage) {
 <template>
   <div class="space-y-6">
     <div
-      v-for="s in STAGES"
+      v-for="s in visibleStages"
       :key="s.key"
       class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-950 p-4"
       :class="status === s.key ? 'ring-1 ring-brand-300 dark:ring-brand-700' : ''"

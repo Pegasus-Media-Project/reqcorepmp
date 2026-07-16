@@ -30,6 +30,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
     /^\/dashboard\/jobs\/[^/]+(\/.*)?$/, // a job + its sub-pages (pipeline, ratings, …)
     /^\/dashboard\/applications\/[^/]+$/, // an application detail
     /^\/dashboard\/interviews(\/[^/]+)?$/, // interview list/detail
+    /^\/dashboard\/ratings$/, // global ratings (job selector; scoped server-side)
   ]
   if (allowed.some(re => re.test(rel))) return
 

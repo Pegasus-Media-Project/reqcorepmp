@@ -4,7 +4,7 @@ import {
   Building2, Code2, FileText, UsersRound, MoreHorizontal,
   CheckCircle2, XCircle, AlertTriangle, UserRound, Briefcase,
   Pencil, Trash2, MapPin, Users, CalendarDays,
-  Mail, ExternalLink, UserPlus, Check,
+  Mail, ExternalLink, UserPlus, Check, Star,
 } from 'lucide-vue-next'
 
 definePageMeta({
@@ -40,8 +40,25 @@ type InterviewStatus = typeof STATUS_OPTIONS[number]
 const activeStatus = ref<InterviewStatus | undefined>(undefined)
 const activeView = ref<'list' | 'calendar'>('list')
 
+// Scope: all / my interviews / today.
+const activeScope = ref<'all' | 'mine' | 'today'>('all')
+const scopeParam = computed(() => activeScope.value === 'mine' ? 'mine' : undefined)
+const fromParam = computed(() => {
+  if (activeScope.value !== 'today') return undefined
+  const d = new Date(); d.setHours(0, 0, 0, 0)
+  return d.toISOString()
+})
+const toParam = computed(() => {
+  if (activeScope.value !== 'today') return undefined
+  const d = new Date(); d.setHours(23, 59, 59, 999)
+  return d.toISOString()
+})
+
 const { interviews, total, status: fetchStatus, error, refresh, updateInterview, deleteInterviewById } = useInterviews({
   status: activeStatus,
+  scope: scopeParam,
+  from: fromParam,
+  to: toParam,
   limit: 100,
 })
 
@@ -344,6 +361,21 @@ const statusCounts = computed(() => {
         </button>
       </div>
 
+      <!-- Scope pills -->
+      <div class="flex items-center rounded-lg border border-surface-200 dark:border-surface-700 overflow-hidden">
+        <button
+          v-for="sc in (['all', 'mine', 'today'] as const)"
+          :key="sc"
+          class="px-3 py-1.5 text-xs font-medium transition-all cursor-pointer capitalize"
+          :class="activeScope === sc
+            ? 'bg-brand-600 text-white'
+            : 'bg-white dark:bg-surface-800 text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-700'"
+          @click="activeScope = sc"
+        >
+          {{ sc === 'mine' ? 'My interviews' : sc === 'today' ? 'Today' : 'All' }}
+        </button>
+      </div>
+
       <!-- Status pills -->
       <div class="flex items-center gap-1.5">
         <button
@@ -520,6 +552,20 @@ const statusCounts = computed(() => {
                   >
                     <span class="size-1.5 rounded-full" :class="statusConfig[interviewItem.status]?.dot" />
                     {{ statusConfig[interviewItem.status]?.label }}
+                  </span>
+                  <span
+                    v-if="interviewItem.interviewAvg != null"
+                    class="inline-flex items-center gap-0.5 rounded-full bg-surface-100 dark:bg-surface-800 px-2 py-0.5 text-[10px] font-semibold text-surface-600 dark:text-surface-300"
+                    title="Average interview rating"
+                  >
+                    <Star class="size-2.5 fill-amber-400 text-amber-400" /> {{ interviewItem.interviewAvg.toFixed(1) }}
+                  </span>
+                  <span
+                    v-if="interviewItem.myRating != null"
+                    class="inline-flex items-center gap-0.5 rounded-full bg-brand-50 dark:bg-brand-950/40 px-2 py-0.5 text-[10px] font-semibold text-brand-600 dark:text-brand-300"
+                    title="Your interview rating"
+                  >
+                    You {{ interviewItem.myRating }}
                   </span>
                 </div>
 

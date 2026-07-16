@@ -38,7 +38,7 @@ export default defineEventHandler(async (event) => {
 
   // Pending invitations bound to this job.
   const pending = await db
-    .select({ email: reviewerInvite.email, createdAt: reviewerInvite.createdAt })
+    .select({ email: reviewerInvite.email, invitationId: reviewerInvite.invitationId, createdAt: reviewerInvite.createdAt })
     .from(reviewerInvite)
     .where(and(
       eq(reviewerInvite.organizationId, orgId),

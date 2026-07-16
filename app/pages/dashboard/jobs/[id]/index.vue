@@ -416,6 +416,7 @@ type SwipeApplicationDetail = {
   status: string
   score: number | null
   notes: string | null
+  confirmationCode: string | null
   coverLetterText: string | null
   createdAt: string | Date
   updatedAt: string | Date
@@ -1928,6 +1929,14 @@ function closeDocPreview() {
                         <Phone class="size-3.5" />
                         {{ resolvedCurrentApplication.candidate.phone }}
                       </span>
+                      <span
+                        v-if="resolvedCurrentApplication?.confirmationCode"
+                        class="inline-flex items-center gap-1.5 font-mono text-[11px] tracking-wide text-surface-500 dark:text-surface-400"
+                        title="Confirmation code"
+                      >
+                        <Hash class="size-3.5" />
+                        {{ resolvedCurrentApplication.confirmationCode }}
+                      </span>
                       <TimelineDateLink :date="currentSummary.createdAt" class="inline-flex items-center gap-1 text-[11px] text-surface-400 dark:text-surface-500">
                         <Clock class="size-3" />
                         Applied {{ new Date(currentSummary.createdAt).toLocaleDateString() }}
@@ -2144,19 +2153,9 @@ function closeDocPreview() {
                 />
               </div>
 
-              <!-- REVIEWER RATINGS SECTION -->
-              <div v-if="showSection.reviews" class="mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-6' : '']">
-                <div class="flex items-center gap-2 mb-3">
-                  <Star class="size-4 text-surface-400 dark:text-surface-500" />
-                  <h2 class="text-sm font-semibold text-surface-800 dark:text-surface-200">Reviews</h2>
-                </div>
-                <ReviewPanel
-                  v-if="currentSummary"
-                  :key="currentSummary.id"
-                  :application-id="currentSummary.id"
-                  :status="currentSummary.status"
-                />
-              </div>
+              <!-- OVERVIEW BODY: application sections (left) + reviews rail (right) -->
+              <div :class="detailTab === 'overview' ? 'xl:flex xl:gap-6 xl:items-start' : ''">
+                <div class="min-w-0 xl:flex-1">
 
               <!-- INTERVIEWS SECTION -->
               <div v-if="showSection.interviews" ref="interviewsRef" class="space-y-3 mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-6' : '']">
@@ -2801,6 +2800,26 @@ function closeDocPreview() {
                   </div>
                 </div>
               </div>
+                </div><!-- /left column -->
+
+                <!-- REVIEWER RATINGS SECTION (right rail on overview) -->
+                <div
+                  v-if="showSection.reviews"
+                  class="mt-6 xl:mt-0"
+                  :class="detailTab === 'overview' ? 'xl:w-[360px] xl:shrink-0 xl:sticky xl:top-2' : 'mx-auto ' + detailWidthClass"
+                >
+                  <div class="flex items-center gap-2 mb-3">
+                    <Star class="size-4 text-surface-400 dark:text-surface-500" />
+                    <h2 class="text-sm font-semibold text-surface-800 dark:text-surface-200">Reviews</h2>
+                  </div>
+                  <ReviewPanel
+                    v-if="currentSummary"
+                    :key="currentSummary.id"
+                    :application-id="currentSummary.id"
+                    :status="currentSummary.status"
+                  />
+                </div>
+              </div><!-- /overview body wrapper -->
 
               <!-- TIMELINE SECTION -->
               <div v-if="showSection.timeline" class="space-y-3 mx-auto" :class="detailWidthClass">

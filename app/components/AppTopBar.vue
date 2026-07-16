@@ -113,7 +113,7 @@ const isGuest = computed(() => memberRole.value === 'guest')
 // Job sub-tabs a guest may see (review-only, no editing/settings).
 const GUEST_JOB_TABS = new Set(['Pipeline', 'Table', 'Ratings'])
 // Top-level nav a guest may see.
-const GUEST_NAV = new Set(['Jobs', 'Interviews'])
+const GUEST_NAV = new Set(['Jobs', 'Interviews', 'Ratings'])
 
 const jobTabs = computed(() => {
   if (!activeJobId.value) return []
@@ -140,6 +140,7 @@ const mainNav: Array<{ label: string; to: string; icon: typeof Briefcase; exact:
   { label: 'Candidates', to: '/dashboard/candidates', icon: Users, exact: false },
   { label: 'Applications', to: '/dashboard/applications', icon: FileText, exact: false },
   { label: 'Interviews', to: '/dashboard/interviews', icon: Calendar, exact: false },
+  { label: 'Ratings', to: '/dashboard/ratings', icon: Star, exact: false },
   { label: 'Timeline', to: '/dashboard/timeline', icon: History, exact: true, feature: 'activityTimeline' },
   { label: 'Source Tracking', to: '/dashboard/source-tracking', icon: Radio, exact: true, feature: 'sourceAnalytics' },
   { label: 'AI Analysis', to: '/dashboard/ai-analysis', icon: Sparkles, exact: true, feature: 'aiAnalytics' },
@@ -184,7 +185,7 @@ function isActiveRoute(to: string, exact: boolean) {
   return route.path === localizedTo || route.path.startsWith(`${localizedTo}/`)
 }
 
-const primaryNavLabels = ['Dashboard', 'Jobs', 'Candidates', 'Applications', 'Interviews', 'Settings']
+const primaryNavLabels = ['Dashboard', 'Jobs', 'Candidates', 'Applications', 'Interviews', 'Ratings', 'Settings']
 const primaryNavItems = computed(() => navItems.value.filter(i => primaryNavLabels.includes(i.label)))
 const moreNavItems = computed(() => navItems.value.filter(i => !primaryNavLabels.includes(i.label)))
 

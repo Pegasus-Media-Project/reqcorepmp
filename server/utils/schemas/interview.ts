@@ -53,6 +53,8 @@ export const interviewQuerySchema = z.object({
   status: z.enum(interviewStatuses).optional(),
   from: z.string().datetime().optional(),
   to: z.string().datetime().optional(),
+  /** `mine` = interviews I'm an assigned reviewer, interviewer email, or creator of. */
+  scope: z.enum(['mine']).optional(),
 })
 
 /** Reusable schema for `:id` route params */

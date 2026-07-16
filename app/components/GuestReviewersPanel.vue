@@ -6,7 +6,7 @@ const props = defineProps<{ jobId: string }>()
 const toast = useToast()
 
 interface GuestRow { userId: string; name: string | null; email: string; image: string | null }
-interface PendingRow { email: string; createdAt: string }
+interface PendingRow { email: string; invitationId: string; createdAt: string }
 
 const { data, refresh, status } = useFetch<{ active: GuestRow[]; pending: PendingRow[] }>(
   () => `/api/jobs/${props.jobId}/guests`,
@@ -47,6 +47,16 @@ async function revoke(userId: string) {
   }
   catch (err: any) {
     toast.error('Failed to revoke access', { message: err?.data?.statusMessage })
+  }
+}
+
+async function cancelInvite(invitationId: string) {
+  try {
+    await $fetch(`/api/guests/invitations/${invitationId}`, { method: 'DELETE' })
+    await refresh()
+  }
+  catch (err: any) {
+    toast.error('Failed to cancel invitation', { message: err?.data?.statusMessage })
   }
 }
 </script>
@@ -116,12 +126,19 @@ async function revoke(userId: string) {
         <ul class="space-y-2">
           <li
             v-for="p in pending"
-            :key="p.email"
+            :key="p.invitationId + p.email"
             class="flex items-center gap-3 rounded-lg border border-dashed border-surface-200 dark:border-surface-800 px-3 py-2"
           >
             <Mail class="size-4 text-surface-400" />
             <span class="min-w-0 flex-1 truncate text-sm text-surface-600 dark:text-surface-300">{{ p.email }}</span>
             <span class="rounded-full bg-surface-100 dark:bg-surface-800 px-2 py-0.5 text-[10px] font-medium text-surface-500 dark:text-surface-400">Pending</span>
+            <button
+              class="text-surface-400 hover:text-danger-600 dark:hover:text-danger-400 transition-colors"
+              title="Cancel invitation"
+              @click="cancelInvite(p.invitationId)"
+            >
+              <X class="size-4" />
+            </button>
           </li>
         </ul>
       </div>

@@ -1,5 +1,5 @@
-import { and, asc, eq } from 'drizzle-orm'
-import { application, candidate, job, review, user } from '../database/schema'
+import { and, asc, eq, inArray } from 'drizzle-orm'
+import { application, candidate, interview, job, review, user } from '../database/schema'
 
 export interface ReviewerRow {
   reviewerId: string
@@ -14,8 +14,12 @@ export interface ReviewerRow {
 export interface ApplicantAggregate {
   applicationId: string
   candidateName: string
+  firstName: string
+  lastName: string
   candidateEmail: string
   status: string
+  /** Next upcoming interview, else the most recent one; null if none. */
+  nextInterviewAt: Date | null
   screeningAvg: number | null
   screeningCount: number
   interviewAvg: number | null
@@ -25,10 +29,23 @@ export interface ApplicantAggregate {
   reviews: ReviewerRow[]
 }
 
+/** How far each reviewer has progressed through the job's applicants. */
+export interface ReviewerProgress {
+  id: string
+  name: string | null
+  email: string
+  /** Distinct applicants this reviewer has scored/noted at each stage. */
+  screeningCount: number
+  interviewCount: number
+  /** Total applicants on the job (the denominator). */
+  totalApplicants: number
+}
+
 export interface JobReviewAggregate {
   jobTitle: string
   applicants: ApplicantAggregate[]
   reviewers: { id: string, name: string | null, email: string }[]
+  reviewerProgress: ReviewerProgress[]
 }
 
 function avg(values: number[]): number | null {
@@ -39,9 +56,10 @@ function avg(values: number[]): number | null {
 
 /**
  * Build the per-applicant review aggregate for a job: average screening score,
- * average interview score, counts, and the full per-reviewer breakdown. Every
+ * average interview score, counts, the full per-reviewer breakdown, each
+ * applicant's next/last interview time, and per-reviewer progress. Every
  * applicant for the job is included (even with no reviews yet). Shared by the
- * ratings-tab endpoint and the CSV/XLSX export so both stay consistent.
+ * ratings tab, the global ratings page, and the CSV/XLSX export.
  *
  * Caller is responsible for permission + job-scope checks.
  */
@@ -81,8 +99,38 @@ export async function buildJobReviewAggregate(orgId: string, jobId: string): Pro
       .where(and(eq(review.organizationId, orgId), eq(review.jobId, jobId))),
   ])
 
+  const appIds = apps.map(a => a.applicationId)
+
+  // Interviews for these applications → each applicant's next/last scheduled time.
+  const interviewRows = appIds.length > 0
+    ? await db
+        .select({ applicationId: interview.applicationId, scheduledAt: interview.scheduledAt })
+        .from(interview)
+        .where(and(eq(interview.organizationId, orgId), inArray(interview.applicationId, appIds)))
+    : []
+  const now = new Date()
+  const nextInterviewByApp = new Map<string, Date>()
+  for (const iv of interviewRows) {
+    const existing = nextInterviewByApp.get(iv.applicationId)
+    if (!existing) {
+      nextInterviewByApp.set(iv.applicationId, iv.scheduledAt)
+      continue
+    }
+    // Prefer the soonest upcoming interview; otherwise keep the latest one.
+    const existingUpcoming = existing >= now
+    const candidateUpcoming = iv.scheduledAt >= now
+    if (candidateUpcoming && (!existingUpcoming || iv.scheduledAt < existing)) {
+      nextInterviewByApp.set(iv.applicationId, iv.scheduledAt)
+    }
+    else if (!existingUpcoming && !candidateUpcoming && iv.scheduledAt > existing) {
+      nextInterviewByApp.set(iv.applicationId, iv.scheduledAt)
+    }
+  }
+
   const reviewsByApp = new Map<string, ReviewerRow[]>()
   const reviewerMap = new Map<string, { id: string, name: string | null, email: string }>()
+  // Per-reviewer distinct applications rated, by stage.
+  const progress = new Map<string, { name: string | null, email: string, screening: Set<string>, interview: Set<string> }>()
   for (const r of reviewRows) {
     const list = reviewsByApp.get(r.applicationId) ?? []
     list.push({
@@ -98,6 +146,9 @@ export async function buildJobReviewAggregate(orgId: string, jobId: string): Pro
     if (!reviewerMap.has(r.reviewerId)) {
       reviewerMap.set(r.reviewerId, { id: r.reviewerId, name: r.reviewerName, email: r.reviewerEmail })
     }
+    const p = progress.get(r.reviewerId) ?? { name: r.reviewerName, email: r.reviewerEmail, screening: new Set<string>(), interview: new Set<string>() }
+    p[r.stage].add(r.applicationId)
+    progress.set(r.reviewerId, p)
   }
 
   const applicants: ApplicantAggregate[] = apps.map((a) => {
@@ -108,8 +159,11 @@ export async function buildJobReviewAggregate(orgId: string, jobId: string): Pro
     return {
       applicationId: a.applicationId,
       candidateName: (a.displayName ?? `${a.firstName} ${a.lastName}`).trim(),
+      firstName: a.firstName,
+      lastName: a.lastName,
       candidateEmail: a.email,
       status: a.status,
+      nextInterviewAt: nextInterviewByApp.get(a.applicationId) ?? null,
       screeningAvg: avg(screeningScores),
       screeningCount: screeningScores.length,
       interviewAvg: avg(interviewScores),
@@ -120,9 +174,19 @@ export async function buildJobReviewAggregate(orgId: string, jobId: string): Pro
     }
   })
 
+  const reviewerProgress: ReviewerProgress[] = [...progress.entries()].map(([id, p]) => ({
+    id,
+    name: p.name,
+    email: p.email,
+    screeningCount: p.screening.size,
+    interviewCount: p.interview.size,
+    totalApplicants: apps.length,
+  }))
+
   return {
     jobTitle: jobRow?.title ?? 'job',
     applicants,
     reviewers: [...reviewerMap.values()],
+    reviewerProgress,
   }
 }

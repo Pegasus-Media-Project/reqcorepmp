@@ -417,6 +417,15 @@ onUnmounted(() => {
               <p v-else class="text-sm text-surface-400 italic">No notes yet.</p>
             </div>
 
+            <!-- Reviewer ratings -->
+            <div class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
+              <div class="flex items-center gap-2 mb-3">
+                <Star class="size-4 text-surface-500 dark:text-surface-400" />
+                <h3 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Reviews</h3>
+              </div>
+              <ReviewPanel :application-id="applicationId" :status="application.status" />
+            </div>
+
             <!-- Properties -->
             <div class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-4">
               <h3 class="text-sm font-semibold text-surface-700 dark:text-surface-200 mb-2 px-2">Properties</h3>

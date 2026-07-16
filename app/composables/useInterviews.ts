@@ -26,6 +26,10 @@ export interface Interview {
   jobTitle: string
   createdAt: string
   updatedAt: string
+  /** Avg interview-stage reviewer rating for this applicant (null if none). */
+  interviewAvg?: number | null
+  /** The current user's interview-stage rating for this applicant. */
+  myRating?: number | null
 }
 
 interface InterviewListResponse {
@@ -44,6 +48,7 @@ export function useInterviews(options?: {
   status?: MaybeRefOrGetter<string | undefined>
   from?: MaybeRefOrGetter<string | undefined>
   to?: MaybeRefOrGetter<string | undefined>
+  scope?: MaybeRefOrGetter<string | undefined>
   limit?: MaybeRefOrGetter<number | undefined>
 }) {
   const { handlePreviewReadOnlyError } = usePreviewReadOnly()
@@ -69,6 +74,10 @@ export function useInterviews(options?: {
     if (options?.to) {
       const v = toValue(options.to)
       if (v) q.to = v
+    }
+    if (options?.scope) {
+      const v = toValue(options.scope)
+      if (v) q.scope = v
     }
     if (options?.limit) {
       const v = toValue(options.limit)

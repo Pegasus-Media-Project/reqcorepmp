@@ -1,10 +1,12 @@
-import { and, count, desc, eq, gte, lte } from 'drizzle-orm'
-import { interview, application, candidate, job } from '../../database/schema'
+import { and, count, desc, eq, gte, inArray, lte, or, sql } from 'drizzle-orm'
+import { interview, interviewReviewer, application, candidate, job, review } from '../../database/schema'
 import { interviewQuerySchema } from '../../utils/schemas/interview'
 
 export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { interview: ['read'] })
   const orgId = session.session.activeOrganizationId
+  const userId = session.user.id
+  const userEmail = (session.user.email ?? '').toLowerCase()
 
   const query = await getValidatedQuery(event, interviewQuerySchema.parse)
 
@@ -24,6 +26,20 @@ export default defineEventHandler(async (event) => {
   }
   if (query.to) {
     conditions.push(lte(interview.scheduledAt, new Date(query.to)))
+  }
+
+  // "My interviews": assigned reviewer OR interviewer email OR creator.
+  if (query.scope === 'mine') {
+    const myReviewerInterviews = db
+      .select({ interviewId: interviewReviewer.interviewId })
+      .from(interviewReviewer)
+      .where(and(eq(interviewReviewer.organizationId, orgId), eq(interviewReviewer.userId, userId)))
+    const mineCondition = or(
+      inArray(interview.id, myReviewerInterviews),
+      eq(interview.createdById, userId),
+      ...(userEmail ? [sql`${interview.interviewers}::jsonb ? ${userEmail}`] : []),
+    )
+    if (mineCondition) conditions.push(mineCondition)
   }
 
   const whereClause = and(...conditions)
@@ -72,5 +88,34 @@ export default defineEventHandler(async (event) => {
       .then(rows => rows[0]?.count ?? 0),
   ])
 
-  return { data, total, page: query.page, limit: query.limit }
+  // Attach the applicant's interview-stage rating summary to each row.
+  const appIds = [...new Set(data.map(d => d.applicationId))]
+  const reviewRows = appIds.length > 0
+    ? await db
+        .select({ applicationId: review.applicationId, rating: review.rating, reviewerId: review.reviewerId })
+        .from(review)
+        .where(and(
+          eq(review.organizationId, orgId),
+          eq(review.stage, 'interview'),
+          inArray(review.applicationId, appIds),
+        ))
+    : []
+  const byApp = new Map<string, { sum: number, n: number, mine: number | null }>()
+  for (const r of reviewRows) {
+    const e = byApp.get(r.applicationId) ?? { sum: 0, n: 0, mine: null }
+    if (r.rating != null) { e.sum += r.rating; e.n += 1 }
+    if (r.reviewerId === userId && r.rating != null) e.mine = r.rating
+    byApp.set(r.applicationId, e)
+  }
+
+  const enriched = data.map((d) => {
+    const e = byApp.get(d.applicationId)
+    return {
+      ...d,
+      interviewAvg: e && e.n > 0 ? Math.round((e.sum / e.n) * 10) / 10 : null,
+      myRating: e?.mine ?? null,
+    }
+  })
+
+  return { data: enriched, total, page: query.page, limit: query.limit }
 })
