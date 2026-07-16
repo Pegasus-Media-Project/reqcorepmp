@@ -176,6 +176,14 @@ function formatResponseValue(value: unknown): string {
           <TimelineDateLink :date="application.createdAt" class="text-sm text-surface-500 dark:text-surface-400">
             Applied {{ new Date(application.createdAt).toLocaleDateString() }}
           </TimelineDateLink>
+          <span
+            v-if="application.confirmationCode"
+            class="inline-flex items-center gap-1.5 text-sm text-surface-500 dark:text-surface-400"
+            title="Applicant's confirmation code — they use this to check status"
+          >
+            <span class="text-surface-400">Code</span>
+            <span class="font-mono font-medium tracking-wider text-surface-700 dark:text-surface-300">{{ application.confirmationCode }}</span>
+          </span>
         </div>
       </div>
 

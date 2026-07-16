@@ -15,8 +15,14 @@ const { data: session } = await authClient.useSession(useFetch)
           <img src="/pegasus-logo.png" alt="Pegasus Media Project" class="h-8 w-auto object-contain" />
         </NuxtLink>
 
-        <!-- Auth actions -->
-        <div class="flex items-center gap-2">
+        <!-- Nav + auth actions -->
+        <div class="flex items-center gap-2 sm:gap-3">
+          <NuxtLink
+            to="/status"
+            class="rounded-md px-2.5 py-1.5 text-[13px] font-medium text-surface-600 transition hover:text-surface-900 no-underline"
+          >
+            Check status
+          </NuxtLink>
           <template v-if="session?.user">
             <NuxtLink
               :to="localePath('/dashboard')"
