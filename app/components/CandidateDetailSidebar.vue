@@ -40,9 +40,19 @@ const activeTab = ref<'overview' | 'documents' | 'responses' | 'ai_analysis' | '
   props.initialTab ?? 'overview',
 )
 
+// AI resume scoring is hidden by default; its tab/score are suppressed.
+const aiScoringEnabled = useFeatureFlagEnabled('ai-scoring')
+
 watch(() => props.applicationId, () => {
   activeTab.value = props.initialTab ?? 'overview'
 })
+
+// If AI scoring is off, never leave the user stranded on the hidden tab.
+watch([aiScoringEnabled, activeTab], () => {
+  if (!aiScoringEnabled.value && activeTab.value === 'ai_analysis') {
+    activeTab.value = 'overview'
+  }
+}, { immediate: true })
 
 // ─────────────────────────────────────────────
 // Fetch application detail
@@ -549,6 +559,7 @@ function formatInterviewDate(dateStr: string) {
             Responses ({{ responsesCount }})
           </button>
           <button
+            v-if="aiScoringEnabled"
             class="cursor-pointer px-3 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px inline-flex items-center gap-1.5"
             :class="activeTab === 'ai_analysis'
               ? 'border-brand-600 text-brand-600'
@@ -669,7 +680,7 @@ function formatInterviewDate(dateStr: string) {
                 <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">Details</h3>
               </div>
               <dl class="grid grid-cols-2 gap-4 text-sm">
-                <div>
+                <div v-if="aiScoringEnabled">
                   <dt class="text-xs font-medium text-surface-400 dark:text-surface-500 mb-1">Score</dt>
                   <dd class="text-surface-800 dark:text-surface-200 font-medium">
                     {{ application.score ?? '—' }}
@@ -1039,7 +1050,7 @@ function formatInterviewDate(dateStr: string) {
           <!-- ═══════════════════════════════════════ -->
           <!-- AI ANALYSIS TAB                         -->
           <!-- ═══════════════════════════════════════ -->
-          <div v-if="activeTab === 'ai_analysis'">
+          <div v-if="activeTab === 'ai_analysis' && aiScoringEnabled">
             <ScoreBreakdown :application-id="props.applicationId" @scored="refresh(); emit('updated')" />
           </div>
 

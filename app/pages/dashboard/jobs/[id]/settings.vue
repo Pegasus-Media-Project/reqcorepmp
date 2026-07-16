@@ -645,6 +645,13 @@ function onSalaryMaxChange(e: Event) {
       </div>
 
       <!-- ═══════════════════════════════════════ -->
+      <!-- SECTION: Guest reviewers                 -->
+      <!-- ═══════════════════════════════════════ -->
+      <div v-if="canManageAccess" class="mb-12">
+        <GuestReviewersPanel :job-id="jobId" />
+      </div>
+
+      <!-- ═══════════════════════════════════════ -->
       <!-- DANGER ZONE                              -->
       <!-- ═══════════════════════════════════════ -->
       <section class="rounded-xl border border-danger-200 dark:border-danger-800/60 bg-danger-50/50 dark:bg-danger-950/20 p-6 mb-12">

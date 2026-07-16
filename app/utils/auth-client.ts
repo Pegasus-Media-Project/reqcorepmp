@@ -5,14 +5,14 @@ import {
 } from "better-auth/client/plugins";
 import { ssoClient } from "@better-auth/sso/client";
 import { stripeClient } from "@better-auth/stripe/client";
-import { ac, owner, admin, member } from "~~/shared/permissions";
+import { ac, owner, admin, member, guest } from "~~/shared/permissions";
 
 export const authClient = createAuthClient({
   plugins: [
     genericOAuthClient(),
     organizationClient({
       ac,
-      roles: { owner, admin, member },
+      roles: { owner, admin, member, guest },
     }),
     ssoClient(),
     // Always registered on the client; the subscription endpoints return errors

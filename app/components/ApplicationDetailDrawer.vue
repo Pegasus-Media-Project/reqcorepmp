@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { X, ExternalLink, User, Briefcase, Calendar, Clock, Hash, FileText, MessageSquare } from 'lucide-vue-next'
+import { X, ExternalLink, User, Briefcase, Calendar, Clock, Hash, FileText, MessageSquare, Star } from 'lucide-vue-next'
 import { APPLICATION_STATUS_TRANSITIONS } from '~~/shared/status-transitions'
 import { usePreviewReadOnly } from '~/composables/usePreviewReadOnly'
 
@@ -17,6 +17,17 @@ const toast = useToast()
 
 const { application, status: fetchStatus, error, refresh, updateApplication } = useApplication(() => props.applicationId)
 const { formatCandidateName } = useOrgSettings()
+
+// AI resume scoring is hidden by default; human reviewer averages take its place.
+const aiScoringEnabled = useFeatureFlagEnabled('ai-scoring')
+const { reviews } = useReviews(() => props.applicationId)
+function stageAvg(stage: 'screening' | 'interview'): number | null {
+  const scores = reviews.value.filter(r => r.stage === stage && r.rating != null).map(r => r.rating as number)
+  if (scores.length === 0) return null
+  return Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
+}
+const screeningAvg = computed(() => stageAvg('screening'))
+const interviewAvg = computed(() => stageAvg('interview'))
 
 // ─── Status transitions ───────────────────────────────────────────────────────
 
@@ -317,9 +328,17 @@ onUnmounted(() => {
                 <h3 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Details</h3>
               </div>
               <dl class="grid grid-cols-2 gap-3 text-sm">
-                <div>
+                <div v-if="aiScoringEnabled">
                   <dt class="text-surface-400">Score</dt>
                   <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ application.score ?? '—' }}</dd>
+                </div>
+                <div>
+                  <dt class="text-surface-400 inline-flex items-center gap-1"><Star class="size-3" /> Avg Screening</dt>
+                  <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ screeningAvg?.toFixed(1) ?? '—' }}</dd>
+                </div>
+                <div>
+                  <dt class="text-surface-400 inline-flex items-center gap-1"><Star class="size-3" /> Avg Interview</dt>
+                  <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ interviewAvg?.toFixed(1) ?? '—' }}</dd>
                 </div>
                 <div>
                   <dt class="text-surface-400">Status</dt>

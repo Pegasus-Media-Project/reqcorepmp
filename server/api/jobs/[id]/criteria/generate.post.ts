@@ -17,6 +17,7 @@ const limiter = createRateLimiter({ windowMs: 60_000, maxRequests: 10, message: 
 export default defineEventHandler(async (event) => {
   await limiter(event)
   const session = await requirePermission(event, { scoring: ['create'] })
+  await assertAiScoringEnabled(session.user.id, session.session.activeOrganizationId)
   const orgId = session.session.activeOrganizationId
   const { id: jobId } = await getValidatedRouterParams(event, paramsSchema.parse)
   await assertJobInScope(session, jobId)

@@ -131,3 +131,28 @@ export async function assertApplicationInScope(session: ScopedSession, applicati
     throw createError({ statusCode: 404, statusMessage: 'Not found' })
   }
 }
+
+/**
+ * Gate a candidate-scoped route (e.g. document download/preview). A scoped user
+ * may reach a candidate only if that candidate has at least one application to a
+ * job in their scope. owner/admin bypass. Throws 404 otherwise (no probing).
+ */
+export async function assertCandidateInScope(session: ScopedSession, candidateId: string): Promise<void> {
+  const scope = await getManagedJobScope(session)
+  if (scope.manageAll) return
+  if (scope.jobIds.length === 0) {
+    throw createError({ statusCode: 404, statusMessage: 'Not found' })
+  }
+
+  const row = await db.query.application.findFirst({
+    where: and(
+      eq(application.candidateId, candidateId),
+      eq(application.organizationId, session.session.activeOrganizationId),
+      inArray(application.jobId, scope.jobIds),
+    ),
+    columns: { id: true },
+  })
+  if (!row) {
+    throw createError({ statusCode: 404, statusMessage: 'Not found' })
+  }
+}

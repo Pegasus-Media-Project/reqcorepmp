@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, User, Briefcase, Calendar, Clock, Hash, FileText, MessageSquare } from 'lucide-vue-next'
+import { ArrowLeft, User, Briefcase, Calendar, Clock, Hash, FileText, MessageSquare, Star } from 'lucide-vue-next'
 import { usePreviewReadOnly } from '~/composables/usePreviewReadOnly'
 
 definePageMeta({
@@ -15,6 +15,17 @@ const toast = useToast()
 const { application, status: fetchStatus, error, refresh, updateApplication } = useApplication(applicationId)
 
 const { formatCandidateName } = useOrgSettings()
+
+// AI resume scoring is hidden by default; human reviewer averages take its place.
+const aiScoringEnabled = useFeatureFlagEnabled('ai-scoring')
+const { reviews } = useReviews(applicationId)
+function stageAvg(stage: 'screening' | 'interview'): number | null {
+  const scores = reviews.value.filter(r => r.stage === stage && r.rating != null).map(r => r.rating as number)
+  if (scores.length === 0) return null
+  return Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
+}
+const screeningAvg = computed(() => stageAvg('screening'))
+const interviewAvg = computed(() => stageAvg('interview'))
 
 useSeoMeta({
   title: computed(() =>
@@ -283,9 +294,17 @@ function formatResponseValue(value: unknown): string {
             <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Details</h2>
           </div>
           <dl class="grid grid-cols-2 gap-3 text-sm">
-            <div>
+            <div v-if="aiScoringEnabled">
               <dt class="text-surface-400">Score</dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ application.score ?? '—' }}</dd>
+            </div>
+            <div>
+              <dt class="text-surface-400">Avg Screening</dt>
+              <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ screeningAvg?.toFixed(1) ?? '—' }}</dd>
+            </div>
+            <div>
+              <dt class="text-surface-400">Avg Interview</dt>
+              <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ interviewAvg?.toFixed(1) ?? '—' }}</dd>
             </div>
             <div>
               <dt class="text-surface-400">Status</dt>
@@ -360,6 +379,15 @@ function formatResponseValue(value: unknown): string {
           {{ application.notes }}
         </p>
         <p v-else class="text-sm text-surface-400 italic">No notes yet.</p>
+      </div>
+
+      <!-- Reviewer ratings -->
+      <div class="mt-4 rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5 mb-4">
+        <div class="flex items-center gap-2 mb-3">
+          <Star class="size-4 text-surface-500 dark:text-surface-400" />
+          <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Reviews</h2>
+        </div>
+        <ReviewPanel :application-id="applicationId" :status="application.status" />
       </div>
 
       <!-- Custom properties (Notion-style) -->

@@ -46,6 +46,10 @@ const visibleCols = useState(`cand-visible-cols-${jobId}`, () => ({
   status: true,
   createdAt: true,
 }))
+
+// AI resume scoring is hidden by default; its Score column is suppressed too.
+const aiScoringEnabled = useFeatureFlagEnabled('ai-scoring')
+const showScoreCol = computed(() => visibleCols.value.score && aiScoringEnabled.value)
 const PAGE_SIZE_OPTIONS = [20, 50, 100] as const
 const page = useState<number>(`cand-page-${jobId}`, () => 1)
 const pageSize = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(`cand-page-size-${jobId}`, () => 20)
@@ -312,12 +316,12 @@ const isLoading = computed(() => jobFetchStatus.value === 'pending' || appFetchS
               <p class="text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wide mb-2">Columns</p>
               <div class="space-y-1.5">
                 <label
-                  v-for="col in ([
+                  v-for="col in (([
                     { key: 'email', label: 'Email' },
                     { key: 'score', label: 'Score' },
                     { key: 'status', label: 'Status' },
                     { key: 'createdAt', label: 'Applied' },
-                  ] as const)"
+                  ] as const).filter(c => aiScoringEnabled || c.key !== 'score'))"
                   :key="col.key"
                   class="flex items-center gap-2.5 cursor-pointer select-none group"
                 >
@@ -473,7 +477,7 @@ const isLoading = computed(() => jobFetchStatus.value === 'pending' || appFetchS
                     <ChevronsUpDown v-else class="size-3 opacity-40" />
                   </button>
                 </th>
-                <th v-if="visibleCols.score" class="px-4 py-3 text-left text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wide select-none">
+                <th v-if="showScoreCol" class="px-4 py-3 text-left text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wide select-none">
                   <button class="inline-flex items-center gap-1 hover:text-surface-900 dark:hover:text-surface-100 transition-colors" @click="toggleSort('score')">
                     Score
                     <ChevronUp v-if="sortKey === 'score' && sortDir === 'asc'" class="size-3" />
@@ -540,7 +544,7 @@ const isLoading = computed(() => jobFetchStatus.value === 'pending' || appFetchS
                     class="hover:text-brand-600 dark:hover:text-brand-400 hover:underline cursor-pointer transition-colors"
                   >{{ app.candidateEmail }}</a>
                 </td>
-                <td v-if="visibleCols.score" class="px-4 py-3">
+                <td v-if="showScoreCol" class="px-4 py-3">
                   <span
                     v-if="app.score != null"
                     class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums ring-1 ring-inset"

@@ -60,4 +60,16 @@ export const interviewIdParamSchema = z.object({
   id: z.string().uuid('Invalid interview ID'),
 })
 
+/** Bulk-assign reviewers (org members or guests) to multiple interviews. */
+export const assignReviewersSchema = z.object({
+  userIds: z.array(z.string()).min(1, 'Select at least one reviewer').max(50),
+  interviewIds: z.array(z.string().uuid()).min(1, 'Select at least one interview').max(100),
+})
+
+/** Route params for a single interview's reviewer sub-resource. */
+export const interviewReviewerParamSchema = z.object({
+  id: z.string().uuid('Invalid interview ID'),
+  userId: z.string(),
+})
+
 

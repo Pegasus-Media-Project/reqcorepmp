@@ -35,6 +35,7 @@ const atsStatements = {
   application: ['create', 'read', 'update', 'delete'],
   document: ['create', 'read', 'update', 'delete'],
   comment: ['create', 'read', 'update', 'delete'],
+  review: ['create', 'read', 'update', 'delete'],
   interview: ['create', 'read', 'update', 'delete'],
   emailTemplate: ['create', 'read', 'update', 'delete'],
   activityLog: ['read'],
@@ -56,6 +57,9 @@ export const ac = createAccessControl(statements)
 // owner   — org creator.  EVERYTHING including delete org / manage billing.
 // admin   — hiring managers.  Full CRUD on ATS resources + invite members.
 // member  — recruiters.  Read jobs, manage candidates/applications in pipeline.
+// guest   — external reviewers.  Read-only on the applicant data of the jobs
+//           they're individually assigned to, plus their own reviews/comments.
+//           No org-wide visibility, no pipeline management, no settings.
 
 export const owner = ac.newRole({
   ...ownerAc.statements,
@@ -66,6 +70,7 @@ export const owner = ac.newRole({
   application: ['create', 'read', 'update', 'delete'],
   document: ['create', 'read', 'update', 'delete'],
   comment: ['create', 'read', 'update', 'delete'],
+  review: ['create', 'read', 'update', 'delete'],
   interview: ['create', 'read', 'update', 'delete'],
   emailTemplate: ['create', 'read', 'update', 'delete'],
   activityLog: ['read'],
@@ -82,6 +87,7 @@ export const admin = ac.newRole({
   application: ['create', 'read', 'update', 'delete'],
   document: ['create', 'read', 'update', 'delete'],
   comment: ['create', 'read', 'update', 'delete'],
+  review: ['create', 'read', 'update', 'delete'],
   interview: ['create', 'read', 'update', 'delete'],
   emailTemplate: ['create', 'read', 'update', 'delete'],
   activityLog: ['read'],
@@ -103,9 +109,33 @@ export const member = ac.newRole({
   document: ['create', 'read'],
   // update/delete are author-scoped in server/api/comments/[id].{patch,delete}.ts
   comment: ['create', 'read', 'update', 'delete'],
+  // update/delete are author-scoped in server/api/reviews/[id].{patch,delete}.ts
+  review: ['create', 'read', 'update', 'delete'],
   interview: ['create', 'read', 'update'],
   emailTemplate: ['create', 'read', 'update'],
   activityLog: ['read'],
   scoring: ['create', 'read'],
   sourceTracking: ['read'],
+})
+
+// guest — external reviewer. Clears the RBAC gate for read + review only; the
+// job-scope layer (jobAccess.ts) then confines them to their individually
+// assigned jobs. No program access, no create/update/delete on jobs or
+// applications, no settings/members/activity-log. review + comment update/delete
+// are author-scoped in the route handlers.
+export const guest = ac.newRole({
+  ...memberAc.statements,
+  organization: ['read'],
+  job: ['read'],
+  // Deliberately NO candidate read: that endpoint isn't job-scoped, so it would
+  // let a guest enumerate the whole org. Guests see candidate details inline via
+  // the job-scoped application endpoints instead.
+  application: ['read'],
+  // document read is allowed, but the download/preview routes additionally
+  // enforce candidate scope (assertCandidateInScope) so guests can only open
+  // documents for applicants in their assigned jobs.
+  document: ['read'],
+  comment: ['create', 'read', 'update', 'delete'],
+  review: ['create', 'read', 'update', 'delete'],
+  interview: ['read'],
 })

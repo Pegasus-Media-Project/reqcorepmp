@@ -4,7 +4,7 @@ import {
   Building2, Code2, FileText, UsersRound, MoreHorizontal,
   CheckCircle2, XCircle, AlertTriangle, UserRound, Briefcase,
   Pencil, Trash2, MapPin, Users, CalendarDays,
-  Mail, ExternalLink,
+  Mail, ExternalLink, UserPlus, Check,
 } from 'lucide-vue-next'
 
 definePageMeta({
@@ -60,6 +60,27 @@ const filteredInterviews = computed(() => {
   }
 
   return list
+})
+
+// ─── Bulk reviewer assignment ────────────────────────────────────
+const selectedInterviewIds = ref<Set<string>>(new Set())
+const showAssignModal = ref(false)
+
+function toggleInterviewSelect(id: string) {
+  const next = new Set(selectedInterviewIds.value)
+  next.has(id) ? next.delete(id) : next.add(id)
+  selectedInterviewIds.value = next
+}
+function clearSelection() {
+  selectedInterviewIds.value = new Set()
+}
+const selectedInterviewList = computed(() => [...selectedInterviewIds.value])
+const selectedJobIds = computed(() => {
+  const ids = new Set<string>()
+  for (const i of filteredInterviews.value) {
+    if (selectedInterviewIds.value.has(i.id)) ids.add(i.jobId)
+  }
+  return [...ids]
 })
 
 // Group by date for calendar-style view
@@ -426,15 +447,54 @@ const statusCounts = computed(() => {
 
     <!-- LIST VIEW -->
     <template v-else-if="activeView === 'list'">
+      <!-- Bulk selection bar -->
+      <div
+        v-if="selectedInterviewIds.size > 0"
+        class="flex items-center justify-between gap-3 mb-3 rounded-lg border border-brand-200 dark:border-brand-800/60 bg-brand-50 dark:bg-brand-950/30 px-4 py-2.5"
+      >
+        <span class="text-sm font-medium text-brand-800 dark:text-brand-300">
+          {{ selectedInterviewIds.size }} interview{{ selectedInterviewIds.size === 1 ? '' : 's' }} selected
+        </span>
+        <div class="flex items-center gap-2">
+          <button
+            class="text-xs font-medium text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200"
+            @click="clearSelection"
+          >
+            Clear
+          </button>
+          <button
+            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
+            @click="showAssignModal = true"
+          >
+            <UserPlus class="size-3.5" />
+            Assign reviewers
+          </button>
+        </div>
+      </div>
+
       <div class="space-y-3">
         <div
           v-for="interviewItem in filteredInterviews"
           :key="interviewItem.id"
-          class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-5 py-4 hover:border-surface-300 dark:hover:border-surface-700 hover:shadow-sm transition-all group"
+          class="rounded-xl border bg-white dark:bg-surface-900 px-5 py-4 hover:border-surface-300 dark:hover:border-surface-700 hover:shadow-sm transition-all group"
+          :class="selectedInterviewIds.has(interviewItem.id)
+            ? 'border-brand-300 dark:border-brand-700 ring-1 ring-brand-200 dark:ring-brand-800'
+            : 'border-surface-200 dark:border-surface-800'"
         >
           <div class="flex items-start justify-between gap-4">
             <!-- Left: main info -->
             <div class="flex items-start gap-3.5 min-w-0 flex-1">
+              <!-- Bulk select checkbox -->
+              <label class="flex items-center pt-1 cursor-pointer" @click.stop>
+                <input type="checkbox" class="sr-only" :checked="selectedInterviewIds.has(interviewItem.id)" @change="toggleInterviewSelect(interviewItem.id)">
+                <span
+                  class="size-4 shrink-0 rounded border flex items-center justify-center transition-colors"
+                  :class="selectedInterviewIds.has(interviewItem.id) ? 'bg-brand-600 border-brand-600 text-white' : 'border-surface-300 dark:border-surface-600'"
+                >
+                  <Check v-if="selectedInterviewIds.has(interviewItem.id)" class="size-3" />
+                </span>
+              </label>
+
               <!-- Avatar -->
               <div
                 class="flex size-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold"
@@ -851,5 +911,14 @@ const statusCounts = computed(() => {
         </div>
       </div>
     </Teleport>
+
+    <!-- Bulk reviewer assignment -->
+    <AssignReviewersModal
+      :open="showAssignModal"
+      :interview-ids="selectedInterviewList"
+      :job-ids="selectedJobIds"
+      @close="showAssignModal = false"
+      @assigned="clearSelection(); refresh()"
+    />
   </div>
 </template>

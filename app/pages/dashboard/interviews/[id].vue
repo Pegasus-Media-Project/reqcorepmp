@@ -4,7 +4,7 @@ import {
   FileText, UsersRound, CheckCircle2, XCircle, AlertTriangle,
   UserRound, Briefcase, Pencil, MapPin, Users, MessageSquare,
   Save, X, Mail, Send, CheckCheck, ChevronDown, ExternalLink,
-  Check, AlertCircle,
+  Check, AlertCircle, UserPlus,
 } from 'lucide-vue-next'
 
 definePageMeta({
@@ -21,6 +21,23 @@ const { track } = useTrack()
 const { formatPersonName } = useOrgSettings()
 
 const { interview, status: fetchStatus, error, updateInterview, deleteInterview, refresh } = useInterview(interviewId)
+
+// ─── Assigned reviewers ──────────────────────────────────────────
+const showReviewersModal = ref(false)
+const { data: reviewersData, refresh: refreshReviewers } = useFetch(
+  () => `/api/interviews/${interviewId}/reviewers`,
+  { key: `interview-reviewers-${interviewId}`, headers: useRequestHeaders(['cookie']) },
+)
+const reviewers = computed(() => reviewersData.value?.data ?? [])
+async function removeReviewer(userId: string) {
+  try {
+    await $fetch(`/api/interviews/${interviewId}/reviewers/${userId}`, { method: 'DELETE' })
+    await refreshReviewers()
+  }
+  catch (err: any) {
+    toast.error('Failed to remove reviewer', { message: err?.data?.statusMessage })
+  }
+}
 
 useSeoMeta({
   title: computed(() =>
@@ -453,6 +470,51 @@ const localePath = useLocalePath()
           >Open in Google Calendar</a>
           <span v-else>Synced to Google Calendar</span>
         </div>
+      </div>
+
+      <!-- Reviewers -->
+      <div class="mb-6 rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <Users class="size-4 text-surface-500 dark:text-surface-400" />
+            <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Reviewers</h2>
+          </div>
+          <button
+            class="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 dark:border-surface-700/80 px-2.5 py-1.5 text-xs font-medium text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+            @click="showReviewersModal = true"
+          >
+            <UserPlus class="size-3.5" />
+            Assign
+          </button>
+        </div>
+        <p v-if="reviewers.length === 0" class="text-sm text-surface-400 italic">No reviewers assigned yet.</p>
+        <ul v-else class="space-y-2">
+          <li
+            v-for="r in reviewers"
+            :key="r.userId"
+            class="flex items-center gap-2.5"
+          >
+            <img v-if="r.image" :src="r.image" class="size-7 rounded-full" :alt="r.name ?? r.email">
+            <span v-else class="size-7 rounded-full bg-surface-200 dark:bg-surface-700 flex items-center justify-center text-xs font-medium text-surface-500 dark:text-surface-300">
+              {{ (r.name ?? r.email).charAt(0).toUpperCase() }}
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-sm text-surface-800 dark:text-surface-200">{{ r.name ?? r.email }}</span>
+              <span class="block truncate text-xs text-surface-400">
+                {{ r.email }}
+                <span v-if="r.calendarSynced" class="ml-1 text-success-600 dark:text-success-400">· calendar invited</span>
+                <span v-else-if="r.invitedAt" class="ml-1 text-surface-400">· emailed</span>
+              </span>
+            </span>
+            <button
+              class="text-surface-400 hover:text-danger-600 dark:hover:text-danger-400 transition-colors"
+              title="Remove reviewer"
+              @click="removeReviewer(r.userId)"
+            >
+              <X class="size-4" />
+            </button>
+          </li>
+        </ul>
       </div>
 
       <!-- Quick actions -->
@@ -1026,5 +1088,14 @@ const localePath = useLocalePath()
       </div>
     </Teleport>
 
+    <!-- Assign reviewers -->
+    <AssignReviewersModal
+      v-if="interview"
+      :open="showReviewersModal"
+      :interview-ids="[interviewId]"
+      :job-ids="[interview.jobId]"
+      @close="showReviewersModal = false"
+      @assigned="refreshReviewers()"
+    />
   </div>
 </template>

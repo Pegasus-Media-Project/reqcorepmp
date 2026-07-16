@@ -6,7 +6,7 @@ import {
 
 definePageMeta({
   layout: 'dashboard',
-  middleware: ['auth', 'require-org'],
+  middleware: ['auth', 'require-org', 'ai-scoring'],
 })
 
 useSeoMeta({

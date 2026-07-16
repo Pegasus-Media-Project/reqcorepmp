@@ -5,7 +5,7 @@ import { sso } from "@better-auth/sso";
 import { stripe as stripePlugin } from "@better-auth/stripe";
 import Stripe from "stripe";
 import { and, eq } from "drizzle-orm";
-import { ac, owner, admin, member } from "~~/shared/permissions";
+import { ac, owner, admin, member, guest } from "~~/shared/permissions";
 import { isBillingActionAllowed } from "~~/shared/billing";
 import { sendOrgInvitationEmail, sendPasswordResetEmail, sendVerificationEmail } from "./email";
 import { APIError } from "better-auth/api";
@@ -14,6 +14,7 @@ import {
   getUserPrimaryOrgId,
   countUsers,
   hasPendingInvitation,
+  bindReviewerInvitesForUser,
 } from "./defaultOrg";
 import { getMissingStripeBillingVars, isStripeBillingConfigured } from "./env";
 import { buildStripePlans } from "./billing/stripe-plans";
@@ -344,7 +345,11 @@ function getAuth(): Auth {
                 // avoid a duplicate-membership conflict. Non-invited signups only
                 // ever happen for the bootstrap owner, who auto-owns the org.
                 const email = (createdUser.email ?? "").trim().toLowerCase();
-                if (email && (await hasPendingInvitation(email))) return;
+                if (email && (await hasPendingInvitation(email))) {
+                  // Invited guest reviewers: confine them to their assigned jobs.
+                  await bindReviewerInvitesForUser(createdUser.id, email);
+                  return;
+                }
                 await ensureDefaultOrgMembership(createdUser.id);
               } catch (e) {
                 console.error(
@@ -431,6 +436,7 @@ function getAuth(): Auth {
             owner,
             admin,
             member,
+            guest,
           },
 
           // ── Invitation Email ────────────────────────────────────

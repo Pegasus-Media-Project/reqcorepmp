@@ -32,6 +32,7 @@ export default defineEventHandler(async (event) => {
       eq(document.organizationId, orgId),
     ),
     columns: {
+      candidateId: true,
       storageKey: true,
       originalFilename: true,
       mimeType: true,
@@ -41,6 +42,10 @@ export default defineEventHandler(async (event) => {
   if (!doc) {
     throw createError({ statusCode: 404, statusMessage: 'Document not found' })
   }
+
+  // Scoped members/guests may only reach documents for candidates who have an
+  // application to a job in their scope. owner/admin bypass.
+  await assertCandidateInScope(session, doc.candidateId)
 
   // Only allow inline preview for PDFs — DOC/DOCX can contain macros
   if (doc.mimeType !== 'application/pdf') {

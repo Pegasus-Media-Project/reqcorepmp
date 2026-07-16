@@ -533,6 +533,33 @@ export const joinRequest = pgTable('join_request', {
   index('join_request_status_idx').on(t.status),
 ]))
 
+export const reviewerInviteStatusEnum = pgEnum('reviewer_invite_status', ['pending', 'accepted', 'revoked'])
+
+/**
+ * Links a Better Auth org invitation (role=guest) to the specific job(s) the
+ * invited guest reviewer should be scoped to. Better Auth's `invitation` table
+ * has a fixed schema, so we carry the job binding here. On accept, a matching
+ * `jobAssignment` is created for each row, confining the guest to those jobs.
+ * One row per (invitation, job).
+ */
+export const reviewerInvite = pgTable('reviewer_invite', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  /** Lower-cased invitee email — used to bind job assignments on accept. */
+  email: text('email').notNull(),
+  /** Better Auth invitation id this binding belongs to. */
+  invitationId: text('invitation_id').notNull(),
+  jobId: text('job_id').notNull().references(() => job.id, { onDelete: 'cascade' }),
+  invitedById: text('invited_by_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  status: reviewerInviteStatusEnum('status').notNull().default('pending'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (t) => ([
+  uniqueIndex('reviewer_invite_invitation_job_idx').on(t.invitationId, t.jobId),
+  index('reviewer_invite_organization_id_idx').on(t.organizationId),
+  index('reviewer_invite_email_idx').on(t.email),
+  index('reviewer_invite_job_id_idx').on(t.jobId),
+]))
+
 // ─────────────────────────────────────────────
 // Collaboration: Comments
 // ─────────────────────────────────────────────
@@ -629,6 +656,29 @@ export const interview = pgTable('interview', {
   index('interview_created_by_id_idx').on(t.createdById),
 ]))
 
+/**
+ * Reviewers (org members or guests) assigned to an interview.
+ * Structured link on top of the free-text `interview.interviewers` email array:
+ * lets us bulk-assign known users, send each a calendar invite, and track
+ * invite status. A user assigned here is also added to `interview.interviewers`
+ * (and the Google Calendar event) so they receive the invite.
+ */
+export const interviewReviewer = pgTable('interview_reviewer', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  interviewId: text('interview_id').notNull().references(() => interview.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  /** When the calendar invite was sent to this reviewer (null = not yet). */
+  invitedAt: timestamp('invited_at'),
+  /** True once added as an attendee on the interview's Google Calendar event. */
+  calendarSynced: boolean('calendar_synced').notNull().default(false),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (t) => ([
+  uniqueIndex('interview_reviewer_interview_user_idx').on(t.interviewId, t.userId),
+  index('interview_reviewer_organization_id_idx').on(t.organizationId),
+  index('interview_reviewer_interview_id_idx').on(t.interviewId),
+]))
+
 // ─────────────────────────────────────────────
 // Email Templates
 // ─────────────────────────────────────────────
@@ -671,6 +721,43 @@ export const comment = pgTable('comment', {
   index('comment_organization_id_idx').on(t.organizationId),
   index('comment_target_idx').on(t.targetType, t.targetId),
   index('comment_author_id_idx').on(t.authorId),
+]))
+
+// ─────────────────────────────────────────────
+// Collaboration: Reviewer Ratings
+// ─────────────────────────────────────────────
+
+/**
+ * Stage at which a human reviewer scores an applicant. Kept independent of the
+ * pipeline `applicationStatusEnum` so a reviewer can score the screening and
+ * interview stages separately regardless of the applicant's current status.
+ */
+export const reviewStageEnum = pgEnum('review_stage', ['screening', 'interview'])
+
+/**
+ * A single reviewer's rating + notes for one applicant at one stage.
+ * One row per (application, reviewer, stage) — editable via upsert. Ratings are
+ * per-reviewer; per-stage averages are computed on read, never stored as a
+ * single shared value. `jobId` is denormalized for cheap job-level aggregation
+ * and scope filtering.
+ */
+export const review = pgTable('review', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  applicationId: text('application_id').notNull().references(() => application.id, { onDelete: 'cascade' }),
+  jobId: text('job_id').notNull().references(() => job.id, { onDelete: 'cascade' }),
+  reviewerId: text('reviewer_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  stage: reviewStageEnum('stage').notNull(),
+  /** 1–5 stars. Nullable so a reviewer can leave notes without a score. */
+  rating: integer('rating'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (t) => ([
+  index('review_organization_id_idx').on(t.organizationId),
+  index('review_application_id_idx').on(t.applicationId),
+  index('review_job_id_idx').on(t.jobId),
+  uniqueIndex('review_org_application_reviewer_stage_idx').on(t.organizationId, t.applicationId, t.reviewerId, t.stage),
 ]))
 
 // ─────────────────────────────────────────────
@@ -1052,6 +1139,13 @@ export const commentRelations = relations(comment, ({ one }) => ({
   author: one(user, { fields: [comment.authorId], references: [user.id] }),
 }))
 
+export const reviewRelations = relations(review, ({ one }) => ({
+  organization: one(organization, { fields: [review.organizationId], references: [organization.id] }),
+  application: one(application, { fields: [review.applicationId], references: [application.id] }),
+  job: one(job, { fields: [review.jobId], references: [job.id] }),
+  reviewer: one(user, { fields: [review.reviewerId], references: [user.id] }),
+}))
+
 export const activityLogRelations = relations(activityLog, ({ one }) => ({
   organization: one(organization, { fields: [activityLog.organizationId], references: [organization.id] }),
   actor: one(user, { fields: [activityLog.actorId], references: [user.id] }),
@@ -1062,16 +1156,29 @@ export const inviteLinkRelations = relations(inviteLink, ({ one }) => ({
   createdBy: one(user, { fields: [inviteLink.createdById], references: [user.id] }),
 }))
 
+export const reviewerInviteRelations = relations(reviewerInvite, ({ one }) => ({
+  organization: one(organization, { fields: [reviewerInvite.organizationId], references: [organization.id] }),
+  job: one(job, { fields: [reviewerInvite.jobId], references: [job.id] }),
+  invitedBy: one(user, { fields: [reviewerInvite.invitedById], references: [user.id] }),
+}))
+
 export const joinRequestRelations = relations(joinRequest, ({ one }) => ({
   user: one(user, { fields: [joinRequest.userId], references: [user.id] }),
   organization: one(organization, { fields: [joinRequest.organizationId], references: [organization.id] }),
   reviewedBy: one(user, { fields: [joinRequest.reviewedById], references: [user.id] }),
 }))
 
-export const interviewRelations = relations(interview, ({ one }) => ({
+export const interviewRelations = relations(interview, ({ one, many }) => ({
   organization: one(organization, { fields: [interview.organizationId], references: [organization.id] }),
   application: one(application, { fields: [interview.applicationId], references: [application.id] }),
   createdBy: one(user, { fields: [interview.createdById], references: [user.id] }),
+  reviewers: many(interviewReviewer),
+}))
+
+export const interviewReviewerRelations = relations(interviewReviewer, ({ one }) => ({
+  organization: one(organization, { fields: [interviewReviewer.organizationId], references: [organization.id] }),
+  interview: one(interview, { fields: [interviewReviewer.interviewId], references: [interview.id] }),
+  user: one(user, { fields: [interviewReviewer.userId], references: [user.id] }),
 }))
 
 export const emailTemplateRelations = relations(emailTemplate, ({ one }) => ({

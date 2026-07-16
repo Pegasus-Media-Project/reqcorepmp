@@ -7,7 +7,7 @@ import {
   CheckCircle2, XCircle, AlertTriangle, ArrowUpDown, ListFilter,
   Maximize2, Minimize2, Brain, History, SlidersHorizontal,
   ChevronLeft, ChevronRight, UnfoldHorizontal, FoldHorizontal,
-  StickyNote, MoreHorizontal,
+  StickyNote, MoreHorizontal, Star,
 } from 'lucide-vue-next'
 import type { Component } from 'vue'
 import type { PropertyEntry, PropertyFilter } from '~~/shared/properties'
@@ -245,13 +245,17 @@ watch(currentIndex, () => {
 })
 
 // Detail tab for center panel
-type DetailTab = 'overview' | 'cover-letter' | 'interviews' | 'documents' | 'responses' | 'ai-analysis' | 'timeline' | 'properties' | 'notes'
+type DetailTab = 'overview' | 'cover-letter' | 'interviews' | 'documents' | 'responses' | 'ai-analysis' | 'reviews' | 'timeline' | 'properties' | 'notes'
 const detailTab = ref<DetailTab>('overview')
+
+// AI resume scoring is hidden by default (see shared/feature-flags.ts).
+const aiScoringEnabled = useFeatureFlagEnabled('ai-scoring')
 
 // Overview section visibility toggles
 const overviewSections = reactive({
   coverLetter: true,
   aiAnalysis: true,
+  reviews: true,
   interviews: true,
   documents: true,
   responses: true,
@@ -278,7 +282,8 @@ watch(showOverviewDropdown, (val) => {
 // Which sections to display based on active tab
 const showSection = computed(() => ({
   coverLetter: detailTab.value === 'overview' ? overviewSections.coverLetter : detailTab.value === 'cover-letter',
-  aiAnalysis: detailTab.value === 'overview' ? overviewSections.aiAnalysis : detailTab.value === 'ai-analysis',
+  aiAnalysis: aiScoringEnabled.value && (detailTab.value === 'overview' ? overviewSections.aiAnalysis : detailTab.value === 'ai-analysis'),
+  reviews: detailTab.value === 'overview' ? overviewSections.reviews : detailTab.value === 'reviews',
   interviews: detailTab.value === 'overview' ? overviewSections.interviews : detailTab.value === 'interviews',
   documents: detailTab.value === 'overview' ? overviewSections.documents : detailTab.value === 'documents',
   responses: detailTab.value === 'overview' ? overviewSections.responses : detailTab.value === 'responses',
@@ -1200,7 +1205,10 @@ const detailTabDefs = computed<DetailTabDef[]>(() => {
   if (hasCoverLetter.value) {
     defs.push({ key: 'cover-letter', label: 'Cover Letter', icon: FileText })
   }
-  defs.push({ key: 'ai-analysis', label: 'AI Analysis' })
+  if (aiScoringEnabled.value) {
+    defs.push({ key: 'ai-analysis', label: 'AI Analysis' })
+  }
+  defs.push({ key: 'reviews', label: 'Reviews', icon: Star })
   defs.push({ key: 'interviews', label: 'Interviews', count: currentApplicationInterviews.value.length })
   defs.push({ key: 'documents', label: 'Documents', count: resolvedCurrentApplication.value?.candidate.documents?.length ?? 0 })
   defs.push({ key: 'responses', label: 'Responses', count: resolvedCurrentApplication.value?.responses?.length ?? 0 })
@@ -1734,7 +1742,7 @@ function closeDocPreview() {
                 <p class="mt-0.5 block truncate text-xs text-surface-500 dark:text-surface-400">{{ app.candidateEmail }}</p>
                 <div class="mt-1.5 flex items-center gap-2">
                   <span
-                    v-if="app.score != null"
+                    v-if="aiScoringEnabled && app.score != null"
                     class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset"
                     :class="{
                       'bg-success-50 text-success-700 ring-success-200 dark:bg-success-950/60 dark:text-success-400 dark:ring-success-800': app.score >= 75,
@@ -1743,6 +1751,20 @@ function closeDocPreview() {
                     }"
                   >
                     {{ app.score }} pts
+                  </span>
+                  <span
+                    v-if="app.screeningAvg != null"
+                    class="inline-flex items-center gap-0.5 rounded-md bg-surface-100 px-1.5 py-0.5 text-[10px] font-semibold text-surface-600 dark:bg-surface-800 dark:text-surface-300"
+                    title="Average screening rating"
+                  >
+                    <Star class="size-2.5 fill-amber-400 text-amber-400" /> S {{ app.screeningAvg.toFixed(1) }}
+                  </span>
+                  <span
+                    v-if="app.interviewAvg != null"
+                    class="inline-flex items-center gap-0.5 rounded-md bg-surface-100 px-1.5 py-0.5 text-[10px] font-semibold text-surface-600 dark:bg-surface-800 dark:text-surface-300"
+                    title="Average interview rating"
+                  >
+                    <Star class="size-2.5 fill-amber-400 text-amber-400" /> I {{ app.interviewAvg.toFixed(1) }}
                   </span>
                   <span class="text-[11px] text-surface-400 dark:text-surface-500">{{ timeAgo(app.createdAt) }}</span>
                   <span v-if="applicationsWithInterviews.has(app.id)" class="inline-flex items-center text-warning-500 dark:text-warning-400" title="Interview scheduled">
@@ -1823,7 +1845,7 @@ function closeDocPreview() {
                           {{ currentSummary.status }}
                         </span>
                         <span
-                          v-if="currentSummary.score != null"
+                          v-if="aiScoringEnabled && currentSummary.score != null"
                           class="inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset"
                           :class="{
                             'bg-success-50 text-success-700 ring-success-200 dark:bg-success-950/60 dark:text-success-400 dark:ring-success-800': currentSummary.score >= 75,
@@ -1832,6 +1854,20 @@ function closeDocPreview() {
                           }"
                         >
                           {{ currentSummary.score }} pts
+                        </span>
+                        <span
+                          v-if="currentSummary.screeningAvg != null"
+                          class="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-surface-100 px-2 py-0.5 text-[11px] font-semibold text-surface-600 dark:bg-surface-800 dark:text-surface-300"
+                          title="Average screening rating"
+                        >
+                          <Star class="size-3 fill-amber-400 text-amber-400" /> Screening {{ currentSummary.screeningAvg.toFixed(1) }}
+                        </span>
+                        <span
+                          v-if="currentSummary.interviewAvg != null"
+                          class="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-surface-100 px-2 py-0.5 text-[11px] font-semibold text-surface-600 dark:bg-surface-800 dark:text-surface-300"
+                          title="Average interview rating"
+                        >
+                          <Star class="size-3 fill-amber-400 text-amber-400" /> Interview {{ currentSummary.interviewAvg.toFixed(1) }}
                         </span>
                       </div>
                       <div class="flex shrink-0 items-center gap-2">
@@ -2098,6 +2134,20 @@ function closeDocPreview() {
                   v-if="currentSummary"
                   :application-id="currentSummary.id"
                   @scored="refreshApps()"
+                />
+              </div>
+
+              <!-- REVIEWER RATINGS SECTION -->
+              <div v-if="showSection.reviews" class="mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-6' : '']">
+                <div class="flex items-center gap-2 mb-3">
+                  <Star class="size-4 text-surface-400 dark:text-surface-500" />
+                  <h2 class="text-sm font-semibold text-surface-800 dark:text-surface-200">Reviews</h2>
+                </div>
+                <ReviewPanel
+                  v-if="currentSummary"
+                  :key="currentSummary.id"
+                  :application-id="currentSummary.id"
+                  :status="currentSummary.status"
                 />
               </div>
 

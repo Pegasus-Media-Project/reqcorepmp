@@ -12,6 +12,7 @@ import { analysisRun, job, application, candidate, aiConfig } from '~~/server/da
  */
 export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { scoring: ['read'] })
+  await assertAiScoringEnabled(session.user.id, session.session.activeOrganizationId)
   const orgId = session.session.activeOrganizationId
 
   // The AI Analysis dashboard (provider health, scoring volume) is Team+.

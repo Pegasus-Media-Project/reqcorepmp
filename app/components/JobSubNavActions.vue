@@ -13,6 +13,9 @@ const { handlePreviewReadOnlyError } = usePreviewReadOnly()
 
 const { job, updateJob, deleteJob, refresh: refreshJob } = useJob(props.jobId)
 
+// AI resume scoring is hidden by default (see shared/feature-flags.ts).
+const aiScoringEnabled = useFeatureFlagEnabled('ai-scoring')
+
 // ─────────────────────────────────────────────
 // Job status transitions
 // ─────────────────────────────────────────────
@@ -258,15 +261,17 @@ function openPropertyEditor(scope: 'org' | 'job') {
                 <UserPlus class="size-3.5 shrink-0 text-surface-400" />
                 Add Candidate
               </button>
-              <div class="border-t border-surface-100 dark:border-surface-800 my-1.5 mx-2" />
-              <button
-                :disabled="isScoringAll"
-                class="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-sm text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800/80 transition-colors disabled:opacity-50"
-                @click="scoreAllCandidates()"
-              >
-                <Brain class="size-3.5 shrink-0 text-surface-400" />
-                {{ isScoringAll ? `Scoring ${scoringProgress.done}/${scoringProgress.total}…` : 'Score All Candidates' }}
-              </button>
+              <template v-if="aiScoringEnabled">
+                <div class="border-t border-surface-100 dark:border-surface-800 my-1.5 mx-2" />
+                <button
+                  :disabled="isScoringAll"
+                  class="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-sm text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800/80 transition-colors disabled:opacity-50"
+                  @click="scoreAllCandidates()"
+                >
+                  <Brain class="size-3.5 shrink-0 text-surface-400" />
+                  {{ isScoringAll ? `Scoring ${scoringProgress.done}/${scoringProgress.total}…` : 'Score All Candidates' }}
+                </button>
+              </template>
               <button
                 class="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-sm text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800/80 transition-colors"
                 @click="openPropertyEditor('job')"

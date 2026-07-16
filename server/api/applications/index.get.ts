@@ -1,5 +1,5 @@
-import { asc, eq, and, desc, inArray, notInArray, or, ilike, gte, lt, isNull, count, sql } from 'drizzle-orm'
-import { application, applicationStatusEnum, candidate, interview, job } from '../../database/schema'
+import { asc, eq, and, desc, inArray, notInArray, or, ilike, gte, lt, isNull, isNotNull, count, sql } from 'drizzle-orm'
+import { application, applicationStatusEnum, candidate, interview, job, review } from '../../database/schema'
 import { applicationQuerySchema } from '../../utils/schemas/application'
 import { propertyFiltersArraySchema } from '../../utils/schemas/property'
 import {
@@ -202,10 +202,38 @@ export default defineEventHandler(async (event) => {
         .where(and(eq(interview.organizationId, orgId), inArray(interview.applicationId, ids)))
     : []
   const interviewedIds = new Set(interviewedApplicationIds.map(row => row.applicationId))
+
+  // Per-stage average reviewer rating for the current page (replaces AI score).
+  const reviewAggRows = ids.length > 0
+    ? await db
+        .select({
+          applicationId: review.applicationId,
+          stage: review.stage,
+          avg: sql<number | null>`avg(${review.rating})`,
+        })
+        .from(review)
+        .where(and(
+          eq(review.organizationId, orgId),
+          inArray(review.applicationId, ids),
+          isNotNull(review.rating),
+        ))
+        .groupBy(review.applicationId, review.stage)
+    : []
+  const reviewAgg = new Map<string, { screeningAvg: number | null, interviewAvg: number | null }>()
+  for (const r of reviewAggRows) {
+    const entry = reviewAgg.get(r.applicationId) ?? { screeningAvg: null, interviewAvg: null }
+    const val = r.avg == null ? null : Math.round(Number(r.avg) * 10) / 10
+    if (r.stage === 'screening') entry.screeningAvg = val
+    else entry.interviewAvg = val
+    reviewAgg.set(r.applicationId, entry)
+  }
+
   const enriched = data.map((a) => ({
     ...a,
     properties: propertyMap.get(a.id) ?? [],
     hasInterview: interviewedIds.has(a.id),
+    screeningAvg: reviewAgg.get(a.id)?.screeningAvg ?? null,
+    interviewAvg: reviewAgg.get(a.id)?.interviewAvg ?? null,
   }))
 
   return {

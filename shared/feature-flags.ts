@@ -53,6 +53,17 @@ export const FEATURE_FLAGS = {
     defaultValue: true,
     description: 'New AI chatbot experience in the dashboard.',
   },
+
+  /**
+   * AI resume scoring & analysis (per-criterion scores, bulk analyze, the
+   * AI Analysis tab). Off by default — human reviewer ratings replace it.
+   * Flip on with `FEATURE_FLAG_AI_SCORING=true` or `?ff_ai-scoring=true` to
+   * restore the AI feature; nothing is deleted, only hidden.
+   */
+  'ai-scoring': {
+    defaultValue: false,
+    description: 'AI resume scoring & analysis.',
+  },
 } as const satisfies Record<string, FeatureFlagDefinition>
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS

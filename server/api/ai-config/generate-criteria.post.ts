@@ -25,6 +25,7 @@ const limiter = createRateLimiter({
 export default defineEventHandler(async (event) => {
   await limiter(event)
   const session = await requirePermission(event, { scoring: ['create'] })
+  await assertAiScoringEnabled(session.user.id, session.session.activeOrganizationId)
   const orgId = session.session.activeOrganizationId
   const body = await readValidatedBody(event, bodySchema.parse)
 

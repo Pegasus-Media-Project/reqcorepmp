@@ -93,12 +93,18 @@ type DraftSection = {
 // Wizard state
 const currentStep = ref<1 | 2 | 3 | 4>(1)
 const wizardEditor = useTemplateRef<HTMLElement>('wizardEditor')
-const steps = [
+
+// AI resume scoring is hidden by default; skip its wizard step entirely.
+const aiScoringEnabled = useFeatureFlagEnabled('ai-scoring')
+
+const steps = computed(() => [
   { id: 1, title: 'Job details', description: 'Tell applicants about this role.' },
   { id: 2, title: 'Application form', description: 'Design the application form.' },
-  { id: 3, title: 'AI scoring criteria', description: 'Define how AI evaluates candidates.' },
+  ...(aiScoringEnabled.value
+    ? [{ id: 3, title: 'AI scoring criteria', description: 'Define how AI evaluates candidates.' }]
+    : []),
   { id: 4, title: 'Publish & distribute', description: 'Go live and share across job boards.' },
-]
+])
 
 // Step 1: Job details (API-supported fields)
 const form = ref({
@@ -642,14 +648,19 @@ function goToStep(step: 1 | 2 | 3 | 4) {
 }
 
 function nextStep() {
-  if (currentStep.value < 4) {
-    if (currentStep.value === 1 && !validateStep1()) return
-    currentStep.value++
-  }
+  if (currentStep.value >= 4) return
+  if (currentStep.value === 1 && !validateStep1()) return
+  let next = currentStep.value + 1
+  // Skip the AI scoring step when the feature is disabled.
+  if (next === 3 && !aiScoringEnabled.value) next = 4
+  currentStep.value = next as typeof currentStep.value
 }
 
 function prevStep() {
-  if (currentStep.value > 1) currentStep.value--
+  if (currentStep.value <= 1) return
+  let prev = currentStep.value - 1
+  if (prev === 3 && !aiScoringEnabled.value) prev = 2
+  currentStep.value = prev as typeof currentStep.value
 }
 
 watch(currentStep, async () => {
@@ -1057,7 +1068,7 @@ const typeOptions = computed(() => {
             </section>
 
             <!-- Step 3: AI scoring criteria -->
-            <section v-else-if="currentStep === 3" class="space-y-8">
+            <section v-else-if="currentStep === 3 && aiScoringEnabled" class="space-y-8">
 
               <div>
                 <div class="flex items-center gap-2">

@@ -1,7 +1,7 @@
 import { and, eq, gt, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { db } from './db'
-import { organization, member, invitation, user } from '../database/schema'
+import { organization, member, invitation, user, reviewerInvite, jobAssignment } from '../database/schema'
 
 /**
  * Single-organization deployment.
@@ -80,6 +80,33 @@ export async function getUserPrimaryOrgId(userId: string): Promise<string | null
 export async function countUsers(): Promise<number> {
   const [row] = await db.select({ n: sql<string>`count(*)` }).from(user)
   return Number(row?.n ?? 0)
+}
+
+/**
+ * Bind any pending guest-reviewer invitations for `email` to `userId`: create a
+ * `jobAssignment` for each invited job (confining the guest to those jobs) and
+ * mark the invite accepted. Called when an invited guest signs up so their job
+ * scope is established immediately. Idempotent. Case-insensitive on email.
+ */
+export async function bindReviewerInvitesForUser(userId: string, email: string): Promise<void> {
+  const normalized = email.trim().toLowerCase()
+  if (!normalized) return
+
+  const pending = await db
+    .select({ id: reviewerInvite.id, organizationId: reviewerInvite.organizationId, jobId: reviewerInvite.jobId })
+    .from(reviewerInvite)
+    .where(and(eq(reviewerInvite.email, normalized), eq(reviewerInvite.status, 'pending')))
+
+  for (const inv of pending) {
+    await db
+      .insert(jobAssignment)
+      .values({ organizationId: inv.organizationId, jobId: inv.jobId, userId })
+      .onConflictDoNothing()
+    await db
+      .update(reviewerInvite)
+      .set({ status: 'accepted' })
+      .where(eq(reviewerInvite.id, inv.id))
+  }
 }
 
 /**

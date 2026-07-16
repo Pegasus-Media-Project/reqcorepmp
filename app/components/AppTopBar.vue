@@ -6,7 +6,7 @@ import {
   ChevronDown, Menu, X, Users, ChevronLeft,
   LayoutDashboard, Calendar, ArrowUpCircle,
   Sparkles, Radio, History,
-  MessageCircle, Lock,
+  MessageCircle, Lock, Star,
 } from 'lucide-vue-next'
 import type { PlanFeature } from '~~/shared/billing'
 
@@ -100,18 +100,34 @@ const { data: feedbackConfig } = useFetch('/api/feedback/config', {
 const isFeedbackEnabled = computed(() => feedbackConfig.value?.enabled === true)
 
 const showChatbot = useFeatureFlagEnabled('chatbot-experience')
+const aiScoringEnabled = useFeatureFlagEnabled('ai-scoring')
+
+// Guest reviewers get a stripped-down nav (their access is job-scoped).
+const memberRole = ref<string | null>(null)
+if (import.meta.client) {
+  authClient.organization.getActiveMemberRole()
+    .then(({ data }) => { memberRole.value = data?.role ?? null })
+    .catch(() => {})
+}
+const isGuest = computed(() => memberRole.value === 'guest')
+// Job sub-tabs a guest may see (review-only, no editing/settings).
+const GUEST_JOB_TABS = new Set(['Pipeline', 'Table', 'Ratings'])
+// Top-level nav a guest may see.
+const GUEST_NAV = new Set(['Jobs', 'Interviews'])
 
 const jobTabs = computed(() => {
   if (!activeJobId.value) return []
   const base = `/dashboard/jobs/${activeJobId.value}`
-  return [
+  const tabs = [
     { label: 'Pipeline', to: base, icon: Kanban, exact: true },
     { label: 'Table', to: `${base}/candidates`, icon: Table2, exact: true },
+    { label: 'Ratings', to: `${base}/ratings`, icon: Star, exact: true },
     { label: 'Application Form', to: `${base}/application-form`, icon: FileText, exact: true },
     { label: 'Source Tracking', to: `${base}/source-tracking`, icon: Radio, exact: true },
-    { label: 'AI Analysis', to: `${base}/ai-analysis`, icon: Sparkles, exact: true },
+    ...(aiScoringEnabled.value ? [{ label: 'AI Analysis', to: `${base}/ai-analysis`, icon: Sparkles, exact: true }] : []),
     { label: 'Settings', to: `${base}/settings`, icon: Settings, exact: true },
   ]
+  return isGuest.value ? tabs.filter(t => GUEST_JOB_TABS.has(t.label)) : tabs
 })
 
 // ─────────────────────────────────────────────
@@ -148,7 +164,10 @@ const flaggedNav = computed(() => {
 })
 
 const navItems = computed(() => {
-  const merged = [...mainNav]
+  // Hide the AI Analysis nav item when AI scoring is disabled.
+  let merged = mainNav.filter(n => aiScoringEnabled.value || n.label !== 'AI Analysis')
+  // Guests get a minimal nav confined to their job-scoped views.
+  if (isGuest.value) merged = merged.filter(n => GUEST_NAV.has(n.label))
   for (const item of flaggedNav.value) {
     const idx = merged.findIndex((n) => n.label === item.afterLabel)
     const insertAt = idx >= 0 ? idx + 1 : merged.length

@@ -53,6 +53,7 @@
     "better-auth": "^1.6.16",
     "better-sqlite3": "^12.9.0",
     "drizzle-orm": "^0.45.1",
+    "exceljs": "^4.4.0",
     "file-type": "^21.3.0",
     "googleapis": "^171.4.0",
     "lucide-vue-next": "^0.577.0",

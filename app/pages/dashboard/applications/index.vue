@@ -27,12 +27,15 @@ const visibleColumns = ref<Record<string, boolean>>({ ...defaultColumnVisibility
 
 const { definitions: propertyDefs } = useProperties({ entityType: () => 'application' })
 
+// AI resume scoring is hidden by default; suppress its Score column.
+const aiScoringEnabled = useFeatureFlagEnabled('ai-scoring')
+
 const applicationColumns = computed(() => [
   { key: 'candidate', label: 'Candidate', required: true },
   { key: 'email', label: 'Email' },
   { key: 'job', label: 'Job' },
   { key: 'status', label: 'Status' },
-  { key: 'score', label: 'Score' },
+  ...(aiScoringEnabled.value ? [{ key: 'score', label: 'Score' }] : []),
   { key: 'applied', label: 'Applied' },
   ...propertyDefs.value.map((d) => ({ key: `prop_${d.id}`, label: d.name })),
 ])
@@ -633,7 +636,7 @@ const selectedApplicationId = ref<string | null>(null)
                   <ArrowUpDown v-else class="size-3.5 opacity-40" />
                 </button>
               </th>
-              <th v-if="visibleColumns.score" class="text-center px-4 py-3 font-medium text-surface-500 dark:text-surface-400 hidden sm:table-cell">
+              <th v-if="visibleColumns.score && aiScoringEnabled" class="text-center px-4 py-3 font-medium text-surface-500 dark:text-surface-400 hidden sm:table-cell">
                 <button class="inline-flex items-center gap-1 hover:text-surface-900 dark:hover:text-surface-100 transition-colors" @click="toggleSort('score')">
                   Score
                   <ArrowUp v-if="sortKey === 'score' && sortDir === 'asc'" class="size-3.5" />
@@ -693,7 +696,7 @@ const selectedApplicationId = ref<string | null>(null)
                   {{ statusLabels[app.status as Status] ?? app.status }}
                 </span>
               </td>
-              <td v-if="visibleColumns.score" class="px-4 py-3 text-center hidden sm:table-cell">
+              <td v-if="visibleColumns.score && aiScoringEnabled" class="px-4 py-3 text-center hidden sm:table-cell">
                 <span
                   v-if="app.score != null"
                   class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ring-1 ring-inset"

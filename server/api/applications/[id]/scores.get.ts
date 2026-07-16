@@ -11,6 +11,7 @@ const paramsSchema = z.object({ id: z.string().min(1) })
  */
 export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { scoring: ['read'] })
+  await assertAiScoringEnabled(session.user.id, session.session.activeOrganizationId)
   const orgId = session.session.activeOrganizationId
   const { id: applicationId } = await getValidatedRouterParams(event, paramsSchema.parse)
   await assertApplicationInScope(session, applicationId)

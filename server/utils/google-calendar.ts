@@ -413,6 +413,58 @@ export async function updateCalendarEvent(
 }
 
 /**
+ * Add attendees to an existing event WITHOUT dropping current attendees.
+ * Reads the event first and merges, since a patch on `attendees` replaces the
+ * whole collection. Google emails the invite to new attendees (sendUpdates:all).
+ * Returns true on success (or when there's nothing valid to add), false on error.
+ */
+export async function addEventAttendees(
+  userId: string,
+  eventId: string,
+  emails: string[],
+): Promise<boolean> {
+  const calendar = await getCalendarClient(userId)
+  if (!calendar) return false
+
+  const valid = emails.map(e => e.trim()).filter(isValidEmail)
+  if (valid.length === 0) return true
+
+  const integration = await db.query.calendarIntegration.findFirst({
+    where: eq(calendarIntegration.userId, userId),
+    columns: { calendarId: true },
+  })
+  const calendarId = integration?.calendarId || 'primary'
+
+  try {
+    const existing = await calendar.events.get({ calendarId, eventId })
+    const current = existing.data.attendees ?? []
+    const currentEmails = new Set(current.map(a => (a.email ?? '').toLowerCase()))
+    const toAdd = valid.filter(e => !currentEmails.has(e.toLowerCase()))
+    if (toAdd.length === 0) return true
+
+    const attendees: calendar_v3.Schema$EventAttendee[] = [
+      ...current,
+      ...toAdd.map(email => ({ email, responseStatus: 'accepted' as const })),
+    ]
+    await calendar.events.patch({
+      calendarId,
+      eventId,
+      sendUpdates: 'all',
+      requestBody: { attendees },
+    })
+    return true
+  }
+  catch (err) {
+    logError('calendar.add_attendees_failed', {
+      posthog_distinct_id: userId,
+      event_id: eventId,
+      error_message: err instanceof Error ? err.message : String(err),
+    })
+    return false
+  }
+}
+
+/**
  * Cancel a Google Calendar event (set status to cancelled).
  * Sends cancellation notifications to all attendees.
  */

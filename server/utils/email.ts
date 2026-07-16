@@ -694,6 +694,58 @@ export async function sendInterviewInvitationEmail(params: {
   })
 }
 
+/**
+ * Notify a reviewer (org member or guest) that they've been assigned to an
+ * interview. Attaches an .ics so they can add it to their calendar when the
+ * event isn't synced to Google (the Google-attendee path handles synced ones).
+ */
+export async function sendReviewerInterviewInvitationEmail(params: {
+  to: string
+  reviewerName: string | null
+  interviewTitle: string
+  jobTitle: string
+  candidateName: string
+  interviewDate: string
+  interviewTime: string
+  interviewLocation: string | null
+  organizationName: string
+  icsContent?: string
+}): Promise<void> {
+  const greeting = params.reviewerName ? `Hi ${params.reviewerName},` : 'Hi,'
+  const lines = [
+    `${params.interviewTitle} — ${params.jobTitle}`,
+    `Candidate: ${params.candidateName}`,
+    `When: ${params.interviewDate} at ${params.interviewTime}`,
+    ...(params.interviewLocation ? [`Where: ${params.interviewLocation}`] : []),
+  ]
+  const subject = `You're a reviewer: ${params.interviewTitle} — ${params.candidateName}`
+  const html = `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;margin:0 auto;color:#09090b;">
+      <p style="font-size:14px;">${escapeHtml(greeting)}</p>
+      <p style="font-size:14px;">You've been assigned as a reviewer for an interview at ${escapeHtml(params.organizationName)}.</p>
+      <table style="font-size:14px;border-collapse:collapse;margin:16px 0;">
+        ${lines.map(l => `<tr><td style="padding:4px 0;">${escapeHtml(l)}</td></tr>`).join('')}
+      </table>
+      <p style="font-size:13px;color:#52525b;">A calendar invite is attached. You'll be able to rate and add notes for this candidate once the interview stage begins.</p>
+    </div>
+  `.trim()
+  const text = `${greeting}\n\nYou've been assigned as a reviewer for an interview at ${params.organizationName}.\n\n${lines.join('\n')}\n\nA calendar invite is attached.`
+
+  await sendEmail({
+    to: params.to,
+    subject,
+    html,
+    text,
+    icsAttachment: params.icsContent ? Buffer.from(params.icsContent) : undefined,
+    resendTags: [{ name: 'category', value: 'reviewer-interview-invitation' }],
+    logFallback:
+      `Reviewer interview invitation → ${params.to} | Interview: ${params.interviewTitle} | ` +
+      `Candidate: ${params.candidateName} | ${params.interviewDate} at ${params.interviewTime}` +
+      (params.icsContent ? ' | .ics attached' : ''),
+    errorCategory: 'email.reviewer_interview_invitation_send_failed',
+  })
+}
+
 function buildInterviewInvitationHtml(subject: string, bodyText: string, data: InterviewEmailData): string {
   const bodyHtml = escapeHtml(bodyText).replace(/\n/g, '<br />')
 
