@@ -1,3 +1,11 @@
+<script setup lang="ts">
+// Public shell (home / job board / career pages). The header keeps the auth
+// actions in the top-right corner: Dashboard when signed in, otherwise
+// Sign in / Sign up.
+const localePath = useLocalePath()
+const { data: session } = await authClient.useSession(useFetch)
+</script>
+
 <template>
   <div class="min-h-screen bg-surface-50">
     <!-- Simple header -->
@@ -6,6 +14,32 @@
         <NuxtLink to="/" class="flex items-center">
           <img src="/pegasus-logo.png" alt="Pegasus Media Project" class="h-8 w-auto object-contain" />
         </NuxtLink>
+
+        <!-- Auth actions -->
+        <div class="flex items-center gap-2">
+          <template v-if="session?.user">
+            <NuxtLink
+              :to="localePath('/dashboard')"
+              class="rounded-md bg-brand-600 px-3.5 py-1.5 text-[13px] font-semibold text-white transition hover:bg-brand-700 no-underline"
+            >
+              Dashboard
+            </NuxtLink>
+          </template>
+          <template v-else>
+            <NuxtLink
+              :to="localePath('/auth/sign-in')"
+              class="rounded-md px-3 py-1.5 text-[13px] font-medium text-surface-600 transition hover:text-surface-900 no-underline"
+            >
+              Sign in
+            </NuxtLink>
+            <NuxtLink
+              :to="localePath('/auth/sign-up')"
+              class="rounded-md bg-brand-600 px-3.5 py-1.5 text-[13px] font-semibold text-white transition hover:bg-brand-700 no-underline"
+            >
+              Sign up
+            </NuxtLink>
+          </template>
+        </div>
       </div>
     </header>
 
