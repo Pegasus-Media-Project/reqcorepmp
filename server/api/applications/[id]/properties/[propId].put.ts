@@ -21,6 +21,7 @@ export default defineEventHandler(async (event) => {
   const orgId = session.session.activeOrganizationId
 
   const { id, propId } = await getValidatedRouterParams(event, paramsSchema.parse)
+  await assertApplicationInScope(session, id)
   const { value } = await readValidatedBody(event, setPropertyValueSchema.parse)
 
   // Verify entity belongs to org

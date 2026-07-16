@@ -19,6 +19,7 @@ export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { scoring: ['create'] })
   const orgId = session.session.activeOrganizationId
   const { id: jobId } = await getValidatedRouterParams(event, paramsSchema.parse)
+  await assertJobInScope(session, jobId)
   const body = await readValidatedBody(event, generateCriteriaSchema.parse)
 
   // Verify job belongs to org

@@ -7,6 +7,7 @@ export default defineEventHandler(async (event) => {
   const orgId = session.session.activeOrganizationId
 
   const { id: jobId, questionId } = await getValidatedRouterParams(event, questionIdParamSchema.parse)
+  await assertJobInScope(session, jobId)
   const body = await readValidatedBody(event, updateQuestionSchema.parse)
 
   const existing = await db.query.jobQuestion.findFirst({
@@ -49,6 +50,7 @@ export default defineEventHandler(async (event) => {
     .returning({
       id: jobQuestion.id,
       jobId: jobQuestion.jobId,
+      sectionId: jobQuestion.sectionId,
       type: jobQuestion.type,
       label: jobQuestion.label,
       description: jobQuestion.description,

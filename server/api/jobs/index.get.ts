@@ -17,8 +17,13 @@ export default defineEventHandler(async (event) => {
 
   const query = await getValidatedQuery(event, jobQuerySchema.parse)
 
+  // Restrict scoped members to jobs in their assigned programs/jobs.
+  const scope = await getManagedJobScope(session)
+  const scopeCondition = jobScopeCondition(scope, job.id)
+
   const offset = (query.page - 1) * query.limit
   const conditions = [eq(job.organizationId, orgId)]
+  if (scopeCondition) conditions.push(scopeCondition)
   if (query.status) conditions.push(eq(job.status, query.status))
 
   const [data, total] = await Promise.all([

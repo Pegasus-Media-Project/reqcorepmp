@@ -48,11 +48,21 @@ export default defineEventHandler(async (event) => {
         orderBy: (q, { asc }) => [asc(q.displayOrder), asc(q.createdAt)],
         columns: {
           id: true,
+          sectionId: true,
           type: true,
           label: true,
           description: true,
           required: true,
           options: true,
+          displayOrder: true,
+        },
+      },
+      questionSections: {
+        orderBy: (s, { asc }) => [asc(s.displayOrder), asc(s.createdAt)],
+        columns: {
+          id: true,
+          title: true,
+          description: true,
           displayOrder: true,
         },
       },
@@ -89,10 +99,16 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  // Whether the posting is past its application deadline. When true, the job
+  // page still renders (for SEO / info) but the apply flow is closed.
+  const applicationsClosed = !!result.validThrough && new Date(result.validThrough).getTime() <= Date.now()
+
   // Flatten organization name into the response for SEO consumers
-  const { organization: org, organizationId: _orgId, ...jobData } = result
+  const { organization: org, organizationId: _orgId, questionSections, ...jobData } = result
   return {
     ...jobData,
+    sections: questionSections,
+    applicationsClosed,
     organizationName: org?.name ?? null,
     organizationLogo,
     careerPageSlug,

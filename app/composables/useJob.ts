@@ -22,7 +22,7 @@ export function useJob(id: MaybeRefOrGetter<string>) {
     title: string
     description: string | null
     location: string | null
-    type: 'full_time' | 'part_time' | 'contract' | 'internship'
+    type: string
     status: 'draft' | 'open' | 'closed' | 'archived'
     salaryMin: number | null
     salaryMax: number | null

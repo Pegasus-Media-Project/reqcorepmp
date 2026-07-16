@@ -13,6 +13,9 @@ export default defineEventHandler(async (event) => {
 
   const { id } = await getValidatedRouterParams(event, applicationIdParamSchema.parse)
 
+  // Scoped members may only view applications for jobs they manage.
+  await assertApplicationInScope(session, id)
+
   const result = await db.query.application.findFirst({
     where: and(eq(application.id, id), eq(application.organizationId, orgId)),
     with: {

@@ -7,6 +7,7 @@ export default defineEventHandler(async (event) => {
   const orgId = session.session.activeOrganizationId
 
   const { id: jobId } = await getValidatedRouterParams(event, jobIdParamSchema.parse)
+  await assertJobInScope(session, jobId)
   const body = await readValidatedBody(event, reorderQuestionsSchema.parse)
 
   // Verify the job belongs to the org

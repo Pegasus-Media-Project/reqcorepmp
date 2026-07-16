@@ -298,13 +298,23 @@ async function handleSubmit() {
 
       <PublicJobApplicationHeader :job="job" />
 
+      <!-- Closed: past the application deadline -->
+      <div
+        v-if="job.applicationsClosed"
+        class="mt-6 rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50 dark:bg-surface-900 px-6 py-8 text-center"
+      >
+        <p class="text-sm font-medium text-surface-600 dark:text-surface-300">{{ t('jobs.detail.closedNotice') }}</p>
+      </div>
+
       <!-- Application form card -->
       <ApplicationFormBody
+        v-else
         v-model:form="form"
         v-model:responses="responses"
         v-model:resume="resumeFile"
         v-model:cover-letter="coverLetterText"
         :job="job"
+        :sections="job.sections ?? []"
         :errors="errors"
         :submit-error="submitError"
         :is-submitting="isSubmitting"

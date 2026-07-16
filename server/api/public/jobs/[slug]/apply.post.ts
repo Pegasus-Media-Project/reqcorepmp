@@ -1,6 +1,6 @@
 import { eq, and, asc, sql } from 'drizzle-orm'
 import { fileTypeFromBuffer } from 'file-type'
-import { job, candidate, application, jobQuestion, questionResponse, document, organization, applicationSource, trackingLink } from '../../../../database/schema'
+import { job, candidate, application, jobQuestion, questionResponse, document, organization, applicationSource, trackingLink, careerPage } from '../../../../database/schema'
 import { publicApplicationSchema, publicJobSlugSchema } from '../../../../utils/schemas/publicApplication'
 import { createPreviewReadOnlyError } from '../../../../utils/previewReadOnly'
 import { autoScoreApplication } from '../../../../utils/ai/autoScore'
@@ -187,11 +187,18 @@ export default defineEventHandler(async (event) => {
       requireResume: true,
       requireCoverLetter: true,
       autoScoreOnApply: true,
+      validThrough: true,
     },
   })
 
   if (!existingJob) {
     throw createError({ statusCode: 404, statusMessage: 'Job not found or not accepting applications' })
+  }
+
+  // Application period cutoff: once validThrough has passed, the posting no
+  // longer accepts applications even if its status is still 'open'.
+  if (existingJob.validThrough && existingJob.validThrough.getTime() <= Date.now()) {
+    throw createError({ statusCode: 410, statusMessage: 'This opportunity is no longer accepting applications' })
   }
 
   if (existingJob.phoneRequirement === 'required' && !phone?.trim()) {
@@ -442,13 +449,60 @@ export default defineEventHandler(async (event) => {
 
   // Email the applicant their confirmation code + status link (best-effort;
   // logs to console when no mail transport is configured).
-  const statusUrl = `${getRequestURL(event).origin}/status?code=${confirmationCode}`
+  const origin = getRequestURL(event).origin
+  const statusUrl = `${origin}/status?code=${confirmationCode}`
+
+  // Resolve org name + an absolute logo URL for the email header. Prefer the
+  // branded career-page logo (served publicly), fall back to the org logo when
+  // it's already an absolute URL.
+  const org = await db.query.organization.findFirst({
+    where: eq(organization.id, orgId),
+    columns: { name: true, logo: true, slug: true },
+  })
+  const cp = await db.query.careerPage.findFirst({
+    where: eq(careerPage.organizationId, orgId),
+    columns: { slug: true, logoStorageKey: true, updatedAt: true, enabled: true },
+  })
+  let logoUrl: string | undefined
+  const cpSlug = cp?.slug ?? org?.slug ?? null
+  if (cp?.logoStorageKey && cpSlug && (cp.enabled ?? true)) {
+    logoUrl = `${origin}/api/public/career-page/${cpSlug}/asset?kind=logo&v=${new Date(cp.updatedAt).getTime()}`
+  } else if (org?.logo && /^https?:\/\//i.test(org.logo)) {
+    logoUrl = org.logo
+  }
+
+  // Build a read-only copy of the submitted application for the email.
+  const questionById = new Map(questions.map((q) => [q.id, q]))
+  const formatAnswer = (value: string | string[] | number | boolean): string => {
+    if (Array.isArray(value)) return value.join(', ')
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+    return String(value)
+  }
+  const summary: Array<{ label: string, value: string }> = [
+    { label: 'Name', value: `${firstName} ${lastName}`.trim() },
+    { label: 'Email', value: email },
+  ]
+  if (phone) summary.push({ label: 'Phone', value: phone })
+  for (const r of validResponses) {
+    const q = questionById.get(r.questionId)
+    if (q) summary.push({ label: q.label, value: formatAnswer(r.value) })
+  }
+  for (const [questionId, file] of uploadedFiles) {
+    const q = questionById.get(questionId)
+    if (q) summary.push({ label: q.label, value: file.filename })
+  }
+  if (resumeUpload) summary.push({ label: 'Resume', value: resumeUpload.filename })
+  if (coverLetterText) summary.push({ label: 'Cover letter', value: coverLetterText })
+
   void sendApplicationConfirmationEmail({
     to: email,
     firstName,
     jobTitle: existingJob.title,
     code: confirmationCode,
     statusUrl,
+    organizationName: org?.name ?? undefined,
+    logoUrl,
+    summary,
   }).catch((e) => console.error('[Pegasus] Failed to send application confirmation email:', e))
 
   // ─────────────────────────────────────────────

@@ -74,7 +74,7 @@ const search = ref('')
 const drawerOpen = ref(false)
 
 type StatusFilter = 'open' | 'draft' | 'closed' | 'archived'
-type TypeFilter = 'full_time' | 'part_time' | 'contract' | 'internship'
+type TypeFilter = string
 type ExperienceFilter = 'junior' | 'mid' | 'senior' | 'lead'
 type RemoteFilter = 'remote' | 'hybrid' | 'onsite'
 
@@ -89,12 +89,13 @@ const statusOptions: { value: StatusFilter, label: string }[] = [
   { value: 'closed', label: 'Closed' },
   { value: 'archived', label: 'Archived' },
 ]
-const typeOptions: { value: TypeFilter, label: string }[] = [
-  { value: 'full_time', label: 'Full-time' },
-  { value: 'part_time', label: 'Part-time' },
-  { value: 'contract', label: 'Contract' },
-  { value: 'internship', label: 'Internship' },
-]
+// Employment types are org-configurable labels; derive the filter chips from
+// the labels present on the current jobs so removed/added types stay in sync.
+const typeOptions = computed<{ value: TypeFilter, label: string }[]>(() => {
+  const seen = new Set<string>()
+  for (const j of jobs.value) if (j.type) seen.add(j.type)
+  return [...seen].sort((a, b) => a.localeCompare(b)).map(label => ({ value: label, label }))
+})
 const experienceOptions: { value: ExperienceFilter, label: string }[] = [
   { value: 'junior', label: 'Junior' },
   { value: 'mid', label: 'Mid' },

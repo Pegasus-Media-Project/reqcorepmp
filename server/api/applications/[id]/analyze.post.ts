@@ -32,6 +32,7 @@ export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { scoring: ['create'] })
   const orgId = session.session.activeOrganizationId
   const { id: applicationId } = await getValidatedRouterParams(event, paramsSchema.parse)
+  await assertApplicationInScope(session, applicationId)
   // Body is optional — GET-style "just run with defaults" stays valid.
   const body = await readBody(event).catch(() => null)
   const parsedBody = body ? bodySchema.parse(body) : null

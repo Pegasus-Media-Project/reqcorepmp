@@ -45,7 +45,9 @@ useSeoMeta({
 })
 
 const localePath = useLocalePath()
+const { t } = useI18n()
 const { createJob } = useJobs()
+const { programs } = usePrograms()
 const { track } = useTrack()
 const toast = useToast()
 
@@ -91,10 +93,11 @@ const steps = [
 // Step 1: Job details (API-supported fields)
 const form = ref({
   title: '',
+  programId: undefined as string | undefined,
   description: '',
   location: '',
-  type: 'full_time' as 'full_time' | 'part_time' | 'contract' | 'internship',
-  experienceLevel: 'mid' as 'junior' | 'mid' | 'senior' | 'lead',
+  type: 'Full-time' as string,
+  experienceLevel: undefined as 'junior' | 'mid' | 'senior' | 'lead' | undefined,
   remoteStatus: undefined as 'remote' | 'hybrid' | 'onsite' | undefined,
 })
 
@@ -297,10 +300,11 @@ const linkCopied = ref(false)
 
 const formSchema = z.object({
   title: z.string().trim().min(1, 'Title is required').max(200, 'Title must be 200 characters or less'),
+  programId: z.string().optional(),
   description: z.string().trim().max(100_000, 'Description is too long'),
   location: z.string().trim().max(500, 'Location must be 500 characters or less'),
-  type: z.enum(['full_time', 'part_time', 'contract', 'internship']),
-  experienceLevel: z.enum(['junior', 'mid', 'senior', 'lead']),
+  type: z.string().min(1, 'Employment type is required').max(60),
+  experienceLevel: z.enum(['junior', 'mid', 'senior', 'lead']).optional(),
   remoteStatus: z.enum(['remote', 'hybrid', 'onsite']).optional(),
 })
 
@@ -378,6 +382,8 @@ function restoreFormFromStorage() {
     if (storedForm.success) {
       form.value = {
         ...storedForm.data,
+        programId: storedForm.data.programId,
+        experienceLevel: storedForm.data.experienceLevel,
         remoteStatus: storedForm.data.remoteStatus,
       }
     }
@@ -413,10 +419,11 @@ function resetState() {
   currentStep.value = 1
   form.value = {
     title: '',
+    programId: undefined,
     description: '',
     location: '',
-    type: 'full_time',
-    experienceLevel: 'mid',
+    type: 'Full-time',
+    experienceLevel: undefined,
     remoteStatus: undefined,
   }
   applicationForm.value = {
@@ -701,6 +708,7 @@ async function handleSubmit(mode: 'publish' | 'draft' = publishChoice.value) {
   try {
     const created = await createJob({
       title: normalizedForm.title,
+      programId: normalizedForm.programId || undefined,
       description: normalizedForm.description || undefined,
       location: normalizedForm.location || undefined,
       type: normalizedForm.type,
@@ -795,12 +803,14 @@ async function copyFinalLink() {
   }
 }
 
-const typeOptions = [
-  { value: 'full_time', label: 'Full-time' },
-  { value: 'part_time', label: 'Part-time' },
-  { value: 'contract', label: 'Contract' },
-  { value: 'internship', label: 'Internship' },
-]
+// Employment-type options come from the org-configurable list (seeded with the
+// four classic defaults). A job stores the chosen label directly.
+const { employmentTypes } = useEmploymentTypes()
+const typeOptions = computed(() => {
+  const labels = employmentTypes.value.map(e => e.label)
+  if (form.value.type && !labels.includes(form.value.type)) labels.unshift(form.value.type)
+  return labels.map(label => ({ value: label, label }))
+})
 </script>
 
 <template>
@@ -941,6 +951,22 @@ const typeOptions = [
                 </div>
               </div>
 
+              <!-- Program -->
+              <div>
+                <label for="programId" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
+                  {{ t('programs.jobField.label') }}
+                </label>
+                <select
+                  id="programId"
+                  v-model="form.programId"
+                  class="w-full rounded-lg border px-3 py-2.5 text-sm bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 border-surface-300 dark:border-surface-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
+                >
+                  <option :value="undefined">{{ t('programs.jobField.none') }}</option>
+                  <option v-for="p in programs" :key="p.id" :value="p.id">{{ p.name }}</option>
+                </select>
+                <p class="mt-1.5 text-xs text-surface-400 dark:text-surface-500">{{ t('programs.jobField.hint') }}</p>
+              </div>
+
               <!-- Experience + remote -->
               <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
@@ -950,6 +976,7 @@ const typeOptions = [
                     v-model="form.experienceLevel"
                     class="w-full rounded-lg border px-3 py-2.5 text-sm bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 border-surface-300 dark:border-surface-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
                   >
+                    <option :value="undefined">Not specified</option>
                     <option value="junior">Junior</option>
                     <option value="mid">Mid-level</option>
                     <option value="senior">Senior</option>

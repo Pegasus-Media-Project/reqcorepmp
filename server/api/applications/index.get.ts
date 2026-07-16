@@ -29,8 +29,13 @@ export default defineEventHandler(async (event) => {
 
   const query = await getValidatedQuery(event, applicationQuerySchema.parse)
 
+  // Restrict scoped members to applications for jobs they manage.
+  const scope = await getManagedJobScope(session)
+  const scopeCondition = jobScopeCondition(scope, application.jobId)
+
   const offset = (query.page - 1) * query.limit
   const conditions = [eq(application.organizationId, orgId)]
+  if (scopeCondition) conditions.push(scopeCondition)
 
   if (query.jobId) {
     conditions.push(eq(application.jobId, query.jobId))
@@ -98,11 +103,12 @@ export default defineEventHandler(async (event) => {
 
   // Job-wide per-status totals for the pipeline tab badges. Intentionally ignores
   // every active filter so the badges stay put as the user narrows the list.
-  const statusCountsPromise: Promise<StatusCountRow[]> = query.jobId
+  const jobIdInScope = !!query.jobId && (scope.manageAll || scope.jobIds.includes(query.jobId))
+  const statusCountsPromise: Promise<StatusCountRow[]> = jobIdInScope
     ? db
         .select({ status: application.status, count: count() })
         .from(application)
-        .where(and(eq(application.organizationId, orgId), eq(application.jobId, query.jobId)))
+        .where(and(eq(application.organizationId, orgId), eq(application.jobId, query.jobId!)))
         .groupBy(application.status)
     : Promise.resolve([])
 

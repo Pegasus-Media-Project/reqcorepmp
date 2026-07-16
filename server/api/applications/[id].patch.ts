@@ -11,6 +11,7 @@ export default defineEventHandler(async (event) => {
   const orgId = session.session.activeOrganizationId
 
   const { id } = await getValidatedRouterParams(event, applicationIdParamSchema.parse)
+  await assertApplicationInScope(session, id)
   const body = await readValidatedBody(event, updateApplicationSchema.parse)
 
   // Fetch current application to validate status transition

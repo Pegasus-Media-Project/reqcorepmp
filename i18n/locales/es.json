@@ -262,5 +262,48 @@
       "chooseFileHint": "Elegir archivo (PDF, DOC, DOCX — máx. 10 MB)",
       "urlPlaceholder": "https://…"
     }
+  },
+  "programs": {
+    "title": "Programs",
+    "navDescription": "Cohorts & tracks",
+    "description": "Group job postings into programs (e.g. Pegasus cohorts) and control who manages them.",
+    "addButton": "Add program",
+    "addFirst": "Add your first program",
+    "empty": "No programs yet",
+    "emptyHint": "Create a program to group related job postings and give team members scoped management access.",
+    "loading": "Loading programs…",
+    "noPermission": "You don't have permission to manage programs. Contact your organization owner or admin.",
+    "jobCount": "{count} job | {count} jobs",
+    "archived": "Archived",
+    "deleteConfirm": "Delete the \"{name}\" program? Its jobs will become standard postings and assignments will be removed.",
+    "deleted": "Program deleted",
+    "deleteFailed": "Failed to delete program",
+    "saveFailed": "Failed to save program",
+    "form": {
+      "nameLabel": "Name",
+      "namePlaceholder": "e.g. Pegasus Fellowship 2026",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "What is this program about?",
+      "archivedLabel": "Archived",
+      "archivedHint": "Hide this program from job creation without deleting it.",
+      "create": "Create program",
+      "save": "Save changes",
+      "cancel": "Cancel"
+    },
+    "assignments": {
+      "title": "Managed by",
+      "description": "These users can manage every job in this program.",
+      "jobTitle": "Job access",
+      "jobDescription": "These users can manage this specific job, in addition to any program-level assignments.",
+      "addPlaceholder": "Add a team member…",
+      "empty": "No one assigned yet. Owners and admins can always manage everything.",
+      "remove": "Remove",
+      "addFailed": "Failed to update assignment"
+    },
+    "jobField": {
+      "label": "Program",
+      "none": "None — standard job posting",
+      "hint": "Attach this posting to a program, or leave it as a standard job."
+    }
   }
 }

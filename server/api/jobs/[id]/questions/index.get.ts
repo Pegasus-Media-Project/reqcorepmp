@@ -7,6 +7,7 @@ export default defineEventHandler(async (event) => {
   const orgId = session.session.activeOrganizationId
 
   const { id: jobId } = await getValidatedRouterParams(event, jobIdParamSchema.parse)
+  await assertJobInScope(session, jobId)
 
   // Verify the job belongs to the org
   const existingJob = await db.query.job.findFirst({
@@ -24,6 +25,7 @@ export default defineEventHandler(async (event) => {
     columns: {
       id: true,
       jobId: true,
+      sectionId: true,
       type: true,
       label: true,
       description: true,

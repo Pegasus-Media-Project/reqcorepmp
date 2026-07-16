@@ -73,13 +73,16 @@ const typeLabels = computed<Record<string, string>>(() => ({
   internship: t('career.type.internship'),
 }))
 
-const typeOptions = computed(() => [
-  { label: t('jobs.list.allTypes'), value: undefined },
-  { label: t('career.type.full_time'), value: 'full_time' },
-  { label: t('career.type.part_time'), value: 'part_time' },
-  { label: t('career.type.contract'), value: 'contract' },
-  { label: t('career.type.internship'), value: 'internship' },
-])
+// Employment types are org-configurable free-text labels, so derive the filter
+// options from the labels actually present on the listed jobs.
+const typeOptions = computed(() => {
+  const seen = new Set<string>()
+  for (const j of jobs.value) if (j.type) seen.add(j.type)
+  return [
+    { label: t('jobs.list.allTypes'), value: undefined as string | undefined },
+    ...[...seen].sort((a, b) => a.localeCompare(b)).map(label => ({ label, value: label as string | undefined })),
+  ]
+})
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString(locale.value, {

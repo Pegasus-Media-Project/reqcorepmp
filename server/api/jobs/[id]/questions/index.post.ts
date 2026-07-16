@@ -7,6 +7,7 @@ export default defineEventHandler(async (event) => {
   const orgId = session.session.activeOrganizationId
 
   const { id: jobId } = await getValidatedRouterParams(event, jobIdParamSchema.parse)
+  await assertJobInScope(session, jobId)
   const body = await readValidatedBody(event, createQuestionSchema.parse)
 
   // Verify the job belongs to the org
@@ -22,6 +23,7 @@ export default defineEventHandler(async (event) => {
   const [created] = await db.insert(jobQuestion).values({
     organizationId: orgId,
     jobId,
+    sectionId: body.sectionId ?? null,
     type: body.type,
     label: body.label,
     description: body.description,
@@ -31,6 +33,7 @@ export default defineEventHandler(async (event) => {
   }).returning({
     id: jobQuestion.id,
     jobId: jobQuestion.jobId,
+    sectionId: jobQuestion.sectionId,
     type: jobQuestion.type,
     label: jobQuestion.label,
     description: jobQuestion.description,

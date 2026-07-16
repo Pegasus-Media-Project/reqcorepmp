@@ -471,6 +471,12 @@ export interface ApplicationConfirmationParams {
   jobTitle: string
   code: string
   statusUrl: string
+  /** Display name used in the header/footer; falls back to the product name. */
+  organizationName?: string
+  /** Absolute https URL of the org/career-page logo, shown in the header. */
+  logoUrl?: string
+  /** Read-only copy of what the applicant submitted, rendered in the email. */
+  summary?: Array<{ label: string, value: string }>
 }
 
 /**
@@ -492,6 +498,26 @@ export async function sendApplicationConfirmationEmail(
 
 function buildApplicationConfirmationHtml(params: ApplicationConfirmationParams): string {
   const greeting = params.firstName ? `Hi ${escapeHtml(params.firstName)},` : 'Hi,'
+  const orgName = params.organizationName?.trim() || 'Pegasus Media Project'
+  const header = params.logoUrl
+    ? `<img src="${escapeHtml(params.logoUrl)}" alt="${escapeHtml(orgName)}" height="40" style="max-height:40px;width:auto;display:inline-block;" />`
+    : `<h1 style="margin:0;font-size:20px;font-weight:600;color:#09090b;">${escapeHtml(orgName)}</h1>`
+  const summaryRows = (params.summary ?? [])
+    .filter((item) => item.value != null && String(item.value).trim() !== '')
+    .map((item) => `
+                  <tr>
+                    <td style="padding:8px 0;border-bottom:1px solid #f4f4f5;vertical-align:top;font-size:12px;color:#71717a;width:40%;">${escapeHtml(item.label)}</td>
+                    <td style="padding:8px 0 8px 12px;border-bottom:1px solid #f4f4f5;vertical-align:top;font-size:13px;color:#3f3f46;white-space:pre-wrap;">${escapeHtml(item.value)}</td>
+                  </tr>`)
+    .join('')
+  const summaryBlock = summaryRows
+    ? `
+              <div style="margin:0 0 24px;">
+                <div style="font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:#71717a;margin-bottom:8px;">Your application</div>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #f4f4f5;">${summaryRows}
+                </table>
+              </div>`
+    : ''
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -506,7 +532,7 @@ function buildApplicationConfirmationHtml(params: ApplicationConfirmationParams)
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e4e4e7;">
           <tr>
             <td style="padding:32px 32px 24px;text-align:center;border-bottom:1px solid #f4f4f5;">
-              <h1 style="margin:0;font-size:20px;font-weight:600;color:#09090b;">Pegasus Media Project</h1>
+              ${header}
             </td>
           </tr>
           <tr>
@@ -514,8 +540,9 @@ function buildApplicationConfirmationHtml(params: ApplicationConfirmationParams)
               <h2 style="margin:0 0 16px;font-size:18px;font-weight:600;color:#09090b;">Application received</h2>
               <p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#3f3f46;">${greeting}</p>
               <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#3f3f46;">
-                Thanks for applying for <strong>${escapeHtml(params.jobTitle)}</strong>. Your application is now with the hiring team. Use the confirmation code below to check your status at any time.
+                Thanks for applying for <strong>${escapeHtml(params.jobTitle)}</strong>. Your application is now with the team. Use the confirmation code below to check your status at any time.
               </p>
+              ${summaryBlock}
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
                 <tr>
                   <td align="center" style="padding:16px;background-color:#f4f4f5;border-radius:8px;">
@@ -541,7 +568,7 @@ function buildApplicationConfirmationHtml(params: ApplicationConfirmationParams)
           </tr>
           <tr>
             <td style="padding:16px 32px;text-align:center;border-top:1px solid #f4f4f5;background-color:#fafafa;">
-              <p style="margin:0;font-size:12px;color:#a1a1aa;">Sent by Pegasus Media Project</p>
+              <p style="margin:0;font-size:12px;color:#a1a1aa;">Sent by ${escapeHtml(orgName)}</p>
             </td>
           </tr>
         </table>
@@ -553,19 +580,27 @@ function buildApplicationConfirmationHtml(params: ApplicationConfirmationParams)
 }
 
 function buildApplicationConfirmationText(params: ApplicationConfirmationParams): string {
+  const orgName = params.organizationName?.trim() || 'Pegasus Media Project'
+  const summaryLines = (params.summary ?? [])
+    .filter((item) => item.value != null && String(item.value).trim() !== '')
+    .map((item) => `- ${item.label}: ${item.value}`)
+  const summaryBlock = summaryLines.length
+    ? ['', 'Your application:', ...summaryLines]
+    : []
   return [
     'Application received',
     '',
     params.firstName ? `Hi ${params.firstName},` : 'Hi,',
     '',
-    `Thanks for applying for ${params.jobTitle}. Your application is now with the hiring team.`,
+    `Thanks for applying for ${params.jobTitle}. Your application is now with the team.`,
+    ...summaryBlock,
     '',
     `Your confirmation code: ${params.code}`,
     `Check your status: ${params.statusUrl}`,
     '',
     'Save this code — it\'s the only way to look up your application.',
     '',
-    '— Pegasus Media Project',
+    `— ${orgName}`,
   ].join('\n')
 }
 

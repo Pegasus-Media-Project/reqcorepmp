@@ -1,5 +1,5 @@
 import { eq, and } from 'drizzle-orm'
-import { job } from '../../database/schema'
+import { job, program } from '../../database/schema'
 import { idParamSchema, updateJobSchema, JOB_STATUS_TRANSITIONS } from '../../utils/schemas/job'
 
 export default defineEventHandler(async (event) => {
@@ -9,6 +9,9 @@ export default defineEventHandler(async (event) => {
   const { id } = await getValidatedRouterParams(event, idParamSchema.parse)
   const body = await readValidatedBody(event, updateJobSchema.parse)
 
+  // Scoped members may only edit jobs they manage.
+  await assertJobInScope(session, id)
+
   // Fetch existing job — needed for status transition check and slug regeneration
   const existing = await db.query.job.findFirst({
     where: and(eq(job.id, id), eq(job.organizationId, orgId)),
@@ -17,6 +20,17 @@ export default defineEventHandler(async (event) => {
 
   if (!existing) {
     throw createError({ statusCode: 404, statusMessage: 'Not found' })
+  }
+
+  // A program can only be attached if it belongs to this org.
+  if (body.programId) {
+    const programRow = await db.query.program.findFirst({
+      where: and(eq(program.id, body.programId), eq(program.organizationId, orgId)),
+      columns: { id: true },
+    })
+    if (!programRow) {
+      throw createError({ statusCode: 422, statusMessage: 'Program not found' })
+    }
   }
 
   // Validate status transition if status is being changed
@@ -47,6 +61,7 @@ export default defineEventHandler(async (event) => {
     .where(and(eq(job.id, id), eq(job.organizationId, orgId)))
     .returning({
       id: job.id,
+      programId: job.programId,
       title: job.title,
       slug: job.slug,
       description: job.description,

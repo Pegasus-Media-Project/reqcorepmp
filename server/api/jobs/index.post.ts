@@ -1,4 +1,5 @@
-import { job, jobQuestion, scoringCriterion } from '../../database/schema'
+import { and, eq } from 'drizzle-orm'
+import { job, jobQuestion, scoringCriterion, program } from '../../database/schema'
 import { createJobWizardSchema } from '../../utils/schemas/job'
 
 export default defineEventHandler(async (event) => {
@@ -12,6 +13,17 @@ export default defineEventHandler(async (event) => {
     await assertActiveRoleLimit(orgId)
   }
 
+  // A program can only be attached if it belongs to this org.
+  if (body.programId) {
+    const programRow = await db.query.program.findFirst({
+      where: and(eq(program.id, body.programId), eq(program.organizationId, orgId)),
+      columns: { id: true },
+    })
+    if (!programRow) {
+      throw createError({ statusCode: 422, statusMessage: 'Program not found' })
+    }
+  }
+
   // Generate a deterministic ID upfront so we can build the slug
   const jobId = crypto.randomUUID()
   const slug = generateJobSlug(body.title, jobId, body.slug)
@@ -20,6 +32,7 @@ export default defineEventHandler(async (event) => {
     const [createdJob] = await tx.insert(job).values({
       id: jobId,
       organizationId: orgId,
+      programId: body.programId ?? null,
       title: body.title,
       slug,
       description: body.description,

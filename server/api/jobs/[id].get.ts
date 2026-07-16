@@ -8,10 +8,14 @@ export default defineEventHandler(async (event) => {
 
   const { id } = await getValidatedRouterParams(event, idParamSchema.parse)
 
+  // Scoped members may only view jobs in their assigned programs/jobs.
+  await assertJobInScope(session, id)
+
   const result = await db.query.job.findFirst({
     where: and(eq(job.id, id), eq(job.organizationId, orgId)),
     columns: {
       id: true,
+      programId: true,
       title: true,
       slug: true,
       description: true,

@@ -82,15 +82,13 @@ describe('Consent surface (banner + composable)', () => {
     expect(consent).toMatch(/consent_granted/)
   })
 
-  it('renders ConsentBanner only while consent is undecided', () => {
-    expect(existsSync(resolve(ROOT, 'app/components/ConsentBanner.vue'))).toBe(true)
-    const banner = read('app/components/ConsentBanner.vue')
-    expect(banner).toMatch(/v-if="needsConsent"/)
-    expect(banner).toMatch(/acceptAnalytics/)
-    expect(banner).toMatch(/declineAnalytics/)
-
+  it('does NOT render a consent banner (privacy-by-default: analytics stay cookieless unless consent is granted elsewhere)', () => {
+    // The consent banner was removed. Without it, no visitor ever grants
+    // consent through the UI, so PostHog stays in its cookieless default
+    // (sessionStorage + identified_only) — the desired no-tracking default.
+    expect(existsSync(resolve(ROOT, 'app/components/ConsentBanner.vue'))).toBe(false)
     const appVue = read('app/app.vue')
-    expect(appVue).toMatch(/<ConsentBanner\s*\/>/)
+    expect(appVue).not.toMatch(/<ConsentBanner\s*\/>/)
   })
 })
 

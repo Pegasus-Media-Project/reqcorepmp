@@ -14,6 +14,9 @@ export default defineEventHandler(async (event) => {
 
   const body = await readValidatedBody(event, createApplicationSchema.parse)
 
+  // Scoped members may only add applications to jobs they manage.
+  await assertJobInScope(session, body.jobId)
+
   // Verify candidate belongs to this org
   const existingCandidate = await findActiveCandidate(orgId, body.candidateId)
 

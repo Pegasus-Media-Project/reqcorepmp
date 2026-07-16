@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import {
-  Building2, Users, UserCircle, ChevronLeft, Plug, Brain, ShieldCheck, Globe, Globe2, CreditCard,
+  Building2, Users, UserCircle, ChevronLeft, Plug, Brain, ShieldCheck, Globe, Globe2, CreditCard, GraduationCap, Briefcase,
 } from 'lucide-vue-next'
 
 const route = useRoute()
 const localePath = useLocalePath()
+const { t } = useI18n()
 
 const settingsNav = [
   {
@@ -26,10 +27,22 @@ const settingsNav = [
     exact: true,
   },
   {
+    label: 'Employment Types',
+    to: '/dashboard/settings/employment-types',
+    icon: Briefcase,
+    exact: true,
+  },
+  {
     label: 'Members',
     to: '/dashboard/settings/members',
     icon: Users,
     exact: true,
+  },
+  {
+    label: t('programs.title'),
+    to: '/dashboard/settings/programs',
+    icon: GraduationCap,
+    exact: false,
   },
   {
     label: 'Billing',

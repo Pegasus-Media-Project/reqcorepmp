@@ -13,10 +13,15 @@ const route = useRoute()
 const localePath = useLocalePath()
 const jobId = route.params.id as string
 const toast = useToast()
+const { t } = useI18n()
 const { handlePreviewReadOnlyError } = usePreviewReadOnly()
 const { track } = useTrack()
 
 const { job, status: fetchStatus, error: fetchError, updateJob, deleteJob } = useJob(jobId)
+const { programs } = usePrograms()
+const { employmentTypes } = useEmploymentTypes()
+// Assigning users to a job is an admin/owner action (program:update).
+const { allowed: canManageAccess } = usePermission({ program: ['update'] })
 
 useSeoMeta({
   title: computed(() =>
@@ -30,9 +35,10 @@ useSeoMeta({
 
 const form = ref({
   title: '',
+  programId: '' as string,
   description: '',
   location: '',
-  type: 'full_time' as string,
+  type: 'Full-time' as string,
   slug: '',
   salaryMin: null as number | null,
   salaryMax: null as number | null,
@@ -47,13 +53,25 @@ const form = ref({
   autoScoreOnApply: false,
 })
 
+/**
+ * Format a stored timestamp as a `YYYY-MM-DDTHH:mm` string in the viewer's
+ * local time zone, which is the value format a `datetime-local` input expects.
+ */
+function toLocalDatetimeInput(value: string | Date): string {
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 watch(job, (j) => {
   if (j) {
     form.value = {
       title: j.title ?? '',
+      programId: (j as { programId?: string | null }).programId ?? '',
       description: j.description ?? '',
       location: j.location ?? '',
-      type: j.type ?? 'full_time',
+      type: j.type ?? 'Full-time',
       slug: j.slug ?? '',
       salaryMin: j.salaryMin ?? null,
       salaryMax: j.salaryMax ?? null,
@@ -62,7 +80,7 @@ watch(job, (j) => {
       salaryNegotiable: j.salaryNegotiable ?? false,
       remoteStatus: j.remoteStatus ?? '',
       experienceLevel: j.experienceLevel ?? '',
-      validThrough: j.validThrough ? new Date(j.validThrough).toISOString().split('T')[0] ?? '' : '',
+      validThrough: j.validThrough ? toLocalDatetimeInput(j.validThrough) : '',
       requireResume: j.requireResume ?? false,
       requireCoverLetter: j.requireCoverLetter ?? false,
       autoScoreOnApply: j.autoScoreOnApply ?? false,
@@ -86,9 +104,10 @@ watch(() => form.value.salaryNegotiable, (negotiable) => {
 
 const editSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200),
+  programId: z.string().optional().or(z.literal('')),
   description: z.string().optional(),
   location: z.string().optional(),
-  type: z.enum(['full_time', 'part_time', 'contract', 'internship']),
+  type: z.string().min(1, 'Employment type is required').max(60),
   slug: z.string().max(80).optional(),
   salaryMin: z.union([z.coerce.number().int().min(0), z.null()]).optional(),
   salaryMax: z.union([z.coerce.number().int().min(0), z.null()]).optional(),
@@ -123,6 +142,7 @@ async function handleSave() {
   try {
     const payload: Record<string, unknown> = {
       title: form.value.title,
+      programId: form.value.programId || null,
       description: form.value.description || null,
       location: form.value.location || null,
       type: form.value.type,
@@ -200,12 +220,14 @@ async function handleDelete() {
 // Options
 // ─────────────────────────────────────────────
 
-const typeOptions = [
-  { value: 'full_time', label: 'Full-time' },
-  { value: 'part_time', label: 'Part-time' },
-  { value: 'contract', label: 'Contract' },
-  { value: 'internship', label: 'Internship' },
-]
+// Employment-type options come from the org-configurable list. A job stores the
+// chosen label directly; if the job's current label was since removed from the
+// list, keep it selectable so saving doesn't silently change it.
+const typeOptions = computed(() => {
+  const labels = employmentTypes.value.map(e => e.label)
+  if (form.value.type && !labels.includes(form.value.type)) labels.unshift(form.value.type)
+  return labels.map(label => ({ value: label, label }))
+})
 
 const remoteOptions = [
   { value: '', label: 'Not specified' },
@@ -331,6 +353,22 @@ function onSalaryMaxChange(e: Event) {
                   </option>
                 </select>
               </div>
+            </div>
+
+            <!-- Program -->
+            <div>
+              <label for="settings-program" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
+                {{ t('programs.jobField.label') }}
+              </label>
+              <select
+                id="settings-program"
+                v-model="form.programId"
+                class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
+              >
+                <option value="">{{ t('programs.jobField.none') }}</option>
+                <option v-for="p in programs" :key="p.id" :value="p.id">{{ p.name }}</option>
+              </select>
+              <p class="mt-1 text-xs text-surface-400 dark:text-surface-500">{{ t('programs.jobField.hint') }}</p>
             </div>
 
             <!-- Remote status -->
@@ -522,19 +560,19 @@ function onSalaryMaxChange(e: Event) {
         <!-- SECTION: Listing Expiry                  -->
         <!-- ═══════════════════════════════════════ -->
         <section class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-6">
-          <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100 mb-1">Listing Expiry</h2>
+          <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100 mb-1">Application Deadline</h2>
           <p class="text-xs text-surface-400 dark:text-surface-500 mb-5">
-            Set when this job posting automatically expires. Required for Google Jobs rich results.
+            Set the exact date and time when this posting stops accepting applications. Also used for Google Jobs rich results.
           </p>
           <div>
             <label for="settings-valid-through" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-              Valid Through
+              Closes at
             </label>
             <div class="flex items-center gap-2">
               <input
                 id="settings-valid-through"
                 v-model="form.validThrough"
-                type="date"
+                type="datetime-local"
                 class="w-full sm:w-64 rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
               />
               <button
@@ -546,7 +584,7 @@ function onSalaryMaxChange(e: Event) {
                 Clear
               </button>
             </div>
-            <p class="mt-1.5 text-xs text-surface-400 dark:text-surface-500">Leave blank if there is no fixed expiry date.</p>
+            <p class="mt-1.5 text-xs text-surface-400 dark:text-surface-500">Uses your local time zone. Once this time passes, the public application form closes. Leave blank for no deadline.</p>
           </div>
         </section>
 
@@ -593,6 +631,18 @@ function onSalaryMaxChange(e: Event) {
           </button>
         </div>
       </form>
+
+      <!-- ═══════════════════════════════════════ -->
+      <!-- SECTION: Job Access (individual)         -->
+      <!-- ═══════════════════════════════════════ -->
+      <div v-if="canManageAccess" class="mb-12">
+        <AssigneesPanel
+          :list-url="`/api/jobs/${jobId}/access`"
+          :title="t('programs.assignments.jobTitle')"
+          :description="t('programs.assignments.jobDescription')"
+          :can-manage="canManageAccess"
+        />
+      </div>
 
       <!-- ═══════════════════════════════════════ -->
       <!-- DANGER ZONE                              -->

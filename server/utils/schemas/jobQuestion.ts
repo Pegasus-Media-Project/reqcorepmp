@@ -39,6 +39,8 @@ export const createQuestionSchema = z.object({
   required: z.boolean().default(false),
   options: z.array(z.string().trim().min(1).max(200)).min(1).max(50).optional(),
   displayOrder: z.number().int().min(0).default(0),
+  /** Optional wizard section/page this question belongs to. Null = default page. */
+  sectionId: z.string().min(1).nullish(),
 }).superRefine(validateSelectOptions)
 
 /** Schema for updating an existing question (all fields optional) */
@@ -49,6 +51,42 @@ export const updateQuestionSchema = z.object({
   required: z.boolean().optional(),
   options: z.array(z.string().trim().min(1).max(200)).min(1).max(50).nullish(),
   displayOrder: z.number().int().min(0).optional(),
+  /** Pass null to move the question back to the default page. */
+  sectionId: z.string().min(1).nullish(),
+})
+
+// ─────────────────────────────────────────────
+// Job question section (wizard page) schemas
+// ─────────────────────────────────────────────
+
+/** Schema for creating a new section (wizard page) */
+export const createSectionSchema = z.object({
+  title: z.string().trim().min(1, 'Title is required').max(200),
+  description: z.string().trim().max(1000).optional(),
+  displayOrder: z.number().int().min(0).default(0),
+})
+
+/** Schema for updating a section (all fields optional) */
+export const updateSectionSchema = z.object({
+  title: z.string().trim().min(1).max(200).optional(),
+  description: z.string().trim().max(1000).nullish(),
+  displayOrder: z.number().int().min(0).optional(),
+})
+
+/** Schema for bulk reordering sections */
+export const reorderSectionsSchema = z.object({
+  order: z.array(
+    z.object({
+      id: z.string().min(1),
+      displayOrder: z.number().int().min(0),
+    }),
+  ).min(1),
+})
+
+/** Route param schema for job id + sectionId */
+export const sectionIdParamSchema = z.object({
+  id: z.string().min(1),
+  sectionId: z.string().min(1),
 })
 
 /** Validates invariants after an existing question and a partial update are merged. */

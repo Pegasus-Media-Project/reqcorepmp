@@ -7,7 +7,7 @@ import Stripe from "stripe";
 import { and, eq } from "drizzle-orm";
 import { ac, owner, admin, member } from "~~/shared/permissions";
 import { isBillingActionAllowed } from "~~/shared/billing";
-import { sendOrgInvitationEmail, sendPasswordResetEmail } from "./email";
+import { sendOrgInvitationEmail, sendPasswordResetEmail, sendVerificationEmail } from "./email";
 import { APIError } from "better-auth/api";
 import {
   ensureDefaultOrgMembership,

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
 import {
-  Building2, Users, UserCircle, ChevronLeft, Settings, Plug, Brain, ShieldCheck, Globe, Globe2, ShieldAlert, CreditCard, Lock,
+  Building2, Users, UserCircle, ChevronLeft, Settings, Plug, Brain, ShieldCheck, Globe, Globe2, ShieldAlert, CreditCard, Lock, GraduationCap, Briefcase,
 } from 'lucide-vue-next'
 import type { PlanFeature } from '~~/shared/billing'
 
@@ -50,11 +50,25 @@ const settingsNav: SettingsNavItem[] = [
     feature: 'careerPage',
   },
   {
+    label: 'Employment Types',
+    description: 'Job type options',
+    to: '/dashboard/settings/employment-types',
+    icon: Briefcase,
+    exact: true,
+  },
+  {
     label: 'Members',
     description: 'Team & invitations',
     to: '/dashboard/settings/members',
     icon: Users,
     exact: true,
+  },
+  {
+    label: t('programs.title'),
+    description: t('programs.navDescription'),
+    to: '/dashboard/settings/programs',
+    icon: GraduationCap,
+    exact: false,
   },
   {
     label: 'Billing',

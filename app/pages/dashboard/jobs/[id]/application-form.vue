@@ -48,10 +48,15 @@ async function copyApplicationLink() {
 
 const {
   questions: jobQuestions,
+  sections: jobSections,
   addQuestion,
   updateQuestion,
   deleteQuestion,
   reorderQuestions,
+  addSection,
+  updateSection,
+  deleteSection,
+  reorderSections,
 } = useJobQuestions(jobId)
 
 type QuestionType =
@@ -65,6 +70,14 @@ type BuilderQuestion = {
   description?: string | null
   required: boolean
   options?: string[] | null
+  sectionId?: string | null
+}
+
+type BuilderSection = {
+  id: string
+  title: string
+  description?: string | null
+  displayOrder: number
 }
 
 const builderModel = ref<{
@@ -72,7 +85,8 @@ const builderModel = ref<{
   requireResume: boolean
   requireCoverLetter: boolean
   questions: BuilderQuestion[]
-}>({ phoneRequirement: 'optional', requireResume: false, requireCoverLetter: false, questions: [] })
+  sections: BuilderSection[]
+}>({ phoneRequirement: 'optional', requireResume: false, requireCoverLetter: false, questions: [], sections: [] })
 
 // Keep the builder model in sync with server state.
 watch(job, (j) => {
@@ -91,6 +105,16 @@ watch(jobQuestions, (qs) => {
     description: q.description ?? null,
     required: q.required,
     options: q.options ?? null,
+    sectionId: q.sectionId ?? null,
+  }))
+}, { immediate: true })
+
+watch(jobSections, (ss) => {
+  builderModel.value.sections = (ss ?? []).map((s: any) => ({
+    id: s.id,
+    title: s.title,
+    description: s.description ?? null,
+    displayOrder: s.displayOrder,
   }))
 }, { immediate: true })
 
@@ -102,6 +126,11 @@ const builderOperations = {
   setPhoneRequirement: (value: 'hidden' | 'optional' | 'required') => updateJob({ phoneRequirement: value }),
   setRequireResume: (value: boolean) => updateJob({ requireResume: value }),
   setRequireCoverLetter: (value: boolean) => updateJob({ requireCoverLetter: value }),
+  addSection: (data: { title: string, description?: string }) => addSection({ ...data, displayOrder: jobSections.value?.length ?? 0 }),
+  updateSection: (id: string, data: { title?: string, description?: string | null }) => updateSection(id, data),
+  deleteSection: (id: string) => deleteSection(id),
+  reorderSections: (order: { id: string; displayOrder: number }[]) => reorderSections(order),
+  assignQuestionSection: (id: string, sectionId: string | null) => updateQuestion(id, { sectionId }),
 }
 
 </script>

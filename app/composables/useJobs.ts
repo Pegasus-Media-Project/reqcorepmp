@@ -25,9 +25,10 @@ export function useJobs(options?: {
   /** Create a new job and refresh the list */
   async function createJob(payload: {
     title: string
+    programId?: string | null
     description?: string
     location?: string
-    type?: 'full_time' | 'part_time' | 'contract' | 'internship'
+    type?: string
     experienceLevel?: 'junior' | 'mid' | 'senior' | 'lead'
     remoteStatus?: 'remote' | 'hybrid' | 'onsite'
     phoneRequirement?: 'hidden' | 'optional' | 'required'

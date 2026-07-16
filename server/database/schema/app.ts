@@ -70,16 +70,42 @@ export const onboardingSurveyResponse = pgTable('onboarding_survey_response', {
 ]))
 
 /**
+ * Programs (e.g. Pegasus cohorts) within an organization.
+ *
+ * A job posting may be tied to a program or stand alone (traditional posting).
+ * Programs are also the primary axis for scoped management access: a user
+ * assigned to a program manages every job inside it (see `programAssignment`).
+ */
+export const program = pgTable('program', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  description: text('description'),
+  archived: boolean('archived').notNull().default(false),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (t) => ([
+  index('program_organization_id_idx').on(t.organizationId),
+]))
+
+/**
  * Jobs / Positions within an organization.
  */
 export const job = pgTable('job', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  /** Optional program this posting belongs to. Null = traditional job posting. */
+  programId: text('program_id').references(() => program.id, { onDelete: 'set null' }),
   title: text('title').notNull(),
   slug: text('slug').notNull().unique(),
   description: text('description'),
   location: text('location'),
-  type: jobTypeEnum('type').notNull().default('full_time'),
+  /**
+   * Employment type as a free-text label (e.g. "Full-time", "Freelance").
+   * The set of selectable labels is org-configurable via the `employmentType`
+   * table; this column stores the chosen label directly rather than a fixed enum.
+   */
+  type: text('type').notNull().default('Full-time'),
   status: jobStatusEnum('status').notNull().default('draft'),
   // ── SEO / Rich Results fields ──
   salaryMin: integer('salary_min'),
@@ -111,6 +137,39 @@ export const job = pgTable('job', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (t) => ([
   index('job_organization_id_idx').on(t.organizationId),
+  index('job_program_id_idx').on(t.programId),
+]))
+
+/**
+ * Scoped management access — assigns a user to a whole program.
+ * The user gains full management of every job in that program.
+ */
+export const programAssignment = pgTable('program_assignment', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  programId: text('program_id').notNull().references(() => program.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (t) => ([
+  uniqueIndex('program_assignment_user_program_idx').on(t.userId, t.programId),
+  index('program_assignment_organization_id_idx').on(t.organizationId),
+  index('program_assignment_program_id_idx').on(t.programId),
+]))
+
+/**
+ * Scoped management access — assigns a user to a single job.
+ * Covers standalone (traditional) postings and one-off exceptions.
+ */
+export const jobAssignment = pgTable('job_assignment', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  jobId: text('job_id').notNull().references(() => job.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (t) => ([
+  uniqueIndex('job_assignment_user_job_idx').on(t.userId, t.jobId),
+  index('job_assignment_organization_id_idx').on(t.organizationId),
+  index('job_assignment_job_id_idx').on(t.jobId),
 ]))
 
 /**
@@ -213,10 +272,32 @@ export const document = pgTable('document', {
  * These appear on the public application form alongside the standard fields.
  * `options` is only used for `single_select` and `multi_select` types.
  */
+/**
+ * Sections group a job's custom questions into pages of a multi-step
+ * application wizard. A question with a NULL sectionId belongs to the implicit
+ * default page (keeps pre-sections jobs working). Sections are ordered by
+ * `displayOrder`; questions order within a section by their own displayOrder.
+ */
+export const jobQuestionSection = pgTable('job_question_section', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  jobId: text('job_id').notNull().references(() => job.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  description: text('description'),
+  displayOrder: integer('display_order').notNull().default(0),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (t) => ([
+  index('job_question_section_organization_id_idx').on(t.organizationId),
+  index('job_question_section_job_id_idx').on(t.jobId),
+]))
+
 export const jobQuestion = pgTable('job_question', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
   jobId: text('job_id').notNull().references(() => job.id, { onDelete: 'cascade' }),
+  /** Optional wizard section/page. NULL = the implicit default page. */
+  sectionId: text('section_id').references(() => jobQuestionSection.id, { onDelete: 'set null' }),
   type: questionTypeEnum('type').notNull().default('short_text'),
   label: text('label').notNull(),
   description: text('description'),
@@ -228,6 +309,24 @@ export const jobQuestion = pgTable('job_question', {
 }, (t) => ([
   index('job_question_organization_id_idx').on(t.organizationId),
   index('job_question_job_id_idx').on(t.jobId),
+  index('job_question_section_id_idx').on(t.sectionId),
+]))
+
+/**
+ * Org-configurable employment types (e.g. "Full-time", "Freelance").
+ * Populates the employment-type picker on the job form. `job.type` stores the
+ * chosen label directly, so these rows are the editable source of that list.
+ */
+export const employmentType = pgTable('employment_type', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  label: text('label').notNull(),
+  displayOrder: integer('display_order').notNull().default(0),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (t) => ([
+  index('employment_type_organization_id_idx').on(t.organizationId),
+  uniqueIndex('employment_type_org_label_idx').on(t.organizationId, t.label),
 ]))
 
 /**
@@ -862,10 +961,31 @@ export const onboardingSurveyResponseRelations = relations(onboardingSurveyRespo
 
 export const jobRelations = relations(job, ({ one, many }) => ({
   organization: one(organization, { fields: [job.organizationId], references: [organization.id] }),
+  program: one(program, { fields: [job.programId], references: [program.id] }),
   applications: many(application),
   questions: many(jobQuestion),
+  questionSections: many(jobQuestionSection),
   scoringCriteria: many(scoringCriterion),
   trackingLinks: many(trackingLink),
+  assignments: many(jobAssignment),
+}))
+
+export const programRelations = relations(program, ({ one, many }) => ({
+  organization: one(organization, { fields: [program.organizationId], references: [organization.id] }),
+  jobs: many(job),
+  assignments: many(programAssignment),
+}))
+
+export const programAssignmentRelations = relations(programAssignment, ({ one }) => ({
+  organization: one(organization, { fields: [programAssignment.organizationId], references: [organization.id] }),
+  program: one(program, { fields: [programAssignment.programId], references: [program.id] }),
+  user: one(user, { fields: [programAssignment.userId], references: [user.id] }),
+}))
+
+export const jobAssignmentRelations = relations(jobAssignment, ({ one }) => ({
+  organization: one(organization, { fields: [jobAssignment.organizationId], references: [organization.id] }),
+  job: one(job, { fields: [jobAssignment.jobId], references: [job.id] }),
+  user: one(user, { fields: [jobAssignment.userId], references: [user.id] }),
 }))
 
 export const candidateRelations = relations(candidate, ({ one, many }) => ({
@@ -893,6 +1013,17 @@ export const documentRelations = relations(document, ({ one }) => ({
 export const jobQuestionRelations = relations(jobQuestion, ({ one }) => ({
   organization: one(organization, { fields: [jobQuestion.organizationId], references: [organization.id] }),
   job: one(job, { fields: [jobQuestion.jobId], references: [job.id] }),
+  section: one(jobQuestionSection, { fields: [jobQuestion.sectionId], references: [jobQuestionSection.id] }),
+}))
+
+export const jobQuestionSectionRelations = relations(jobQuestionSection, ({ one, many }) => ({
+  organization: one(organization, { fields: [jobQuestionSection.organizationId], references: [organization.id] }),
+  job: one(job, { fields: [jobQuestionSection.jobId], references: [job.id] }),
+  questions: many(jobQuestion),
+}))
+
+export const employmentTypeRelations = relations(employmentType, ({ one }) => ({
+  organization: one(organization, { fields: [employmentType.organizationId], references: [organization.id] }),
 }))
 
 export const questionResponseRelations = relations(questionResponse, ({ one }) => ({

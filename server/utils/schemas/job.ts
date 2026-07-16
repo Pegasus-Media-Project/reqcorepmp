@@ -21,9 +21,12 @@ export const analysisContextSchema = z.object({
 /** Schema for creating a new job */
 export const createJobSchema = z.object({
   title: z.string().trim().min(1, 'Title is required').max(200),
+  /** Optional program this posting belongs to. Null/omitted = traditional posting. */
+  programId: z.string().min(1).nullish(),
   description: z.string().trim().max(100_000).optional(),
   location: z.string().trim().max(500).optional(),
-  type: z.enum(['full_time', 'part_time', 'contract', 'internship']).default('full_time'),
+  /** Employment type label, chosen from the org's configurable list. */
+  type: z.string().trim().min(1).max(60).default('Full-time'),
   /** Optional custom slug — if omitted, generated from title */
   slug: z.string().max(80).optional(),
   /** Salary range fields for SEO-rich job postings (Google Jobs) */
@@ -80,9 +83,12 @@ export const createJobWizardSchema = createJobSchema.extend({
 /** Schema for updating an existing job (all fields optional, no defaults — PATCH semantics) */
 export const updateJobSchema = z.object({
   title: z.string().trim().min(1, 'Title is required').max(200).optional(),
+  /** Pass null to detach the job from its program (make it a traditional posting) */
+  programId: z.string().min(1).nullable().optional(),
   description: z.string().trim().max(100_000).nullable().optional(),
   location: z.string().trim().max(500).nullable().optional(),
-  type: z.enum(['full_time', 'part_time', 'contract', 'internship']).optional(),
+  /** Employment type label, chosen from the org's configurable list. */
+  type: z.string().trim().min(1).max(60).optional(),
   slug: z.string().max(80).optional(),
   /** Pass null to explicitly clear a salary field */
   salaryMin: z.coerce.number().int().min(0).nullable().optional(),

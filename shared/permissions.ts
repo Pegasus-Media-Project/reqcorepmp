@@ -29,6 +29,7 @@ import {
 
 const atsStatements = {
   organization: ['read', 'update', 'delete'],
+  program: ['create', 'read', 'update', 'delete'],
   job: ['create', 'read', 'update', 'delete'],
   candidate: ['create', 'read', 'update', 'delete'],
   application: ['create', 'read', 'update', 'delete'],
@@ -59,6 +60,7 @@ export const ac = createAccessControl(statements)
 export const owner = ac.newRole({
   ...ownerAc.statements,
   organization: ['read', 'update', 'delete'],
+  program: ['create', 'read', 'update', 'delete'],
   job: ['create', 'read', 'update', 'delete'],
   candidate: ['create', 'read', 'update', 'delete'],
   application: ['create', 'read', 'update', 'delete'],
@@ -74,6 +76,7 @@ export const owner = ac.newRole({
 export const admin = ac.newRole({
   ...adminAc.statements,
   organization: ['read', 'update', 'delete'],
+  program: ['create', 'read', 'update', 'delete'],
   job: ['create', 'read', 'update', 'delete'],
   candidate: ['create', 'read', 'update', 'delete'],
   application: ['create', 'read', 'update', 'delete'],
@@ -89,7 +92,12 @@ export const admin = ac.newRole({
 export const member = ac.newRole({
   ...memberAc.statements,
   organization: ['read'],
-  job: ['read'],
+  program: ['read'],
+  // Members can read all programs, but managing jobs is SCOPED per assignment:
+  // the RBAC capability here only clears the first gate — server routes then
+  // narrow to the member's assigned programs/jobs via `assertJobInScope`.
+  // Creating jobs stays owner/admin-only.
+  job: ['read', 'update', 'delete'],
   candidate: ['create', 'read', 'update'],
   application: ['create', 'read', 'update'],
   document: ['create', 'read'],

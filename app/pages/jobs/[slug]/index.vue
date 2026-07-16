@@ -106,15 +106,28 @@ useSeoMeta({
 // SEO — JSON-LD JobPosting structured data (Google Jobs)
 // ─────────────────────────────────────────────
 
-/** Map internal job type to schema.org employmentType */
+/**
+ * Map the (now org-configurable) employment-type label to a schema.org
+ * employmentType token. Normalizes on a lowercased label so the seeded defaults
+ * and common custom labels resolve; anything unrecognized falls back to OTHER.
+ */
 function mapEmploymentType(type: string): string {
   const map: Record<string, string> = {
-    full_time: 'FULL_TIME',
-    part_time: 'PART_TIME',
-    contract: 'CONTRACTOR',
-    internship: 'INTERN',
+    'full-time': 'FULL_TIME',
+    'full time': 'FULL_TIME',
+    'part-time': 'PART_TIME',
+    'part time': 'PART_TIME',
+    'contract': 'CONTRACTOR',
+    'contractor': 'CONTRACTOR',
+    'freelance': 'CONTRACTOR',
+    'internship': 'INTERN',
+    'intern': 'INTERN',
+    'temporary': 'TEMPORARY',
+    'volunteer': 'VOLUNTEER',
+    'per diem': 'PER_DIEM',
+    'fellowship': 'OTHER',
   }
-  return map[type] || 'OTHER'
+  return map[type.trim().toLowerCase()] || 'OTHER'
 }
 
 // Build the JobPosting JSON-LD reactively. Exposed as a computed and injected
@@ -332,14 +345,17 @@ function formatSalary(min?: number | null, max?: number | null, currency?: strin
 
           <!-- Apply CTA inline -->
           <div class="mt-6 flex flex-col sm:flex-row items-start sm:items-center gap-3 border-t border-surface-100 dark:border-surface-800 pt-5">
-            <NuxtLink
-              :to="{ path: $localePath(`/jobs/${job.slug}/apply`), query: applyQuery }"
-              class="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-6 py-3 text-sm font-semibold text-white hover:bg-brand-700 active:scale-[0.98] transition-all shadow-sm"
-            >
-              {{ t('jobs.detail.applyNow') }}
-              <ExternalLink class="size-3.5" />
-            </NuxtLink>
-            <p class="text-xs text-surface-400">{{ t('jobs.detail.applyTime') }}</p>
+            <template v-if="!job.applicationsClosed">
+              <NuxtLink
+                :to="{ path: $localePath(`/jobs/${job.slug}/apply`), query: applyQuery }"
+                class="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-6 py-3 text-sm font-semibold text-white hover:bg-brand-700 active:scale-[0.98] transition-all shadow-sm"
+              >
+                {{ t('jobs.detail.applyNow') }}
+                <ExternalLink class="size-3.5" />
+              </NuxtLink>
+              <p class="text-xs text-surface-400">{{ t('jobs.detail.applyTime') }}</p>
+            </template>
+            <p v-else class="text-sm font-medium text-surface-500 dark:text-surface-400">{{ t('jobs.detail.closedNotice') }}</p>
           </div>
 
           <!-- Branded path to the organization's career page and other roles -->
@@ -417,7 +433,7 @@ function formatSalary(min?: number | null, max?: number | null, currency?: strin
       </div>
 
       <!-- Bottom Apply CTA -->
-      <div class="rounded-2xl border border-brand-100 dark:border-brand-900 bg-brand-50 dark:bg-brand-950/50 px-6 sm:px-8 py-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div v-if="!job.applicationsClosed" class="rounded-2xl border border-brand-100 dark:border-brand-900 bg-brand-50 dark:bg-brand-950/50 px-6 sm:px-8 py-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <p class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('jobs.detail.readyTitle') }}</p>
           <p class="text-sm text-surface-500 mt-0.5">{{ t('jobs.detail.readyBody') }}</p>
@@ -429,6 +445,9 @@ function formatSalary(min?: number | null, max?: number | null, currency?: strin
           {{ t('jobs.detail.applyForPosition') }}
           <ExternalLink class="size-3.5" />
         </NuxtLink>
+      </div>
+      <div v-else class="rounded-2xl border border-surface-200 dark:border-surface-800 bg-surface-50 dark:bg-surface-900 px-6 sm:px-8 py-6">
+        <p class="text-sm font-medium text-surface-600 dark:text-surface-300">{{ t('jobs.detail.closedNotice') }}</p>
       </div>
     </template>
   </div>

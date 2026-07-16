@@ -7,6 +7,7 @@ export default defineEventHandler(async (event) => {
   const orgId = session.session.activeOrganizationId
 
   const { id: jobId, questionId } = await getValidatedRouterParams(event, questionIdParamSchema.parse)
+  await assertJobInScope(session, jobId)
 
   const [deleted] = await db.delete(jobQuestion)
     .where(and(

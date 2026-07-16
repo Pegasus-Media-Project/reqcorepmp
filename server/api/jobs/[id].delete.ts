@@ -8,6 +8,9 @@ export default defineEventHandler(async (event) => {
 
   const { id } = await getValidatedRouterParams(event, idParamSchema.parse)
 
+  // Scoped members may only delete jobs they manage.
+  await assertJobInScope(session, id)
+
   const [deleted] = await db.delete(job)
     .where(and(eq(job.id, id), eq(job.organizationId, orgId)))
     .returning({ id: job.id })

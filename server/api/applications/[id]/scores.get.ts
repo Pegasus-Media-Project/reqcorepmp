@@ -13,6 +13,7 @@ export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { scoring: ['read'] })
   const orgId = session.session.activeOrganizationId
   const { id: applicationId } = await getValidatedRouterParams(event, paramsSchema.parse)
+  await assertApplicationInScope(session, applicationId)
 
   // Verify application belongs to org
   const app = await db.query.application.findFirst({

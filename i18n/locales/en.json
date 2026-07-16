@@ -9,7 +9,7 @@
     "nav": {
       "features": "Features",
       "pricing": "Pricing",
-      "openPositions": "Open Positions",
+      "openPositions": "Open Opportunities",
       "roadmap": "Roadmap",
       "blog": "Blog",
       "github": "GitHub",
@@ -123,7 +123,7 @@
     "allLocations": "All locations",
     "allTypes": "All types",
     "clear": "Clear",
-    "emptyTitle": "No open positions",
+    "emptyTitle": "No open opportunities",
     "emptyBody": "There are no open roles right now. Check back soon.",
     "noMatchesTitle": "No roles match your filters",
     "clearFilters": "Clear filters",
@@ -153,25 +153,25 @@
   },
   "jobs": {
     "list": {
-      "metaTitle": "Open Positions — Job Board",
-      "metaDescription": "Browse open job positions on Pegasus Media Project and apply directly. Find your next career opportunity with companies that value transparency.",
-      "ogTitle": "Open Positions — Pegasus Media Project Job Board",
-      "ogDescription": "Browse open job positions and apply directly. Powered by the open-source ATS you actually own.",
-      "twitterDescription": "Browse open job positions and apply directly.",
-      "title": "Open Positions",
+      "metaTitle": "Open Opportunities — Job Board",
+      "metaDescription": "Browse open opportunities on Pegasus Media Project and apply directly. Find your next career opportunity with companies that value transparency.",
+      "ogTitle": "Open Opportunities — Pegasus Media Project Job Board",
+      "ogDescription": "Browse open opportunities and apply directly. Powered by the open-source ATS you actually own.",
+      "twitterDescription": "Browse open opportunities and apply directly.",
+      "title": "Open Opportunities",
       "subtitle": "Browse our current openings and find your next opportunity.",
       "searchPlaceholder": "Search jobs by title or location…",
       "allTypes": "All types",
-      "loading": "Loading positions…",
+      "loading": "Loading opportunities…",
       "errorLoad": "Failed to load jobs. Please try again.",
       "retry": "Retry",
-      "emptyTitle": "No open positions",
+      "emptyTitle": "No open opportunities",
       "emptyFiltered": "No jobs match your current filters. Try adjusting your search.",
-      "emptyDefault": "There are no open positions right now. Check back soon!",
+      "emptyDefault": "There are no open opportunities right now. Check back soon!",
       "previous": "Previous",
       "next": "Next",
       "pageOf": "Page {page} of {total}",
-      "totalCount": "{count} open position | {count} open positions"
+      "totalCount": "{count} open opportunity | {count} open opportunities"
     },
     "detail": {
       "metaTitleFallback": "Job Details — Pegasus Media Project",
@@ -182,14 +182,14 @@
       "metaIn": "in",
       "notFoundTitle": "Job Not Found",
       "notFoundBody": "This position may no longer be available or is not currently accepting applications.",
-      "browseAll": "Browse all positions",
-      "allPositions": "All positions",
+      "browseAll": "Browse all opportunities",
+      "allPositions": "All opportunities",
       "negotiable": "Negotiable",
       "postedOn": "Posted {date}",
       "applyNow": "Apply Now",
       "applyTime": "Takes a few minutes · No account required",
       "seeAllRoles": "See all open roles at {name}",
-      "careerPageTitle": "Careers at {name}",
+      "careerPageTitle": "opportunities at {name}, visit the board to see all open opportunities",
       "careerPageDescription": "Visit the company career page and view all open roles",
       "companyLogoAlt": "{name} logo",
       "aboutRole": "About this role",
@@ -198,7 +198,8 @@
       "required": "Required",
       "readyTitle": "Ready to apply?",
       "readyBody": "Submit your application in just a few minutes.",
-      "applyForPosition": "Apply for this position"
+      "applyForPosition": "Apply for this position",
+      "closedNotice": "This opportunity is no longer accepting applications."
     },
     "apply": {
       "metaApplyPrefix": "Apply",
@@ -225,11 +226,11 @@
     "confirmation": {
       "metaTitle": "Application Submitted — Pegasus Media Project",
       "title": "Application received",
-      "thanksWithTitle": "Thanks for applying for {title}. Your details are now with the hiring team.",
-      "thanksPlain": "Thanks for applying. Your details are now with the hiring team.",
+      "thanksWithTitle": "Thanks for applying for {title}. Your details are now with the team.",
+      "thanksPlain": "Thanks for applying. Your details are now with the team.",
       "received": "Sent successfully",
-      "backToCareerPage": "Back to {name} careers",
-      "browseMore": "Browse more positions",
+      "backToCareerPage": "Back to opportunities",
+      "browseMore": "Browse more opportunities",
       "backHome": "Back to Home"
     },
     "form": {
@@ -254,13 +255,61 @@
       "additionalQuestions": "Additional questions",
       "submit": "Submit Application",
       "submitting": "Submitting…",
-      "confidential": "Your information is kept confidential."
+      "confidential": "Your information is kept confidential.",
+      "wizard": {
+        "stepOf": "Step {current} of {total}",
+        "next": "Continue",
+        "back": "Back"
+      }
     },
     "question": {
       "selectOption": "Select an option…",
       "yes": "Yes",
       "chooseFileHint": "Choose file (PDF, DOC, DOCX — max 10 MB)",
       "urlPlaceholder": "https://…"
+    }
+  },
+  "programs": {
+    "title": "Programs",
+    "navDescription": "Cohorts & tracks",
+    "description": "Group job postings into programs (e.g. Pegasus cohorts) and control who manages them.",
+    "addButton": "Add program",
+    "addFirst": "Add your first program",
+    "empty": "No programs yet",
+    "emptyHint": "Create a program to group related job postings and give team members scoped management access.",
+    "loading": "Loading programs…",
+    "noPermission": "You don't have permission to manage programs. Contact your organization owner or admin.",
+    "jobCount": "{count} job | {count} jobs",
+    "archived": "Archived",
+    "deleteConfirm": "Delete the \"{name}\" program? Its jobs will become standard postings and assignments will be removed.",
+    "deleted": "Program deleted",
+    "deleteFailed": "Failed to delete program",
+    "saveFailed": "Failed to save program",
+    "form": {
+      "nameLabel": "Name",
+      "namePlaceholder": "e.g. Pegasus Fellowship 2026",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "What is this program about?",
+      "archivedLabel": "Archived",
+      "archivedHint": "Hide this program from job creation without deleting it.",
+      "create": "Create program",
+      "save": "Save changes",
+      "cancel": "Cancel"
+    },
+    "assignments": {
+      "title": "Managed by",
+      "description": "These users can manage every job in this program.",
+      "jobTitle": "Job access",
+      "jobDescription": "These users can manage this specific job, in addition to any program-level assignments.",
+      "addPlaceholder": "Add a team member…",
+      "empty": "No one assigned yet. Owners and admins can always manage everything.",
+      "remove": "Remove",
+      "addFailed": "Failed to update assignment"
+    },
+    "jobField": {
+      "label": "Program",
+      "none": "None — standard job posting",
+      "hint": "Attach this posting to a program, or leave it as a standard job."
     }
   }
 }
