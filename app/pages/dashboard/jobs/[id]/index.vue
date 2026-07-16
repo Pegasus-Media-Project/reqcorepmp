@@ -555,6 +555,8 @@ interface ApplicationNote {
 }
 
 const { allowed: canCreateNote, role: noteRole } = usePermission({ comment: ['create'] })
+// Guests are read-only: no stage moves, reject, or scheduling.
+const { allowed: canManageApplication } = usePermission({ application: ['update'] })
 
 // Only used to decide which notes the current user owns, and notes are never
 // rendered during SSR — so resolve the session on the client rather than
@@ -825,6 +827,7 @@ const showInterviewSidebar = ref(false)
 const interviewTargetApplication = ref<{ id: string; name: string } | null>(null)
 
 function openInterviewScheduler() {
+  if (!canManageApplication.value) return
   if (!currentSummary.value) return
   interviewTargetApplication.value = {
     id: currentSummary.value.id,
@@ -1105,6 +1108,7 @@ async function handleReschedule() {
 }
 
 async function changeStatus(status: string) {
+  if (!canManageApplication.value) return
   if (!currentSummary.value || isMutating.value) return
   const applicationId = currentSummary.value.id
   const selectedIndex = currentIndex.value
@@ -1806,8 +1810,8 @@ function closeDocPreview() {
           </div>
 
           <template v-else>
-            <!-- Sticky status transitions (stays visible on scroll) -->
-            <div v-if="allowedTransitions.length > 0" class="shrink-0 border-b border-surface-200/80 bg-white/95 backdrop-blur-sm px-4 sm:px-6 py-2.5 dark:border-surface-800/60 dark:bg-surface-900/95">
+            <!-- Sticky status transitions (managers only — guests are read-only) -->
+            <div v-if="allowedTransitions.length > 0 && canManageApplication" class="shrink-0 border-b border-surface-200/80 bg-white/95 backdrop-blur-sm px-4 sm:px-6 py-2.5 dark:border-surface-800/60 dark:bg-surface-900/95">
               <div class="mx-auto flex flex-wrap items-center gap-1.5 sm:gap-2" :class="detailWidthClass">
                 <button
                   v-for="(nextStatus, idx) in allowedTransitions"
@@ -2165,6 +2169,7 @@ function closeDocPreview() {
                     Interviews
                   </h2>
                   <button
+                    v-if="canManageApplication"
                     class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-surface-200 dark:border-surface-700/80 px-2.5 py-1.5 text-xs font-medium text-surface-600 dark:text-surface-300 hover:bg-white hover:border-surface-300 dark:hover:bg-surface-800 dark:hover:border-surface-600 transition-all duration-150"
                     @click="openInterviewScheduler"
                   >
@@ -2512,6 +2517,7 @@ function closeDocPreview() {
                   <p class="text-sm font-medium text-surface-600 dark:text-surface-300">No interviews scheduled</p>
                   <p class="mt-1 text-xs text-surface-400 dark:text-surface-500">Schedule an interview to start the process.</p>
                   <button
+                    v-if="canManageApplication"
                     class="mt-4 inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-brand-700 transition-colors shadow-sm"
                     @click="openInterviewScheduler"
                   >

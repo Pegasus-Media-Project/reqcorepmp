@@ -24,6 +24,8 @@ const { formatCandidateName } = useOrgSettings()
 
 // AI resume scoring is hidden by default; human reviewer averages take its place.
 const aiScoringEnabled = useFeatureFlagEnabled('ai-scoring')
+// Guests are read-only: no stage moves, reject, or scheduling.
+const { allowed: canManageApplication } = usePermission({ application: ['update'] })
 const { reviews } = useReviews(() => props.applicationId)
 function stageAvg(stage: 'screening' | 'interview'): number | null {
   const scores = reviews.value.filter(r => r.stage === stage && r.rating != null).map(r => r.rating as number)
@@ -234,8 +236,8 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <!-- Quick actions -->
-            <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white/80 dark:bg-surface-900/70 p-3">
+            <!-- Quick actions (managers only — guests are read-only) -->
+            <div v-if="canManageApplication" class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white/80 dark:bg-surface-900/70 p-3">
               <div class="flex flex-wrap items-center gap-2">
                 <span class="inline-flex items-center rounded-full bg-surface-100 dark:bg-surface-800 px-2.5 py-1 text-xs font-medium text-surface-600 dark:text-surface-400">Quick actions</span>
                 <button
@@ -377,7 +379,7 @@ onUnmounted(() => {
                   <h3 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Notes</h3>
                 </div>
                 <button
-                  v-if="!isEditingNotes"
+                  v-if="!isEditingNotes && canManageApplication"
                   class="cursor-pointer text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 font-medium transition-colors"
                   @click="startEditNotes"
                 >
