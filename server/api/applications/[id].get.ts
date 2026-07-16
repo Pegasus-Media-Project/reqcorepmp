@@ -40,7 +40,12 @@ export default defineEventHandler(async (event) => {
       responses: {
         with: {
           question: {
-            columns: { id: true, label: true, type: true, options: true },
+            columns: { id: true, label: true, type: true, options: true, sectionId: true, displayOrder: true },
+            with: {
+              section: {
+                columns: { id: true, title: true, displayOrder: true },
+              },
+            },
           },
         },
         orderBy: (r, { asc }) => [asc(r.createdAt)],

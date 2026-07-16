@@ -444,6 +444,9 @@ function formatResponseValue(value: unknown): string {
 }
 
 const responsesCount = computed(() => application.value?.responses?.length ?? 0)
+// Group responses by form page (section) to match the application form.
+const responseGroups = computed(() => groupResponsesBySection(application.value?.responses ?? []))
+const showResponsePages = computed(() => responseGroups.value.some(g => g.section))
 
 // ─────────────────────────────────────────────
 // Interview scheduling & existing interviews
@@ -1031,18 +1034,25 @@ function formatInterviewDate(dateStr: string) {
               <p class="text-sm font-medium text-surface-600 dark:text-surface-300">No application responses.</p>
             </div>
 
-            <div v-else class="space-y-3">
-              <div
-                v-for="response in application.responses"
-                :key="response.id"
-                class="rounded-xl border border-surface-200/80 dark:border-surface-800/60 bg-white dark:bg-surface-950 p-4 shadow-sm shadow-surface-900/[0.03] dark:shadow-none"
-              >
-                <dt class="text-xs font-semibold text-surface-400 dark:text-surface-500 mb-1.5 uppercase tracking-wider">
-                  {{ response.question?.label ?? 'Unknown question' }}
-                </dt>
-                <dd class="text-sm text-surface-700 dark:text-surface-200 leading-relaxed">
-                  {{ formatResponseValue(response.value) }}
-                </dd>
+            <div v-else class="space-y-4">
+              <div v-for="grp in responseGroups" :key="grp.section?.id ?? '__default'">
+                <p v-if="showResponsePages" class="text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400 mb-2 px-1">
+                  {{ grp.section?.title ?? 'General' }}
+                </p>
+                <div class="space-y-3">
+                  <div
+                    v-for="response in grp.responses"
+                    :key="response.id"
+                    class="rounded-xl border border-surface-200/80 dark:border-surface-800/60 bg-white dark:bg-surface-950 p-4 shadow-sm shadow-surface-900/[0.03] dark:shadow-none"
+                  >
+                    <dt class="text-xs font-semibold text-surface-400 dark:text-surface-500 mb-1.5 uppercase tracking-wider">
+                      {{ response.question?.label ?? 'Unknown question' }}
+                    </dt>
+                    <dd class="text-sm text-surface-700 dark:text-surface-200 leading-relaxed">
+                      {{ formatResponseValue(response.value) }}
+                    </dd>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

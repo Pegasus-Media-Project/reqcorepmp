@@ -16,6 +16,10 @@ const { handlePreviewReadOnlyError } = usePreviewReadOnly()
 const toast = useToast()
 
 const { application, status: fetchStatus, error, refresh, updateApplication } = useApplication(() => props.applicationId)
+
+// Group question responses by form page (section) to match the application form.
+const responseGroups = computed(() => groupResponsesBySection(application.value?.responses ?? []))
+const showResponsePages = computed(() => responseGroups.value.some(g => g.section))
 const { formatCandidateName } = useOrgSettings()
 
 // AI resume scoring is hidden by default; human reviewer averages take its place.
@@ -436,18 +440,25 @@ onUnmounted(() => {
                   Application Responses ({{ application.responses.length }})
                 </h3>
               </div>
-              <div class="space-y-3">
-                <div
-                  v-for="response in application.responses"
-                  :key="response.id"
-                  class="border-b border-surface-100 dark:border-surface-800 pb-3 last:border-0 last:pb-0"
-                >
-                  <dt class="text-xs font-medium text-surface-500 dark:text-surface-400 mb-0.5">
-                    {{ response.question?.label ?? 'Unknown question' }}
-                  </dt>
-                  <dd class="text-sm text-surface-700 dark:text-surface-200">
-                    {{ formatResponseValue(response.value) }}
-                  </dd>
+              <div class="space-y-4">
+                <div v-for="grp in responseGroups" :key="grp.section?.id ?? '__default'">
+                  <p v-if="showResponsePages" class="text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">
+                    {{ grp.section?.title ?? 'General' }}
+                  </p>
+                  <div class="space-y-3">
+                    <div
+                      v-for="response in grp.responses"
+                      :key="response.id"
+                      class="border-b border-surface-100 dark:border-surface-800 pb-3 last:border-0 last:pb-0"
+                    >
+                      <dt class="text-xs font-medium text-surface-500 dark:text-surface-400 mb-0.5">
+                        {{ response.question?.label ?? 'Unknown question' }}
+                      </dt>
+                      <dd class="text-sm text-surface-700 dark:text-surface-200">
+                        {{ formatResponseValue(response.value) }}
+                      </dd>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

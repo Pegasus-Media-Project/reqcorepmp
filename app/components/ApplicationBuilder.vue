@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {
   Lock, Upload, FileText, GripVertical, Plus, Pencil, Trash2,
-  ChevronUp, ChevronDown,
+  ChevronUp, ChevronDown, Check,
 } from 'lucide-vue-next'
 
 /**
@@ -72,6 +72,7 @@ type QuestionInput = {
   content?: string
   required: boolean
   options?: string[]
+  sectionId?: string | null
 }
 
 const props = defineProps<{
@@ -111,6 +112,8 @@ const phoneRequirementOptions = [
 // ─────────────────────────────────────────────
 const showAddForm = ref(false)
 const addInitialType = ref<'short_text' | 'info'>('short_text')
+/** Page the "Add" form should attach a new item to (null = default page). */
+const addTargetSectionId = ref<string | null>(null)
 const editingQuestion = ref<DraftQuestion | null>(null)
 const questionActionError = ref<string | null>(null)
 let nextQuestionId = 0
@@ -120,12 +123,13 @@ function newDraftId() {
   return `draft-${Date.now()}-${nextQuestionId++}`
 }
 
-function startAdd(type: 'short_text' | 'info' = 'short_text') {
+function startAdd(type: 'short_text' | 'info' = 'short_text', sectionId: string | null = null) {
   if (model.value.questions.length >= 50) {
     questionActionError.value = 'You can add up to 50 form items.'
     return
   }
   addInitialType.value = type
+  addTargetSectionId.value = sectionId
   editingQuestion.value = null
   showAddForm.value = true
   questionActionError.value = null
@@ -153,18 +157,21 @@ async function runOp(op: () => Promise<unknown>): Promise<boolean> {
 }
 
 async function handleAddQuestion(data: QuestionInput) {
+  // Attach the page the "Add" was launched from (null = default page).
+  const payload: QuestionInput = { ...data, sectionId: addTargetSectionId.value }
   if (props.operations) {
-    if (await runOp(() => props.operations!.addQuestion(data))) showAddForm.value = false
+    if (await runOp(() => props.operations!.addQuestion(payload))) showAddForm.value = false
     return
   }
   model.value.questions.push({
     id: newDraftId(),
-    label: data.label,
-    type: data.type as QuestionType,
-    description: data.description ?? null,
-    content: data.content ?? null,
-    required: data.required,
-    options: data.options ?? null,
+    label: payload.label,
+    type: payload.type as QuestionType,
+    description: payload.description ?? null,
+    content: payload.content ?? null,
+    required: payload.required,
+    options: payload.options ?? null,
+    sectionId: payload.sectionId ?? null,
   })
   showAddForm.value = false
   questionActionError.value = null
@@ -207,21 +214,6 @@ async function handleDeleteQuestion(questionId: string) {
   model.value.questions.splice(index, 1)
   if (editingQuestion.value?.id === questionId) editingQuestion.value = null
   questionActionError.value = null
-}
-
-function moveQuestion(index: number, direction: 'up' | 'down') {
-  const list = model.value.questions
-  const target = direction === 'up' ? index - 1 : index + 1
-  if (target < 0 || target >= list.length) return
-  if (props.operations) {
-    // Compute the post-swap order and persist; the parent syncs the model back.
-    const reordered = [...list]
-    ;[reordered[index], reordered[target]] = [reordered[target]!, reordered[index]!]
-    const order = reordered.map((q, i) => ({ id: q.id, displayOrder: i }))
-    runOp(() => props.operations!.reorderQuestions(order))
-    return
-  }
-  ;[list[index], list[target]] = [list[target]!, list[index]!]
 }
 
 function setRequireResume(value: boolean) {
@@ -341,13 +333,114 @@ function moveSection(index: number, direction: 'up' | 'down') {
   const b = model.value.sections?.find(s => s.id === list[target]!.id)
   if (a && b) { const tmp = a.displayOrder; a.displayOrder = b.displayOrder; b.displayOrder = tmp }
 }
-async function assignQuestion(questionId: string, sectionId: string) {
-  if (props.operations?.assignQuestionSection) {
-    await runOp(() => props.operations!.assignQuestionSection!(questionId, sectionId || null))
-    return
+/** Index of a section within the ordered `sections` list (for page up/down). */
+function sectionIndex(section: DraftSection): number {
+  return sections.value.findIndex(s => s.id === section.id)
+}
+
+// ─────────────────────────────────────────────
+// Grouping: questions rendered under their page
+// ─────────────────────────────────────────────
+type QuestionGroup = { section: DraftSection | null, questions: DraftQuestion[] }
+
+/** Sections in displayOrder, then the default/no-page group last (mirrors the
+ *  public wizard). With no sections, a single default group holds everything. */
+const questionGroups = computed<QuestionGroup[]>(() => {
+  const groups: QuestionGroup[] = []
+  const knownSectionIds = new Set(sections.value.map(s => s.id))
+  for (const s of sections.value) {
+    groups.push({ section: s, questions: model.value.questions.filter(q => q.sectionId === s.id) })
   }
-  const q = model.value.questions.find(x => x.id === questionId)
-  if (q) q.sectionId = sectionId || null
+  const orphans = model.value.questions.filter(q => !q.sectionId || !knownSectionIds.has(q.sectionId))
+  if (orphans.length || sections.value.length === 0) {
+    groups.push({ section: null, questions: orphans })
+  }
+  return groups
+})
+
+/** Whether to show page headers (only once real pages exist). */
+const showGroupHeaders = computed(() => sectionsEnabled.value && sections.value.length > 0)
+
+// ── Reordering / moving questions ──
+
+/** Persist a new global question order (optimistic locally; operations sync). */
+function persistQuestionOrder(list: DraftQuestion[], movedId?: string, movedSection?: string | null, sectionChanged?: boolean) {
+  model.value.questions = list
+  if (!props.operations) return
+  const order = list.map((q, i) => ({ id: q.id, displayOrder: i }))
+  runOp(async () => {
+    if (sectionChanged && props.operations!.assignQuestionSection && movedId !== undefined) {
+      await props.operations!.assignQuestionSection!(movedId, movedSection ?? null)
+    }
+    await props.operations!.reorderQuestions(order)
+  })
+}
+
+/** Move a question to a page, before `beforeId` (or the end of that page). */
+function moveQuestionTo(draggedId: string, targetSectionId: string | null, beforeId: string | null) {
+  if (!draggedId || draggedId === beforeId) return
+  const list = [...model.value.questions]
+  const fromIdx = list.findIndex(q => q.id === draggedId)
+  if (fromIdx === -1) return
+  const dragged = list[fromIdx]!
+  const sectionChanged = (dragged.sectionId ?? null) !== targetSectionId
+  list.splice(fromIdx, 1)
+  dragged.sectionId = targetSectionId
+  let insertIdx: number
+  if (beforeId) {
+    insertIdx = list.findIndex(q => q.id === beforeId)
+    if (insertIdx === -1) insertIdx = list.length
+  }
+  else {
+    // End of the target page: after the last question already in that section.
+    let last = -1
+    list.forEach((q, i) => { if ((q.sectionId ?? null) === targetSectionId) last = i })
+    insertIdx = last === -1 ? list.length : last + 1
+  }
+  list.splice(insertIdx, 0, dragged)
+  persistQuestionOrder(list, draggedId, targetSectionId, sectionChanged)
+}
+
+/** Accessible fallback: move a question up/down within its own page. */
+function moveQuestionInGroup(q: DraftQuestion, direction: 'up' | 'down') {
+  const groupQs = model.value.questions.filter(x => (x.sectionId ?? null) === (q.sectionId ?? null))
+  const gi = groupQs.findIndex(x => x.id === q.id)
+  const gt = direction === 'up' ? gi - 1 : gi + 1
+  if (gt < 0 || gt >= groupQs.length) return
+  if (direction === 'up') {
+    moveQuestionTo(q.id, q.sectionId ?? null, groupQs[gt]!.id)
+  }
+  else {
+    const afterTarget = groupQs[gt + 1]
+    moveQuestionTo(q.id, q.sectionId ?? null, afterTarget ? afterTarget.id : null)
+  }
+}
+
+// ── Drag and drop (native HTML5) ──
+const draggingId = ref<string | null>(null)
+/** Key of the group currently under the drag (section id, or '' for default). */
+const dragOverGroup = ref<string | null>(null)
+
+function onDragStart(q: DraftQuestion, e: DragEvent) {
+  draggingId.value = q.id
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', q.id)
+  }
+}
+function onDragEnd() {
+  draggingId.value = null
+  dragOverGroup.value = null
+}
+/** Drop onto a specific question row → place the dragged item before it. */
+function onDropOnQuestion(target: DraftQuestion) {
+  if (draggingId.value) moveQuestionTo(draggingId.value, target.sectionId ?? null, target.id)
+  onDragEnd()
+}
+/** Drop onto a page's body (not a row) → append to that page. */
+function onDropOnGroup(section: DraftSection | null) {
+  if (draggingId.value) moveQuestionTo(draggingId.value, section?.id ?? null, null)
+  onDragEnd()
 }
 
 const questionsAnchor = ref<HTMLElement | null>(null)
@@ -507,71 +600,17 @@ function handleEditField(field: string) {
         </div>
       </div>
 
-      <!-- Pages / sections (multi-step wizard) -->
-      <div v-if="sectionsEnabled">
-        <div class="flex items-center justify-between pb-3 border-b border-surface-100 dark:border-surface-800">
-          <div>
-            <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">Pages</h2>
-            <p class="mt-0.5 text-xs text-surface-400 dark:text-surface-500">Group questions into pages to turn the application into a multi-step form.</p>
-          </div>
-        </div>
-
-        <div v-if="sections.length > 0" class="divide-y divide-surface-100 dark:divide-surface-800">
-          <div v-for="(s, index) in sections" :key="s.id" class="flex items-center gap-3 py-3 px-1 group">
-            <template v-if="editingSectionId === s.id">
-              <input
-                v-model="editingSectionTitle"
-                type="text"
-                maxlength="200"
-                class="flex-1 rounded-lg border border-surface-300 dark:border-surface-700 px-2.5 py-1.5 text-sm bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                @keyup.enter="saveSection(s.id)"
-                @keyup.esc="editingSectionId = null"
-              />
-              <button type="button" class="rounded p-1.5 text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950" @click="saveSection(s.id)"><Plus class="size-4 rotate-45" /></button>
-            </template>
-            <template v-else>
-              <span class="flex-1 text-sm font-medium text-surface-900 dark:text-surface-100 truncate">{{ index + 1 }}. {{ s.title }}</span>
-              <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
-                <button type="button" :disabled="index === 0" class="rounded p-1.5 text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:bg-surface-800 disabled:opacity-30" title="Move up" @click="moveSection(index, 'up')"><ChevronUp class="size-4" /></button>
-                <button type="button" :disabled="index === sections.length - 1" class="rounded p-1.5 text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:bg-surface-800 disabled:opacity-30" title="Move down" @click="moveSection(index, 'down')"><ChevronDown class="size-4" /></button>
-                <button type="button" class="rounded p-1.5 text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:bg-surface-800" title="Rename" @click="startEditSection(s)"><Pencil class="size-4" /></button>
-                <button type="button" class="rounded p-1.5 text-surface-400 hover:text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-950" title="Delete page" @click="deleteSectionRow(s.id)"><Trash2 class="size-4" /></button>
-              </div>
-            </template>
-          </div>
-        </div>
-        <p v-else class="text-sm text-surface-400 dark:text-surface-500 py-4 text-center">No pages yet. Questions appear on a single page until you add one.</p>
-
-        <div class="mt-3 flex items-center gap-2">
-          <template v-if="showAddSection">
-            <input
-              v-model="newSectionTitle"
-              type="text"
-              maxlength="200"
-              placeholder="Page title (e.g. Experience)"
-              class="flex-1 max-w-xs rounded-lg border border-surface-300 dark:border-surface-700 px-2.5 py-1.5 text-sm bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
-              @keyup.enter="addSectionRow"
-            />
-            <button type="button" class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50" :disabled="!newSectionTitle.trim()" @click="addSectionRow">Add</button>
-            <button type="button" class="text-sm text-surface-400 hover:text-surface-600" @click="showAddSection = false; newSectionTitle = ''">Cancel</button>
-          </template>
-          <button
-            v-else
-            type="button"
-            class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-surface-300 dark:border-surface-700 px-3 py-2 text-sm font-medium text-surface-600 dark:text-surface-400 hover:border-brand-400 hover:text-brand-600 transition-colors"
-            @click="showAddSection = true"
-          >
-            <Plus class="size-4" /> Add a page
-          </button>
-        </div>
-      </div>
-
-      <!-- Screening questions -->
+      <!-- Pages & questions -->
       <div ref="questionsAnchor">
         <div class="flex items-center justify-between pb-3 border-b border-surface-100 dark:border-surface-800">
-          <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">Screening questions</h2>
-          <span v-if="model.questions.length > 0" class="text-xs font-medium text-surface-400 dark:text-surface-500 tabular-nums">
-            {{ model.questions.length }} {{ model.questions.length === 1 ? 'question' : 'questions' }} added
+          <div>
+            <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">Pages &amp; questions</h2>
+            <p class="mt-0.5 text-xs text-surface-400 dark:text-surface-500">
+              Group questions into pages for a multi-step form. Personal information is always the first page and Documents the last.
+            </p>
+          </div>
+          <span v-if="model.questions.length > 0" class="text-xs font-medium text-surface-400 dark:text-surface-500 tabular-nums shrink-0">
+            {{ model.questions.length }} {{ model.questions.length === 1 ? 'item' : 'items' }}
           </span>
         </div>
 
@@ -583,108 +622,7 @@ function handleEditField(field: string) {
           <button class="ml-2 underline" @click="questionActionError = null">Dismiss</button>
         </div>
 
-        <div v-if="model.questions.length > 0" class="divide-y divide-surface-100 dark:divide-surface-800">
-          <div
-            v-for="(q, index) in model.questions"
-            :key="q.id"
-            class="flex items-center gap-3 py-3.5 px-1 group"
-          >
-            <div class="text-surface-300 dark:text-surface-600 cursor-grab">
-              <GripVertical class="size-4" />
-            </div>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2">
-                <span class="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">{{ q.label || (q.type === 'info' ? 'Information block' : 'Untitled') }}</span>
-                <template v-if="q.type !== 'info'">
-                  <span
-                    v-if="q.required"
-                    class="inline-flex items-center rounded-md bg-brand-50 dark:bg-brand-950/50 px-2 py-0.5 text-[10px] font-medium text-brand-700 dark:text-brand-300 ring-1 ring-inset ring-brand-200 dark:ring-brand-800"
-                  >
-                    Required
-                  </span>
-                  <span
-                    v-else
-                    class="inline-flex items-center rounded-md bg-surface-100 dark:bg-surface-800 px-2 py-0.5 text-[10px] font-medium text-surface-500 dark:text-surface-400 ring-1 ring-inset ring-surface-200 dark:ring-surface-700"
-                  >
-                    Optional
-                  </span>
-                </template>
-                <span
-                  v-else
-                  class="inline-flex items-center rounded-md bg-surface-100 dark:bg-surface-800 px-2 py-0.5 text-[10px] font-medium text-surface-500 dark:text-surface-400 ring-1 ring-inset ring-surface-200 dark:ring-surface-700"
-                >
-                  Info
-                </span>
-              </div>
-              <div class="flex items-center gap-1.5 mt-0.5 ml-0">
-                <span class="text-xs text-surface-400 dark:text-surface-500">{{ questionTypeLabels[q.type] ?? q.type }}</span>
-                <span v-if="q.description" class="text-xs text-surface-400 dark:text-surface-500 truncate">
-                  &middot; {{ q.description }}
-                </span>
-                <span
-                  v-if="(q.type === 'single_select' || q.type === 'multi_select') && q.options"
-                  class="text-xs text-surface-400 dark:text-surface-500"
-                >
-                  &middot; {{ q.options.length }} options
-                </span>
-              </div>
-              <div v-if="sectionsEnabled && sections.length > 0" class="mt-1.5">
-                <label class="sr-only" :for="`q-page-${q.id}`">Page</label>
-                <select
-                  :id="`q-page-${q.id}`"
-                  :value="q.sectionId ?? ''"
-                  class="rounded-md border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 px-2 py-1 text-xs text-surface-600 dark:text-surface-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  @change="assignQuestion(q.id, ($event.target as HTMLSelectElement).value)"
-                  @click.stop
-                >
-                  <option value="">Default page</option>
-                  <option v-for="s in sections" :key="s.id" :value="s.id">{{ s.title }}</option>
-                </select>
-              </div>
-            </div>
-            <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
-              <button
-                type="button"
-                :disabled="index === 0"
-                class="rounded p-1.5 text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors disabled:opacity-30"
-                title="Move up"
-                @click="moveQuestion(index, 'up')"
-              >
-                <ChevronUp class="size-4" />
-              </button>
-              <button
-                type="button"
-                :disabled="index === model.questions.length - 1"
-                class="rounded p-1.5 text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors disabled:opacity-30"
-                title="Move down"
-                @click="moveQuestion(index, 'down')"
-              >
-                <ChevronDown class="size-4" />
-              </button>
-              <button
-                type="button"
-                class="rounded p-1.5 text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
-                title="Edit"
-                @click="startEdit(q)"
-              >
-                <Pencil class="size-4" />
-              </button>
-              <button
-                type="button"
-                class="rounded p-1.5 text-surface-400 hover:text-danger-600 dark:hover:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors"
-                title="Delete"
-                @click="handleDeleteQuestion(q.id)"
-              >
-                <Trash2 class="size-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <p v-else class="text-sm text-surface-400 dark:text-surface-500 py-6 text-center">
-          No screening questions added yet.
-        </p>
-
+        <!-- Shared add/edit form (attaches to the page the add was launched from) -->
         <QuestionForm
           v-if="editingQuestion"
           :key="editingQuestion.id"
@@ -693,33 +631,192 @@ function handleEditField(field: string) {
           @save="handleUpdateQuestion"
           @cancel="editingQuestion = null"
         />
-
         <QuestionForm
-          v-if="showAddForm && !editingQuestion"
+          v-else-if="showAddForm"
           class="mt-4 mb-2"
           :initial-type="addInitialType"
           @save="handleAddQuestion"
           @cancel="showAddForm = false"
         />
 
-        <div v-if="!showAddForm && !editingQuestion" class="mt-4 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            :disabled="model.questions.length >= 50"
-            class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-surface-300 dark:border-surface-700 px-3 py-2 text-sm font-medium text-surface-600 dark:text-surface-400 hover:border-brand-400 dark:hover:border-brand-600 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50/50 dark:hover:bg-brand-950/30 transition-colors"
-            @click="startAdd('short_text')"
+        <!-- Groups: one per page, then the default/no-page group -->
+        <div class="mt-4 space-y-5">
+          <div
+            v-for="group in questionGroups"
+            :key="group.section?.id ?? '__default'"
+            class="rounded-xl transition-colors"
+            :class="[
+              showGroupHeaders ? 'border border-surface-200 dark:border-surface-800 p-3' : '',
+              draggingId && dragOverGroup === (group.section?.id ?? '') ? 'ring-2 ring-brand-300 dark:ring-brand-700' : '',
+            ]"
+            @dragover.prevent="dragOverGroup = group.section?.id ?? ''"
+            @drop="onDropOnGroup(group.section)"
           >
-            <Plus class="size-4" />
-            Add a question
-          </button>
+            <!-- Page header -->
+            <div v-if="showGroupHeaders" class="flex items-center gap-2 pb-2 mb-1 border-b border-surface-100 dark:border-surface-800">
+              <template v-if="group.section && editingSectionId === group.section.id">
+                <input
+                  v-model="editingSectionTitle"
+                  type="text"
+                  maxlength="200"
+                  class="flex-1 rounded-lg border border-surface-300 dark:border-surface-700 px-2.5 py-1.5 text-sm bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  @keyup.enter="saveSection(group.section.id)"
+                  @keyup.esc="editingSectionId = null"
+                />
+                <button type="button" class="rounded p-1.5 text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950" title="Save" @click="saveSection(group.section.id)"><Check class="size-4" /></button>
+              </template>
+              <template v-else>
+                <span class="flex-1 text-sm font-semibold text-surface-900 dark:text-surface-100 truncate">
+                  {{ group.section ? group.section.title : 'General (no page)' }}
+                </span>
+                <div v-if="group.section" class="flex items-center gap-0.5 shrink-0">
+                  <button type="button" :disabled="sectionIndex(group.section) === 0" class="rounded p-1.5 text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:bg-surface-800 disabled:opacity-30" title="Move page up" @click="moveSection(sectionIndex(group.section), 'up')"><ChevronUp class="size-4" /></button>
+                  <button type="button" :disabled="sectionIndex(group.section) === sections.length - 1" class="rounded p-1.5 text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:bg-surface-800 disabled:opacity-30" title="Move page down" @click="moveSection(sectionIndex(group.section), 'down')"><ChevronDown class="size-4" /></button>
+                  <button type="button" class="rounded p-1.5 text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:bg-surface-800" title="Rename page" @click="startEditSection(group.section)"><Pencil class="size-4" /></button>
+                  <button type="button" class="rounded p-1.5 text-surface-400 hover:text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-950" title="Delete page" @click="deleteSectionRow(group.section.id)"><Trash2 class="size-4" /></button>
+                </div>
+              </template>
+            </div>
+
+            <!-- Questions in this page -->
+            <div class="divide-y divide-surface-100 dark:divide-surface-800">
+              <div
+                v-for="(q, qi) in group.questions"
+                :key="q.id"
+                draggable="true"
+                class="flex items-center gap-3 py-3 px-1 group cursor-move"
+                :class="draggingId === q.id ? 'opacity-40' : ''"
+                @dragstart="onDragStart(q, $event)"
+                @dragend="onDragEnd"
+                @dragover.prevent.stop="dragOverGroup = group.section?.id ?? ''"
+                @drop.stop="onDropOnQuestion(q)"
+              >
+                <div class="text-surface-300 dark:text-surface-600 cursor-grab" title="Drag to reorder or move to another page">
+                  <GripVertical class="size-4" />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">{{ q.label || (q.type === 'info' ? 'Information block' : 'Untitled') }}</span>
+                    <template v-if="q.type !== 'info'">
+                      <span
+                        v-if="q.required"
+                        class="inline-flex items-center rounded-md bg-brand-50 dark:bg-brand-950/50 px-2 py-0.5 text-[10px] font-medium text-brand-700 dark:text-brand-300 ring-1 ring-inset ring-brand-200 dark:ring-brand-800"
+                      >
+                        Required
+                      </span>
+                      <span
+                        v-else
+                        class="inline-flex items-center rounded-md bg-surface-100 dark:bg-surface-800 px-2 py-0.5 text-[10px] font-medium text-surface-500 dark:text-surface-400 ring-1 ring-inset ring-surface-200 dark:ring-surface-700"
+                      >
+                        Optional
+                      </span>
+                    </template>
+                    <span
+                      v-else
+                      class="inline-flex items-center rounded-md bg-surface-100 dark:bg-surface-800 px-2 py-0.5 text-[10px] font-medium text-surface-500 dark:text-surface-400 ring-1 ring-inset ring-surface-200 dark:ring-surface-700"
+                    >
+                      Info
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-1.5 mt-0.5 ml-0">
+                    <span class="text-xs text-surface-400 dark:text-surface-500">{{ questionTypeLabels[q.type] ?? q.type }}</span>
+                    <span v-if="q.description" class="text-xs text-surface-400 dark:text-surface-500 truncate">
+                      &middot; {{ q.description }}
+                    </span>
+                    <span
+                      v-if="(q.type === 'single_select' || q.type === 'multi_select') && q.options"
+                      class="text-xs text-surface-400 dark:text-surface-500"
+                    >
+                      &middot; {{ q.options.length }} options
+                    </span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
+                  <button
+                    type="button"
+                    :disabled="qi === 0"
+                    class="rounded p-1.5 text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors disabled:opacity-30"
+                    title="Move up"
+                    @click="moveQuestionInGroup(q, 'up')"
+                  >
+                    <ChevronUp class="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    :disabled="qi === group.questions.length - 1"
+                    class="rounded p-1.5 text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors disabled:opacity-30"
+                    title="Move down"
+                    @click="moveQuestionInGroup(q, 'down')"
+                  >
+                    <ChevronDown class="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded p-1.5 text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+                    title="Edit"
+                    @click="startEdit(q)"
+                  >
+                    <Pencil class="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded p-1.5 text-surface-400 hover:text-danger-600 dark:hover:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors"
+                    title="Delete"
+                    @click="handleDeleteQuestion(q.id)"
+                  >
+                    <Trash2 class="size-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <p v-if="group.questions.length === 0" class="text-xs text-surface-400 dark:text-surface-500 py-3 text-center">
+              {{ showGroupHeaders ? 'Drag questions here, or add one below.' : 'No questions added yet.' }}
+            </p>
+
+            <!-- Per-page add buttons -->
+            <div v-if="!showAddForm && !editingQuestion" class="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                :disabled="model.questions.length >= 50"
+                class="inline-flex items-center gap-1 rounded-lg border border-dashed border-surface-300 dark:border-surface-700 px-2.5 py-1.5 text-xs font-medium text-surface-600 dark:text-surface-400 hover:border-brand-400 dark:hover:border-brand-600 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50/50 dark:hover:bg-brand-950/30 transition-colors"
+                @click="startAdd('short_text', group.section?.id ?? null)"
+              >
+                <Plus class="size-3.5" /> Add a question
+              </button>
+              <button
+                type="button"
+                :disabled="model.questions.length >= 50"
+                class="inline-flex items-center gap-1 rounded-lg border border-dashed border-surface-300 dark:border-surface-700 px-2.5 py-1.5 text-xs font-medium text-surface-600 dark:text-surface-400 hover:border-brand-400 dark:hover:border-brand-600 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50/50 dark:hover:bg-brand-950/30 transition-colors"
+                @click="startAdd('info', group.section?.id ?? null)"
+              >
+                <Plus class="size-3.5" /> Add information block
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add a page -->
+        <div v-if="sectionsEnabled" class="mt-4 flex items-center gap-2">
+          <template v-if="showAddSection">
+            <input
+              v-model="newSectionTitle"
+              type="text"
+              maxlength="200"
+              placeholder="Page title (e.g. Experience)"
+              class="flex-1 max-w-xs rounded-lg border border-surface-300 dark:border-surface-700 px-2.5 py-1.5 text-sm bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              @keyup.enter="addSectionRow"
+            />
+            <button type="button" class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50" :disabled="!newSectionTitle.trim()" @click="addSectionRow">Add page</button>
+            <button type="button" class="text-sm text-surface-400 hover:text-surface-600" @click="showAddSection = false; newSectionTitle = ''">Cancel</button>
+          </template>
           <button
+            v-else
             type="button"
-            :disabled="model.questions.length >= 50"
-            class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-surface-300 dark:border-surface-700 px-3 py-2 text-sm font-medium text-surface-600 dark:text-surface-400 hover:border-brand-400 dark:hover:border-brand-600 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50/50 dark:hover:bg-brand-950/30 transition-colors"
-            @click="startAdd('info')"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-surface-300 dark:border-surface-700 px-3 py-2 text-sm font-medium text-surface-600 dark:text-surface-400 hover:border-brand-400 hover:text-brand-600 transition-colors"
+            @click="showAddSection = true"
           >
-            <Plus class="size-4" />
-            Add information block
+            <Plus class="size-4" /> Add a page
           </button>
         </div>
       </div>
