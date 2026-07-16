@@ -18,6 +18,8 @@ useSeoMeta({
 
 const { activeOrg } = useCurrentOrg()
 const localePath = useLocalePath()
+// Guests can't create jobs — hide the affordance.
+const { allowed: canCreateJob } = usePermission({ job: ['create'] })
 
 // ─────────────────────────────────────────────
 // Stage config for clickable pipeline counts
@@ -413,6 +415,7 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
 
           <!-- One clear action -->
           <NuxtLink
+            v-if="canCreateJob"
             :to="localePath('/dashboard/jobs/new')"
             class="group mt-8 inline-flex w-full items-center justify-center gap-2.5 rounded-xl bg-brand-600 px-7 py-3.5 text-sm font-semibold text-white shadow-md shadow-brand-600/25 transition-all hover:bg-brand-700 hover:shadow-lg hover:shadow-brand-600/30 no-underline"
           >

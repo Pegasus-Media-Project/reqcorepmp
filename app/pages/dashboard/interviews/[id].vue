@@ -22,6 +22,9 @@ const { formatPersonName } = useOrgSettings()
 
 const { interview, status: fetchStatus, error, updateInterview, deleteInterview, refresh } = useInterview(interviewId)
 
+// Guests are read-only on interviews (can rate via ReviewPanel, not manage).
+const { allowed: canManageInterview } = usePermission({ interview: ['update'] })
+
 // ─── Assigned reviewers ──────────────────────────────────────────
 const showReviewersModal = ref(false)
 const { data: reviewersData, refresh: refreshReviewers } = useFetch(
@@ -441,6 +444,7 @@ const localePath = useLocalePath()
             </div>
           </div>
           <button
+            v-if="canManageInterview"
             class="cursor-pointer rounded-lg border border-surface-200 dark:border-surface-700 p-2 text-surface-400 hover:text-surface-600 hover:bg-surface-50 dark:hover:text-surface-300 dark:hover:bg-surface-800 transition-all"
             @click="openEditDetails"
           >
@@ -480,6 +484,7 @@ const localePath = useLocalePath()
             <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Reviewers</h2>
           </div>
           <button
+            v-if="canManageInterview"
             class="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 dark:border-surface-700/80 px-2.5 py-1.5 text-xs font-medium text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
             @click="showReviewersModal = true"
           >
@@ -507,6 +512,7 @@ const localePath = useLocalePath()
               </span>
             </span>
             <button
+              v-if="canManageInterview"
               class="text-surface-400 hover:text-danger-600 dark:hover:text-danger-400 transition-colors"
               title="Remove reviewer"
               @click="removeReviewer(r.userId)"
@@ -526,9 +532,9 @@ const localePath = useLocalePath()
         <ReviewPanel :application-id="interview.applicationId" status="interview" />
       </div>
 
-      <!-- Quick actions -->
+      <!-- Quick actions (managers only) -->
       <div
-        v-if="allowedTransitions.length > 0"
+        v-if="canManageInterview && allowedTransitions.length > 0"
         class="mb-6 rounded-xl border border-surface-200 dark:border-surface-800 bg-white/80 dark:bg-surface-900/70 p-3"
       >
         <div class="flex flex-wrap items-center gap-2">
@@ -843,7 +849,7 @@ const localePath = useLocalePath()
             <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Notes</h2>
           </div>
           <button
-            v-if="!isEditingNotes"
+            v-if="!isEditingNotes && canManageInterview"
             class="cursor-pointer text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 font-medium transition-colors"
             @click="startEditNotes"
           >
@@ -884,8 +890,8 @@ const localePath = useLocalePath()
         <p v-else class="text-sm text-surface-400 italic">No notes yet.</p>
       </div>
 
-      <!-- Danger zone -->
-      <div class="rounded-xl border border-danger-200/60 dark:border-danger-900/40 bg-danger-50/30 dark:bg-danger-950/20 p-5">
+      <!-- Danger zone (managers only) -->
+      <div v-if="canManageInterview" class="rounded-xl border border-danger-200/60 dark:border-danger-900/40 bg-danger-50/30 dark:bg-danger-950/20 p-5">
         <h3 class="text-sm font-semibold text-danger-700 dark:text-danger-400 mb-1">Danger Zone</h3>
         <p class="text-xs text-danger-600/80 dark:text-danger-400/60 mb-3">Permanently delete this interview. This action cannot be undone.</p>
         <button

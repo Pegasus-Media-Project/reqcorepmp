@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { UserPlus, Mail, X, Loader2, ChevronDown, Trash2, Check } from 'lucide-vue-next'
+import { UserPlus, Mail, X, Loader2, ChevronDown, Trash2, Check, UserCheck } from 'lucide-vue-next'
 
 interface GuestMember {
   userId: string
@@ -19,7 +19,7 @@ const toast = useToast()
 // Jobs for the multiselect / per-guest editor.
 const { data: jobsData } = useFetch<{ data: { id: string; title: string }[] }>('/api/jobs', {
   key: 'guest-mgmt-jobs',
-  query: { limit: 200 },
+  query: { limit: 100 },
   headers: useRequestHeaders(['cookie']),
 })
 const jobs = computed(() => jobsData.value?.data ?? [])
@@ -127,22 +127,29 @@ async function cancelInvite(id: string) {
 </script>
 
 <template>
-  <section class="mb-8">
-    <div class="flex items-center justify-between mb-3">
-      <div>
-        <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Guest reviewers</h2>
-        <p class="text-xs text-surface-500 dark:text-surface-400">External reviewers with access only to the jobs you assign — no other org access.</p>
+  <section class="mb-6 rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 overflow-hidden">
+    <!-- Card header -->
+    <div class="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-surface-200 dark:border-surface-800">
+      <div class="flex items-center gap-3">
+        <div class="flex items-center justify-center size-8 rounded-lg bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400">
+          <UserCheck class="size-4" />
+        </div>
+        <div>
+          <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Guest reviewers</h2>
+          <p class="text-xs text-surface-500 dark:text-surface-400">Access only to the jobs you assign — no other org access.</p>
+        </div>
       </div>
       <button
-        class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+        class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700 shrink-0"
         @click="showInvite = !showInvite"
       >
         <UserPlus class="size-4" /> Invite guest
       </button>
     </div>
 
+    <div class="p-4 sm:p-6">
     <!-- Invite form -->
-    <div v-if="showInvite" class="mb-4 rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-4">
+    <div v-if="showInvite" class="mb-4 rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50/60 dark:bg-surface-950/40 p-4">
       <div class="relative max-w-sm mb-3">
         <Mail class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-surface-400" />
         <input
@@ -234,5 +241,6 @@ async function cancelInvite(id: string) {
     </div>
 
     <p v-if="!guests.length && !pending.length" class="text-sm text-surface-400 italic">No guest reviewers yet.</p>
+    </div>
   </section>
 </template>

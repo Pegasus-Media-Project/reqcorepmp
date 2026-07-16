@@ -225,11 +225,12 @@ const drawerApplicationId = ref<string | null>(null)
                   <td class="px-4 py-3 font-medium text-surface-700 dark:text-surface-200 tabular-nums">{{ fmt(a.overallAvg) }}</td>
                   <td class="px-2 py-3">
                     <button
-                      class="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+                      class="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 dark:border-surface-700/80 px-2.5 py-1.5 text-xs font-medium text-surface-600 dark:text-surface-300 hover:bg-surface-50 hover:text-brand-600 dark:hover:bg-surface-800 transition-colors whitespace-nowrap"
                       title="Open application"
                       @click.stop="drawerApplicationId = a.applicationId"
                     >
-                      <PanelRight class="size-4" />
+                      <PanelRight class="size-3.5" />
+                      Application
                     </button>
                   </td>
                 </tr>

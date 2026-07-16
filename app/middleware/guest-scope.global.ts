@@ -27,7 +27,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
   // Pages a guest may see. Everything is still server-scoped to their jobs.
   const allowed: RegExp[] = [
     /^\/dashboard\/jobs$/, // scoped jobs list — the guest landing
-    /^\/dashboard\/jobs\/[^/]+(\/.*)?$/, // a job + its sub-pages (pipeline, ratings, …)
+    /^\/dashboard\/jobs\/(?!new$)[^/]+(\/.*)?$/, // a job + its sub-pages (NOT the create wizard)
     /^\/dashboard\/applications\/[^/]+$/, // an application detail
     /^\/dashboard\/interviews(\/[^/]+)?$/, // interview list/detail
     /^\/dashboard\/ratings$/, // global ratings (job selector; scoped server-side)

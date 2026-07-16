@@ -200,6 +200,9 @@ watch(() => route.path, () => {
 // New Job button
 // ─────────────────────────────────────────────
 
+// Only staff who can create jobs see the New Job affordance (hidden for guests).
+const { allowed: canCreateJob } = usePermission({ job: ['create'] })
+
 const newJobResetSignal = useState('new-job-reset-signal', () => 0)
 
 function handleNewJobClick() {
@@ -366,6 +369,7 @@ onUnmounted(() => {
 
           <!-- New Job button (desktop) -->
           <button
+            v-if="canCreateJob"
             class="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-sm shadow-brand-600/20 hover:bg-brand-700 hover:shadow-md hover:shadow-brand-600/25 active:bg-brand-800 transition-all duration-200 border-0 cursor-pointer"
             @click="handleNewJobClick"
           >
@@ -593,6 +597,7 @@ onUnmounted(() => {
           </NuxtLink>
 
           <button
+            v-if="canCreateJob"
             class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium bg-brand-600 text-white hover:bg-brand-700 transition-colors sm:hidden mt-1 border-0 cursor-pointer w-full"
             @click="handleNewJobClick(); showMobileMenu = false"
           >

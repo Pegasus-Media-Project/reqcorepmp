@@ -14,7 +14,7 @@ useSeoMeta({
 // Scoped jobs list (guests see only their assigned jobs).
 const { data: jobsData, status: jobsStatus } = useFetch<{ data: { id: string, title: string, status: string }[] }>(
   '/api/jobs',
-  { key: 'ratings-jobs', query: { limit: 200 }, headers: useRequestHeaders(['cookie']) },
+  { key: 'ratings-jobs', query: { limit: 100 }, headers: useRequestHeaders(['cookie']) },
 )
 const jobs = computed(() => jobsData.value?.data ?? [])
 

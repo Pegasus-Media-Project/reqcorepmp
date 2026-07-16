@@ -2,7 +2,7 @@
 import {
   X, User, Calendar, Clock, Hash, MessageSquare, FileText,
   ExternalLink, Mail, Phone, Upload, Download, Eye, Trash2,
-  ArrowLeft, AlertTriangle, Brain, History, RefreshCw,
+  ArrowLeft, AlertTriangle, Brain, History, RefreshCw, Star,
 } from 'lucide-vue-next'
 import { usePreviewReadOnly } from '~/composables/usePreviewReadOnly'
 
@@ -42,6 +42,11 @@ const activeTab = ref<'overview' | 'documents' | 'responses' | 'ai_analysis' | '
 
 // AI resume scoring is hidden by default; its tab/score are suppressed.
 const aiScoringEnabled = useFeatureFlagEnabled('ai-scoring')
+
+// Guests are read-only on applications/documents (they rate via ReviewPanel).
+const { allowed: canManageApplication } = usePermission({ application: ['update'] })
+const { allowed: canManageDocuments } = usePermission({ document: ['create'] })
+const { allowed: canManageInterviews } = usePermission({ interview: ['create'] })
 
 watch(() => props.applicationId, () => {
   activeTab.value = props.initialTab ?? 'overview'
@@ -512,7 +517,7 @@ function formatInterviewDate(dateStr: string) {
         </div>
         <div class="flex items-center gap-1 shrink-0 ml-3">
           <button
-            v-if="application"
+            v-if="application && canManageInterviews"
             class="inline-flex items-center gap-1.5 rounded-lg border border-surface-300 dark:border-surface-700 px-2.5 py-1.5 text-sm font-medium text-surface-600 dark:text-surface-400 hover:border-brand-400 dark:hover:border-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/30 hover:text-brand-700 dark:hover:text-brand-300 transition-all cursor-pointer"
             title="Schedule Interview"
             @click="showScheduleSidebar = true"
@@ -612,7 +617,7 @@ function formatInterviewDate(dateStr: string) {
                 </span>
               </div>
 
-              <div v-if="allowedTransitions.length > 0" class="flex flex-wrap items-center gap-2">
+              <div v-if="allowedTransitions.length > 0 && canManageApplication" class="flex flex-wrap items-center gap-2">
                 <span class="text-xs font-medium text-surface-500 dark:text-surface-400 mr-0.5">Move to:</span>
                 <button
                   v-for="nextStatus in allowedTransitions"
@@ -726,7 +731,7 @@ function formatInterviewDate(dateStr: string) {
                   <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">Notes</h3>
                 </div>
                 <button
-                  v-if="!isEditingNotes"
+                  v-if="!isEditingNotes && canManageApplication"
                   class="text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 font-medium transition-colors"
                   @click="startEditNotes"
                 >
@@ -765,6 +770,17 @@ function formatInterviewDate(dateStr: string) {
                 {{ application.notes }}
               </p>
               <p v-else class="text-sm text-surface-400 italic">No notes yet.</p>
+            </div>
+
+            <!-- Reviewer ratings -->
+            <div class="rounded-xl border border-surface-200/80 dark:border-surface-800/60 bg-white dark:bg-surface-950 p-5 shadow-sm shadow-surface-900/[0.03] dark:shadow-none">
+              <div class="flex items-center gap-2.5 mb-4">
+                <div class="flex size-7 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-950/40">
+                  <Star class="size-3.5 text-amber-500" />
+                </div>
+                <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">Reviews</h3>
+              </div>
+              <ReviewPanel v-if="application" :application-id="props.applicationId" :status="application.status" />
             </div>
 
             <!-- Scheduled interviews -->
@@ -913,8 +929,8 @@ function formatInterviewDate(dateStr: string) {
 
             <!-- ── Document list (normal state) ── -->
             <template v-else>
-              <!-- Upload controls -->
-              <div class="flex items-center justify-between">
+              <!-- Upload controls (guests are read-only) -->
+              <div v-if="canManageDocuments" class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <select
                     v-model="selectedDocType"
@@ -1009,6 +1025,7 @@ function formatInterviewDate(dateStr: string) {
                       <Download class="size-4" />
                     </button>
                     <button
+                      v-if="canManageDocuments"
                       class="rounded-lg p-1.5 text-surface-400 hover:text-danger-600 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
                       title="Delete"
                       @click="showDocDeleteConfirm = doc.id"

@@ -22,6 +22,10 @@ const { handlePreviewReadOnlyError } = usePreviewReadOnly()
 const toast = useToast()
 const { formatPersonName, formatDateTime } = useOrgSettings()
 
+// Guests are read-only on interviews and can't see email templates.
+const { allowed: canManageInterviews } = usePermission({ interview: ['update'] })
+const { allowed: canReadEmailTemplates } = usePermission({ emailTemplate: ['read'] })
+
 // ─── Filters ──────────────────────────────────────────────────────
 const searchInput = ref('')
 const debouncedSearch = ref('')
@@ -417,6 +421,7 @@ const statusCounts = computed(() => {
       </div>
 
       <NuxtLink
+        v-if="canReadEmailTemplates"
         :to="$localePath('/dashboard/interviews/templates')"
         class="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 dark:border-surface-700/80 bg-white dark:bg-surface-900 px-3 py-2 text-xs font-medium text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors no-underline"
       >
@@ -516,8 +521,8 @@ const statusCounts = computed(() => {
           <div class="flex items-start justify-between gap-4">
             <!-- Left: main info -->
             <div class="flex items-start gap-3.5 min-w-0 flex-1">
-              <!-- Bulk select checkbox -->
-              <label class="flex items-center pt-1 cursor-pointer" @click.stop>
+              <!-- Bulk select checkbox (reviewer assignment — managers only) -->
+              <label v-if="canManageInterviews" class="flex items-center pt-1 cursor-pointer" @click.stop>
                 <input type="checkbox" class="sr-only" :checked="selectedInterviewIds.has(interviewItem.id)" @change="toggleInterviewSelect(interviewItem.id)">
                 <span
                   class="size-4 shrink-0 rounded border flex items-center justify-center transition-colors"
@@ -623,8 +628,8 @@ const statusCounts = computed(() => {
               </div>
             </div>
 
-            <!-- Right: actions -->
-            <div class="flex items-center gap-2 shrink-0">
+            <!-- Right: actions (managers only) -->
+            <div v-if="canManageInterviews" class="flex items-center gap-2 shrink-0">
               <!-- Quick status actions -->
               <button
                 v-if="interviewItem.status === 'scheduled'"
@@ -770,7 +775,7 @@ const statusCounts = computed(() => {
                     </span>
                   </div>
                 </div>
-                <div class="flex items-center gap-1.5 shrink-0">
+                <div v-if="canManageInterviews" class="flex items-center gap-1.5 shrink-0">
                   <button
                     class="cursor-pointer rounded-lg border border-surface-200 dark:border-surface-700 p-1.5 text-surface-400 hover:text-surface-600 hover:bg-surface-50 dark:hover:text-surface-300 dark:hover:bg-surface-800 transition-all"
                     @click="openEdit(interviewItem)"
