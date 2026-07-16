@@ -471,19 +471,22 @@ async function handleSocialSignIn(providerId: string) {
             </button>
         </template>
 
-        <p class="text-center text-sm text-surface-500 dark:text-surface-400">
-            Don't have an account?
+        <!-- Self-service sign-up is invite-only: the link appears only when the
+             visitor arrived via an invitation link (carries ?invitation=). -->
+        <p
+            v-if="route.query.invitation"
+            class="text-center text-sm text-surface-500 dark:text-surface-400"
+        >
+            Have an invitation?
             <NuxtLink
                 :to="
-                    route.query.invitation
-                        ? $localePath({
-                              path: '/auth/sign-up',
-                              query: { invitation: route.query.invitation },
-                          })
-                        : $localePath('/auth/sign-up')
+                    $localePath({
+                        path: '/auth/sign-up',
+                        query: { invitation: route.query.invitation },
+                    })
                 "
                 class="text-brand-600 dark:text-brand-400 hover:underline"
-                >Sign up</NuxtLink
+                >Create your account</NuxtLink
             >
         </p>
     </form>

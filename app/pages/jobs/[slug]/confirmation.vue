@@ -12,6 +12,19 @@ const { t } = useI18n()
 const config = useRuntimeConfig()
 const organizationLogoFailed = ref(false)
 
+// Confirmation code passed from the apply step (?code=). Shown so the applicant
+// can save it and check status later at /status.
+const code = (route.query.code as string | undefined)?.toUpperCase()
+const copied = ref(false)
+async function copyCode() {
+  if (!code) return
+  try {
+    await navigator.clipboard.writeText(code)
+    copied.value = true
+    setTimeout(() => { copied.value = false }, 2000)
+  } catch { /* clipboard unavailable — user can still read the code */ }
+}
+
 onMounted(() => track('application_confirmed', { slug: jobSlug }))
 
 // Optionally fetch job title for a nicer confirmation
@@ -51,6 +64,34 @@ useSeoMeta({
             </i18n-t>
             <template v-else>{{ t('jobs.confirmation.thanksPlain') }}</template>
           </p>
+
+          <!-- Confirmation code -->
+          <div
+            v-if="code"
+            class="mt-6 rounded-xl border border-surface-200 bg-surface-50 p-5 dark:border-surface-800 dark:bg-surface-950/40"
+          >
+            <p class="text-xs font-medium uppercase tracking-wide text-surface-500">
+              Your confirmation code
+            </p>
+            <div class="mt-2 flex flex-wrap items-center gap-3">
+              <span class="font-mono text-2xl font-bold tracking-[0.2em] text-surface-900 dark:text-white">
+                {{ code }}
+              </span>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 rounded-md border border-surface-300 px-2.5 py-1 text-xs font-medium text-surface-600 transition hover:bg-surface-100 dark:border-surface-700 dark:text-surface-300 dark:hover:bg-surface-800"
+                @click="copyCode"
+              >
+                <Check v-if="copied" class="size-3.5 text-success-600" :stroke-width="2.5" />
+                {{ copied ? 'Copied' : 'Copy' }}
+              </button>
+            </div>
+            <p class="mt-3 text-sm leading-6 text-surface-500 dark:text-surface-400">
+              Save this code — you'll need it to
+              <NuxtLink :to="`/status?code=${code}`" class="font-medium text-brand-600 hover:underline">check your application status</NuxtLink>.
+              We've also emailed it to you.
+            </p>
+          </div>
         </div>
       </div>
 

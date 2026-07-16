@@ -1,7 +1,7 @@
-import { eq } from 'drizzle-orm'
+import { and, eq, gt, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { db } from './db'
-import { organization, member } from '../database/schema'
+import { organization, member, invitation, user } from '../database/schema'
 
 /**
  * Single-organization deployment.
@@ -74,4 +74,31 @@ export async function getUserPrimaryOrgId(userId: string): Promise<string | null
     .where(eq(member.userId, userId))
     .limit(1)
   return m?.organizationId ?? null
+}
+
+/** Number of user accounts in the system — used to allow the first (bootstrap) signup. */
+export async function countUsers(): Promise<number> {
+  const [row] = await db.select({ n: sql<string>`count(*)` }).from(user)
+  return Number(row?.n ?? 0)
+}
+
+/**
+ * Whether `email` has a pending, unexpired org invitation. Used to gate
+ * invite-only signup and to let invited users join via the normal
+ * acceptInvitation flow (rather than the generic auto-join). Case-insensitive.
+ */
+export async function hasPendingInvitation(email: string): Promise<boolean> {
+  const normalized = email.trim().toLowerCase()
+  const [row] = await db
+    .select({ id: invitation.id })
+    .from(invitation)
+    .where(
+      and(
+        eq(sql`lower(${invitation.email})`, normalized),
+        eq(invitation.status, 'pending'),
+        gt(invitation.expiresAt, new Date()),
+      ),
+    )
+    .limit(1)
+  return Boolean(row)
 }

@@ -462,6 +462,114 @@ function buildPasswordResetText(params: { url: string }): string {
 }
 
 // ─────────────────────────────────────────────
+// Applicant confirmation emails
+// ─────────────────────────────────────────────
+
+export interface ApplicationConfirmationParams {
+  to: string
+  firstName?: string
+  jobTitle: string
+  code: string
+  statusUrl: string
+}
+
+/**
+ * Email an applicant their confirmation code + a link to check status.
+ * Best-effort: falls back to a console log when no mail provider is configured.
+ */
+export async function sendApplicationConfirmationEmail(
+  params: ApplicationConfirmationParams,
+): Promise<void> {
+  await sendEmail({
+    to: params.to,
+    subject: `Application received — ${params.jobTitle}`,
+    html: buildApplicationConfirmationHtml(params),
+    text: buildApplicationConfirmationText(params),
+    logFallback: `Application confirmation for ${params.to} — code ${params.code} (${params.jobTitle})`,
+    errorCategory: 'application_confirmation_email',
+  })
+}
+
+function buildApplicationConfirmationHtml(params: ApplicationConfirmationParams): string {
+  const greeting = params.firstName ? `Hi ${escapeHtml(params.firstName)},` : 'Hi,'
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Application received</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e4e4e7;">
+          <tr>
+            <td style="padding:32px 32px 24px;text-align:center;border-bottom:1px solid #f4f4f5;">
+              <h1 style="margin:0;font-size:20px;font-weight:600;color:#09090b;">Pegasus Media Project</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px;">
+              <h2 style="margin:0 0 16px;font-size:18px;font-weight:600;color:#09090b;">Application received</h2>
+              <p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#3f3f46;">${greeting}</p>
+              <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#3f3f46;">
+                Thanks for applying for <strong>${escapeHtml(params.jobTitle)}</strong>. Your application is now with the hiring team. Use the confirmation code below to check your status at any time.
+              </p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+                <tr>
+                  <td align="center" style="padding:16px;background-color:#f4f4f5;border-radius:8px;">
+                    <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#71717a;margin-bottom:6px;">Confirmation code</div>
+                    <div style="font-size:28px;font-weight:700;letter-spacing:0.18em;color:#09090b;font-family:'SFMono-Regular',Menlo,Consolas,monospace;">${escapeHtml(params.code)}</div>
+                  </td>
+                </tr>
+              </table>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center">
+                    <a href="${escapeHtml(params.statusUrl)}" target="_blank" rel="noopener noreferrer"
+                       style="display:inline-block;padding:12px 32px;background-color:#2563eb;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;border-radius:8px;line-height:1;">
+                      Check application status
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:24px 0 0;font-size:12px;line-height:1.5;color:#71717a;">
+                Save this code — it's the only way to look up your application. We'll be in touch about next steps.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 32px;text-align:center;border-top:1px solid #f4f4f5;background-color:#fafafa;">
+              <p style="margin:0;font-size:12px;color:#a1a1aa;">Sent by Pegasus Media Project</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
+}
+
+function buildApplicationConfirmationText(params: ApplicationConfirmationParams): string {
+  return [
+    'Application received',
+    '',
+    params.firstName ? `Hi ${params.firstName},` : 'Hi,',
+    '',
+    `Thanks for applying for ${params.jobTitle}. Your application is now with the hiring team.`,
+    '',
+    `Your confirmation code: ${params.code}`,
+    `Check your status: ${params.statusUrl}`,
+    '',
+    'Save this code — it\'s the only way to look up your application.',
+    '',
+    '— Pegasus Media Project',
+  ].join('\n')
+}
+
+// ─────────────────────────────────────────────
 // Interview invitation emails
 // ─────────────────────────────────────────────
 

@@ -167,6 +167,7 @@ async function handleSubmit() {
     const hasAnyFiles = Object.keys(fileUploads.value).length > 0
       || !!resumeFile.value
 
+    let applyRes: { success?: boolean; confirmationCode?: string } | undefined
     if (hasAnyFiles) {
       // Use FormData when files are present
       const formData = new FormData()
@@ -205,13 +206,13 @@ async function handleSubmit() {
       if (utmTerm) formData.append('utmTerm', utmTerm)
       if (utmContent) formData.append('utmContent', utmContent)
 
-      await $fetch(`/api/public/jobs/${jobSlug}/apply`, {
+      applyRes = await $fetch<{ success?: boolean; confirmationCode?: string }>(`/api/public/jobs/${jobSlug}/apply`, {
         method: 'POST',
         body: formData,
       })
     } else {
       // No files — use JSON as before
-      await $fetch(`/api/public/jobs/${jobSlug}/apply`, {
+      applyRes = await $fetch<{ success?: boolean; confirmationCode?: string }>(`/api/public/jobs/${jobSlug}/apply`, {
         method: 'POST',
         body: {
           firstName: form.value.firstName.trim(),
@@ -232,7 +233,10 @@ async function handleSubmit() {
     }
 
     track('application_submitted', { slug: jobSlug })
-    await navigateTo(`/jobs/${jobSlug}/confirmation`)
+    await navigateTo({
+      path: `/jobs/${jobSlug}/confirmation`,
+      query: applyRes?.confirmationCode ? { code: applyRes.confirmationCode } : undefined,
+    })
   } catch (err: any) {
     const message = err.data?.statusMessage ?? t('jobs.apply.genericError')
     submitError.value = message

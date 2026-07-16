@@ -8,7 +8,13 @@ import { and, eq } from "drizzle-orm";
 import { ac, owner, admin, member } from "~~/shared/permissions";
 import { isBillingActionAllowed } from "~~/shared/billing";
 import { sendOrgInvitationEmail, sendPasswordResetEmail } from "./email";
-import { ensureDefaultOrgMembership, getUserPrimaryOrgId } from "./defaultOrg";
+import { APIError } from "better-auth/api";
+import {
+  ensureDefaultOrgMembership,
+  getUserPrimaryOrgId,
+  countUsers,
+  hasPendingInvitation,
+} from "./defaultOrg";
 import { getMissingStripeBillingVars, isStripeBillingConfigured } from "./env";
 import { buildStripePlans } from "./billing/stripe-plans";
 import { isDemoOrgId, isDemoAccountEmail } from "./demoOrg";
@@ -316,8 +322,29 @@ function getAuth(): Auth {
       databaseHooks: {
         user: {
           create: {
+            // Invite-only gate. Staff accounts can only be created by an admin
+            // inviting them (Settings → Members) — with one exception: the very
+            // first account on a fresh instance is allowed so there's a way to
+            // bootstrap the owner. Everyone else must have a pending invitation.
+            before: async (newUser) => {
+              const email = (newUser.email ?? "").trim().toLowerCase();
+              // Bootstrap: allow the first-ever account (becomes owner).
+              if ((await countUsers()) === 0) return;
+              // Otherwise require a pending, unexpired invitation for this email.
+              if (email && (await hasPendingInvitation(email))) return;
+              throw new APIError("FORBIDDEN", {
+                message:
+                  "Sign-ups are invite-only. Ask an administrator to invite you.",
+              });
+            },
             after: async (createdUser) => {
               try {
+                // Invited users get their membership + role via the normal
+                // acceptInvitation flow — skip the generic auto-join for them to
+                // avoid a duplicate-membership conflict. Non-invited signups only
+                // ever happen for the bootstrap owner, who auto-owns the org.
+                const email = (createdUser.email ?? "").trim().toLowerCase();
+                if (email && (await hasPendingInvitation(email))) return;
                 await ensureDefaultOrgMembership(createdUser.id);
               } catch (e) {
                 console.error(

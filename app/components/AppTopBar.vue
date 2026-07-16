@@ -214,13 +214,13 @@ onUnmounted(() => {
       <div class="flex h-14 items-center justify-between px-4 lg:px-6">
         <!-- Left: Logo + Nav -->
         <div class="flex items-center gap-1 lg:gap-2">
-          <!-- Logo — links to marketing site (reqcore.com), not app root -->
-          <a
-            :href="useRuntimeConfig().public.marketingUrl"
+          <!-- Logo — links to the home page -->
+          <NuxtLink
+            :to="localePath('/')"
             class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg no-underline hover:bg-surface-100/60 dark:hover:bg-surface-800/60 transition-colors mr-1 lg:mr-4"
           >
             <img src="/pegasus-logo.png" alt="Pegasus Media Project" class="h-7 w-auto shrink-0 object-contain" />
-          </a>
+          </NuxtLink>
 
           <!-- Desktop nav links -->
           <nav class="hidden md:flex items-center gap-0.5">

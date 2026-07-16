@@ -30,13 +30,7 @@ const { data: session } = await authClient.useSession(useFetch)
               :to="localePath('/auth/sign-in')"
               class="rounded-md px-3 py-1.5 text-[13px] font-medium text-surface-600 transition hover:text-surface-900 no-underline"
             >
-              Sign in
-            </NuxtLink>
-            <NuxtLink
-              :to="localePath('/auth/sign-up')"
-              class="rounded-md bg-brand-600 px-3.5 py-1.5 text-[13px] font-semibold text-white transition hover:bg-brand-700 no-underline"
-            >
-              Sign up
+              Staff sign in
             </NuxtLink>
           </template>
         </div>
@@ -50,7 +44,13 @@ const { data: session } = await authClient.useSession(useFetch)
 
     <!-- Footer -->
     <footer class="border-t border-surface-200 mt-12">
-      <div class="mx-auto max-w-3xl px-4 sm:px-6 py-6">
+      <div class="mx-auto max-w-3xl px-4 sm:px-6 py-6 flex flex-col items-center gap-2">
+        <NuxtLink
+          to="/status"
+          class="text-xs font-medium text-brand-600 transition hover:text-brand-700 no-underline"
+        >
+          Check application status
+        </NuxtLink>
         <p class="text-xs text-surface-400 text-center">
           Pegasus Media Project
         </p>

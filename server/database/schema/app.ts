@@ -169,6 +169,10 @@ export const application = pgTable('application', {
   score: integer('score'),
   notes: text('notes'),
   coverLetterText: text('cover_letter_text'),
+  // Public, airline-style confirmation code an applicant uses to check status at
+  // /status. Unique so a code maps to exactly one application. Nullable because
+  // rows created before this feature (and any internal inserts) have none.
+  confirmationCode: text('confirmation_code'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (t) => ([
@@ -176,6 +180,7 @@ export const application = pgTable('application', {
   index('application_candidate_id_idx').on(t.candidateId),
   index('application_job_id_idx').on(t.jobId),
   uniqueIndex('application_org_candidate_job_idx').on(t.organizationId, t.candidateId, t.jobId),
+  uniqueIndex('application_confirmation_code_idx').on(t.confirmationCode),
 ]))
 
 /**

@@ -1,0 +1,61 @@
+import { eq } from 'drizzle-orm'
+import { application, job } from '../../../database/schema'
+
+/**
+ * GET /api/public/applications/:code
+ *
+ * Public application-status lookup by confirmation code. No auth — the code is
+ * the secret. Because the code space is small enough to brute-force, this is
+ * rate-limited and returns a uniform 404 for both invalid and unknown codes so
+ * it can't be used to enumerate valid codes. Returns no candidate PII.
+ */
+
+/** Max 10 status checks per IP per 15 minutes — throttles code enumeration. */
+const statusCheckRateLimit = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 10,
+  message: 'Too many status checks. Please try again in a little while.',
+})
+
+/** Internal pipeline stage → applicant-facing label (honest full mapping). */
+const STATUS_LABELS: Record<string, string> = {
+  new: 'Received',
+  screening: 'Under review',
+  interview: 'Interviewing',
+  offer: 'Offer extended',
+  hired: 'Hired',
+  rejected: 'Not selected',
+}
+
+export default defineEventHandler(async (event) => {
+  // Skipped outside production and in CI (mirrors the apply endpoint).
+  if (process.env.NODE_ENV === 'production' && !process.env.CI && !process.env.GITHUB_ACTIONS) {
+    await statusCheckRateLimit(event)
+  }
+
+  const notFound = () =>
+    createError({ statusCode: 404, statusMessage: 'No application found for that code' })
+
+  const code = normalizeConfirmationCode(getRouterParam(event, 'code') ?? '')
+  if (!isValidConfirmationCode(code)) throw notFound()
+
+  const [row] = await db
+    .select({
+      status: application.status,
+      submittedAt: application.createdAt,
+      jobTitle: job.title,
+    })
+    .from(application)
+    .innerJoin(job, eq(application.jobId, job.id))
+    .where(eq(application.confirmationCode, code))
+    .limit(1)
+
+  if (!row) throw notFound()
+
+  return {
+    statusKey: row.status,
+    status: STATUS_LABELS[row.status] ?? 'Received',
+    jobTitle: row.jobTitle,
+    submittedAt: row.submittedAt,
+  }
+})

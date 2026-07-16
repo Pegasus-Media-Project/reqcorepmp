@@ -182,6 +182,7 @@ export default defineEventHandler(async (event) => {
     columns: {
       id: true,
       organizationId: true,
+      title: true,
       phoneRequirement: true,
       requireResume: true,
       requireCoverLetter: true,
@@ -417,13 +418,38 @@ export default defineEventHandler(async (event) => {
   // 8. Create application
   // ─────────────────────────────────────────────
 
+  // Generate a unique, airline-style confirmation code the applicant can use to
+  // check status at /status. Retry on the (astronomically rare) collision.
+  let confirmationCode = generateConfirmationCode()
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const [clash] = await db
+      .select({ id: application.id })
+      .from(application)
+      .where(eq(application.confirmationCode, confirmationCode))
+      .limit(1)
+    if (!clash) break
+    confirmationCode = generateConfirmationCode()
+  }
+
   const [newApplication] = await db.insert(application).values({
     organizationId: orgId,
     candidateId,
     jobId,
     status: 'new',
     coverLetterText: coverLetterText || null,
+    confirmationCode,
   }).returning({ id: application.id })
+
+  // Email the applicant their confirmation code + status link (best-effort;
+  // logs to console when no mail transport is configured).
+  const statusUrl = `${getRequestURL(event).origin}/status?code=${confirmationCode}`
+  void sendApplicationConfirmationEmail({
+    to: email,
+    firstName,
+    jobTitle: existingJob.title,
+    code: confirmationCode,
+    statusUrl,
+  }).catch((e) => console.error('[Pegasus] Failed to send application confirmation email:', e))
 
   // ─────────────────────────────────────────────
   // 8b. Record source attribution
@@ -676,7 +702,7 @@ export default defineEventHandler(async (event) => {
   })
 
   setResponseStatus(event, 201)
-  return { success: true }
+  return { success: true, confirmationCode }
 })
 
 // ─────────────────────────────────────────────
