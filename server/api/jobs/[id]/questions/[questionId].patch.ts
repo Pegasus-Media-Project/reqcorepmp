@@ -54,6 +54,7 @@ export default defineEventHandler(async (event) => {
       type: jobQuestion.type,
       label: jobQuestion.label,
       description: jobQuestion.description,
+      content: jobQuestion.content,
       required: jobQuestion.required,
       options: jobQuestion.options,
       displayOrder: jobQuestion.displayOrder,

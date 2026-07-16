@@ -61,13 +61,14 @@ const {
 
 type QuestionType =
   | 'short_text' | 'long_text' | 'single_select' | 'multi_select'
-  | 'number' | 'date' | 'url' | 'checkbox' | 'file_upload'
+  | 'number' | 'date' | 'url' | 'checkbox' | 'file_upload' | 'info'
 
 type BuilderQuestion = {
   id: string
   label: string
   type: QuestionType
   description?: string | null
+  content?: string | null
   required: boolean
   options?: string[] | null
   sectionId?: string | null
@@ -103,6 +104,7 @@ watch(jobQuestions, (qs) => {
     label: q.label,
     type: q.type as QuestionType,
     description: q.description ?? null,
+    content: q.content ?? null,
     required: q.required,
     options: q.options ?? null,
     sectionId: q.sectionId ?? null,

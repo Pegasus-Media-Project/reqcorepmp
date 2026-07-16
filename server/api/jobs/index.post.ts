@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm'
-import { job, jobQuestion, scoringCriterion, program } from '../../database/schema'
+import { job, jobQuestion, jobQuestionSection, scoringCriterion, program } from '../../database/schema'
 import { createJobWizardSchema } from '../../utils/schemas/job'
 
 export default defineEventHandler(async (event) => {
@@ -79,13 +79,35 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 500, statusMessage: 'Failed to create job' })
     }
 
+    // Create sections first so questions can reference their real ids. The
+    // wizard sends a client-side `ref` per section; build ref → real id.
+    const sectionRefToId = new Map<string, string>()
+    if (body.sections.length) {
+      const insertedSections = await tx.insert(jobQuestionSection).values(
+        body.sections.map((section, index) => ({
+          organizationId: orgId,
+          jobId,
+          title: section.title,
+          description: section.description ?? null,
+          displayOrder: index,
+        })),
+      ).returning({ id: jobQuestionSection.id })
+      body.sections.forEach((section, index) => {
+        const created = insertedSections[index]
+        if (created) sectionRefToId.set(section.ref, created.id)
+      })
+    }
+
     if (body.questions.length) {
       await tx.insert(jobQuestion).values(body.questions.map((question, index) => ({
         organizationId: orgId,
         jobId,
+        // `sectionId` from the wizard holds a section ref; map it to the real id.
+        sectionId: question.sectionId ? sectionRefToId.get(question.sectionId) ?? null : null,
         type: question.type,
         label: question.label,
         description: question.description,
+        content: question.content,
         required: question.required,
         options: question.options,
         displayOrder: index,

@@ -8,9 +8,12 @@ const props = defineProps<{
     label: string
     type: string
     description?: string | null
+    content?: string | null
     required: boolean
     options?: string[] | null
   }
+  /** Preselects the field type when adding a new item (e.g. 'info'). */
+  initialType?: string
 }>()
 
 const emit = defineEmits<{
@@ -18,6 +21,7 @@ const emit = defineEmits<{
     label: string
     type: string
     description?: string
+    content?: string
     required: boolean
     options?: string[]
   }): void
@@ -34,12 +38,14 @@ const questionTypes = [
   { value: 'url', label: 'URL' },
   { value: 'checkbox', label: 'Checkbox (Yes/No)' },
   { value: 'file_upload', label: 'File Upload' },
+  { value: 'info', label: 'Information block (no answer)' },
 ]
 
 const form = ref({
   label: props.question?.label ?? '',
-  type: props.question?.type ?? 'short_text',
+  type: props.question?.type ?? props.initialType ?? 'short_text',
   description: props.question?.description ?? '',
+  content: props.question?.content ?? '',
   required: props.question?.required ?? false,
   options: props.question?.options ?? [''],
 })
@@ -49,6 +55,14 @@ const errors = ref<Record<string, string>>({})
 const isSelectType = computed(() =>
   form.value.type === 'single_select' || form.value.type === 'multi_select',
 )
+
+/** Info blocks are display-only content, not an input field. */
+const isInfo = computed(() => form.value.type === 'info')
+
+/** True when the rich-text body has visible text or an image. */
+function hasRichContent(html: string) {
+  return /<img/i.test(html) || html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim().length > 0
+}
 
 function addOption() {
   if (form.value.options.length >= 50) return
@@ -63,6 +77,17 @@ function removeOption(index: number) {
 
 function validate(): boolean {
   errors.value = {}
+
+  if (isInfo.value) {
+    // Info blocks: heading optional, rich content required.
+    if (!hasRichContent(form.value.content)) {
+      errors.value.content = 'Add some content for this information block'
+    }
+    if (form.value.label.trim().length > 500) {
+      errors.value.label = 'Heading must be 500 characters or less'
+    }
+    return Object.keys(errors.value).length === 0
+  }
 
   if (!form.value.label.trim()) {
     errors.value.label = 'Question label is required'
@@ -95,12 +120,20 @@ function handleSubmit() {
     label: string
     type: string
     description?: string
+    content?: string
     required: boolean
     options?: string[]
   } = {
     label: form.value.label.trim(),
     type: form.value.type,
-    required: form.value.required,
+    // Info blocks are never "required" — they collect no answer.
+    required: isInfo.value ? false : form.value.required,
+  }
+
+  if (isInfo.value) {
+    data.content = form.value.content
+    emit('save', data)
+    return
   }
 
   if (form.value.description.trim()) {
@@ -123,7 +156,7 @@ const isEditing = computed(() => !!props.question)
   <div class="rounded-lg border border-surface-200 dark:border-surface-800 bg-surface-50 dark:bg-surface-900 p-4">
     <div class="flex items-center justify-between mb-4">
       <h3 class="text-sm font-semibold text-surface-700 dark:text-surface-300">
-        {{ isEditing ? 'Edit Question' : 'Add Question' }}
+        {{ isEditing ? (isInfo ? 'Edit Block' : 'Edit Question') : (isInfo ? 'Add Information Block' : 'Add Question') }}
       </h3>
       <button
         type="button"
@@ -135,23 +168,6 @@ const isEditing = computed(() => !!props.question)
     </div>
 
     <form class="space-y-4" @submit.prevent="handleSubmit">
-      <!-- Label -->
-      <div>
-        <label for="q-label" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-          Question <span class="text-danger-500">*</span>
-        </label>
-        <input
-          id="q-label"
-          v-model="form.label"
-          type="text"
-          maxlength="500"
-          placeholder="e.g. How many years of experience do you have?"
-          class="w-full rounded-lg border px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
-          :class="errors.label ? 'border-danger-300' : 'border-surface-300 dark:border-surface-700'"
-        />
-        <p v-if="errors.label" class="mt-1 text-xs text-danger-600 dark:text-danger-400">{{ errors.label }}</p>
-      </div>
-
       <!-- Type -->
       <div>
         <label for="q-type" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
@@ -168,8 +184,36 @@ const isEditing = computed(() => !!props.question)
         </select>
       </div>
 
-      <!-- Description / help text -->
+      <!-- Label / heading -->
       <div>
+        <label for="q-label" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
+          <template v-if="isInfo">Heading <span class="text-surface-400 font-normal">(optional)</span></template>
+          <template v-else>Question <span class="text-danger-500">*</span></template>
+        </label>
+        <input
+          id="q-label"
+          v-model="form.label"
+          type="text"
+          maxlength="500"
+          :placeholder="isInfo ? 'Optional heading for this block' : 'e.g. How many years of experience do you have?'"
+          class="w-full rounded-lg border px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
+          :class="errors.label ? 'border-danger-300' : 'border-surface-300 dark:border-surface-700'"
+        />
+        <p v-if="errors.label" class="mt-1 text-xs text-danger-600 dark:text-danger-400">{{ errors.label }}</p>
+      </div>
+
+      <!-- Info block: rich content -->
+      <div v-if="isInfo">
+        <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
+          Content <span class="text-danger-500">*</span>
+        </label>
+        <RichTextEditor v-model="form.content" />
+        <p v-if="errors.content" class="mt-1 text-xs text-danger-600 dark:text-danger-400">{{ errors.content }}</p>
+        <p v-else class="mt-1 text-xs text-surface-400 dark:text-surface-500">Shown to applicants as information — no answer is collected.</p>
+      </div>
+
+      <!-- Description / help text -->
+      <div v-if="!isInfo">
         <label for="q-desc" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
           Help Text <span class="text-surface-400 font-normal">(optional)</span>
         </label>
@@ -185,7 +229,7 @@ const isEditing = computed(() => !!props.question)
       </div>
 
       <!-- Options (for select types) -->
-      <div v-if="isSelectType">
+      <div v-if="isSelectType && !isInfo">
         <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
           Options <span class="text-danger-500">*</span>
         </label>
@@ -221,7 +265,7 @@ const isEditing = computed(() => !!props.question)
       </div>
 
       <!-- Required -->
-      <label class="flex items-center gap-2 cursor-pointer">
+      <label v-if="!isInfo" class="flex items-center gap-2 cursor-pointer">
         <input
           v-model="form.required"
           type="checkbox"
@@ -236,7 +280,7 @@ const isEditing = computed(() => !!props.question)
           type="submit"
           class="inline-flex items-center rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
         >
-          {{ isEditing ? 'Update' : 'Add Question' }}
+          {{ isEditing ? 'Update' : (isInfo ? 'Add Block' : 'Add Question') }}
         </button>
         <button
           type="button"

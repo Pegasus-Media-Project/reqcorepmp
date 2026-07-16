@@ -21,6 +21,7 @@ type Question = {
   type: string
   label: string
   description?: string | null
+  content?: string | null
   required: boolean
   options?: string[] | null
   sectionId?: string | null
@@ -432,7 +433,9 @@ function clearError(key: string) {
             <p v-else class="text-sm font-medium text-surface-700 dark:text-surface-300">{{ t('jobs.form.additionalQuestions') }}</p>
             <div class="space-y-5">
               <div v-for="q in visibleQuestions" :key="q.id">
+                <FormInfoBlock v-if="q.type === 'info'" :block="q" />
                 <DynamicField
+                  v-else
                   v-model="responses[q.id]"
                   :question="q"
                   :error="displayErrors[`q-${q.id}`]"
@@ -458,7 +461,9 @@ function clearError(key: string) {
                   @click="onFieldClick(`question:${q.id}`)"
                 >
                   <div :class="isPreview ? 'pointer-events-none' : ''">
+                    <FormInfoBlock v-if="q.type === 'info'" :block="q" />
                     <DynamicField
+                      v-else
                       v-model="responses[q.id]"
                       :question="q"
                       :error="displayErrors[`q-${q.id}`]"

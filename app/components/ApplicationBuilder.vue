@@ -15,13 +15,14 @@ import {
  */
 type QuestionType =
   | 'short_text' | 'long_text' | 'single_select' | 'multi_select'
-  | 'number' | 'date' | 'url' | 'checkbox' | 'file_upload'
+  | 'number' | 'date' | 'url' | 'checkbox' | 'file_upload' | 'info'
 
 type DraftQuestion = {
   id: string
   label: string
   type: QuestionType
   description?: string | null
+  content?: string | null
   required: boolean
   options?: string[] | null
   sectionId?: string | null
@@ -68,6 +69,7 @@ type QuestionInput = {
   label: string
   type: string
   description?: string
+  content?: string
   required: boolean
   options?: string[]
 }
@@ -95,6 +97,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
   url: 'URL',
   checkbox: 'Checkbox',
   file_upload: 'File Upload',
+  info: 'Information block',
 }
 
 const phoneRequirementOptions = [
@@ -107,6 +110,7 @@ const phoneRequirementOptions = [
 // Question CRUD (operates on the model in place)
 // ─────────────────────────────────────────────
 const showAddForm = ref(false)
+const addInitialType = ref<'short_text' | 'info'>('short_text')
 const editingQuestion = ref<DraftQuestion | null>(null)
 const questionActionError = ref<string | null>(null)
 let nextQuestionId = 0
@@ -116,11 +120,12 @@ function newDraftId() {
   return `draft-${Date.now()}-${nextQuestionId++}`
 }
 
-function startAdd() {
+function startAdd(type: 'short_text' | 'info' = 'short_text') {
   if (model.value.questions.length >= 50) {
-    questionActionError.value = 'You can add up to 50 screening questions.'
+    questionActionError.value = 'You can add up to 50 form items.'
     return
   }
+  addInitialType.value = type
   editingQuestion.value = null
   showAddForm.value = true
   questionActionError.value = null
@@ -157,6 +162,7 @@ async function handleAddQuestion(data: QuestionInput) {
     label: data.label,
     type: data.type as QuestionType,
     description: data.description ?? null,
+    content: data.content ?? null,
     required: data.required,
     options: data.options ?? null,
   })
@@ -180,8 +186,10 @@ async function handleUpdateQuestion(data: QuestionInput) {
     label: data.label,
     type: data.type as QuestionType,
     description: data.description ?? null,
+    content: data.content ?? null,
     required: data.required,
     options: data.options ?? null,
+    sectionId: existing.sectionId ?? null,
   }
   editingQuestion.value = null
   questionActionError.value = null
@@ -259,9 +267,17 @@ function setRequireCoverLetter(value: boolean) {
 // Sections (wizard pages) — only available on the per-job editor, where the
 // section operations are wired. The create-job wizard leaves them undefined.
 // ─────────────────────────────────────────────
-const sectionsEnabled = computed(() => !!props.operations?.addSection)
+// Sections work in two modes: delegated (per-job editor, persisted via
+// operations) and in-memory (create-job wizard, mutating the model directly).
+const inMemory = computed(() => !props.operations)
+const sectionsEnabled = computed(() => inMemory.value || !!props.operations?.addSection)
 const sections = computed<DraftSection[]>(() =>
   [...(model.value.sections ?? [])].sort((a, b) => a.displayOrder - b.displayOrder))
+
+function ensureSectionsArray(): DraftSection[] {
+  if (!model.value.sections) model.value.sections = []
+  return model.value.sections
+}
 
 const showAddSection = ref(false)
 const newSectionTitle = ref('')
@@ -270,11 +286,18 @@ const editingSectionTitle = ref('')
 
 async function addSectionRow() {
   const title = newSectionTitle.value.trim()
-  if (!title || !props.operations?.addSection) return
-  if (await runOp(() => props.operations!.addSection!({ title }))) {
-    newSectionTitle.value = ''
-    showAddSection.value = false
+  if (!title) return
+  if (props.operations?.addSection) {
+    if (await runOp(() => props.operations!.addSection!({ title }))) {
+      newSectionTitle.value = ''
+      showAddSection.value = false
+    }
+    return
   }
+  const list = ensureSectionsArray()
+  list.push({ id: newDraftId(), title, description: null, displayOrder: list.length })
+  newSectionTitle.value = ''
+  showAddSection.value = false
 }
 function startEditSection(s: DraftSection) {
   editingSectionId.value = s.id
@@ -282,25 +305,49 @@ function startEditSection(s: DraftSection) {
 }
 async function saveSection(id: string) {
   const title = editingSectionTitle.value.trim()
-  if (!title || !props.operations?.updateSection) return
-  if (await runOp(() => props.operations!.updateSection!(id, { title }))) editingSectionId.value = null
+  if (!title) return
+  if (props.operations?.updateSection) {
+    if (await runOp(() => props.operations!.updateSection!(id, { title }))) editingSectionId.value = null
+    return
+  }
+  const s = model.value.sections?.find(x => x.id === id)
+  if (s) s.title = title
+  editingSectionId.value = null
 }
 async function deleteSectionRow(id: string) {
-  if (!props.operations?.deleteSection) return
-  await runOp(() => props.operations!.deleteSection!(id))
+  if (props.operations?.deleteSection) {
+    await runOp(() => props.operations!.deleteSection!(id))
+    return
+  }
+  const list = model.value.sections ?? []
+  const idx = list.findIndex(s => s.id === id)
+  if (idx >= 0) list.splice(idx, 1)
+  // Questions in the removed section fall back to the default page.
+  for (const q of model.value.questions) if (q.sectionId === id) q.sectionId = null
 }
 function moveSection(index: number, direction: 'up' | 'down') {
   const list = sections.value
   const target = direction === 'up' ? index - 1 : index + 1
-  if (target < 0 || target >= list.length || !props.operations?.reorderSections) return
-  const reordered = [...list]
-  ;[reordered[index], reordered[target]] = [reordered[target]!, reordered[index]!]
-  const order = reordered.map((s, i) => ({ id: s.id, displayOrder: i }))
-  runOp(() => props.operations!.reorderSections!(order))
+  if (target < 0 || target >= list.length) return
+  if (props.operations?.reorderSections) {
+    const reordered = [...list]
+    ;[reordered[index], reordered[target]] = [reordered[target]!, reordered[index]!]
+    const order = reordered.map((s, i) => ({ id: s.id, displayOrder: i }))
+    runOp(() => props.operations!.reorderSections!(order))
+    return
+  }
+  // In-memory: swap the two sections' displayOrder on the real model objects.
+  const a = model.value.sections?.find(s => s.id === list[index]!.id)
+  const b = model.value.sections?.find(s => s.id === list[target]!.id)
+  if (a && b) { const tmp = a.displayOrder; a.displayOrder = b.displayOrder; b.displayOrder = tmp }
 }
 async function assignQuestion(questionId: string, sectionId: string) {
-  if (!props.operations?.assignQuestionSection) return
-  await runOp(() => props.operations!.assignQuestionSection!(questionId, sectionId || null))
+  if (props.operations?.assignQuestionSection) {
+    await runOp(() => props.operations!.assignQuestionSection!(questionId, sectionId || null))
+    return
+  }
+  const q = model.value.questions.find(x => x.id === questionId)
+  if (q) q.sectionId = sectionId || null
 }
 
 const questionsAnchor = ref<HTMLElement | null>(null)
@@ -547,18 +594,26 @@ function handleEditField(field: string) {
             </div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
-                <span class="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">{{ q.label }}</span>
-                <span
-                  v-if="q.required"
-                  class="inline-flex items-center rounded-md bg-brand-50 dark:bg-brand-950/50 px-2 py-0.5 text-[10px] font-medium text-brand-700 dark:text-brand-300 ring-1 ring-inset ring-brand-200 dark:ring-brand-800"
-                >
-                  Required
-                </span>
+                <span class="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">{{ q.label || (q.type === 'info' ? 'Information block' : 'Untitled') }}</span>
+                <template v-if="q.type !== 'info'">
+                  <span
+                    v-if="q.required"
+                    class="inline-flex items-center rounded-md bg-brand-50 dark:bg-brand-950/50 px-2 py-0.5 text-[10px] font-medium text-brand-700 dark:text-brand-300 ring-1 ring-inset ring-brand-200 dark:ring-brand-800"
+                  >
+                    Required
+                  </span>
+                  <span
+                    v-else
+                    class="inline-flex items-center rounded-md bg-surface-100 dark:bg-surface-800 px-2 py-0.5 text-[10px] font-medium text-surface-500 dark:text-surface-400 ring-1 ring-inset ring-surface-200 dark:ring-surface-700"
+                  >
+                    Optional
+                  </span>
+                </template>
                 <span
                   v-else
                   class="inline-flex items-center rounded-md bg-surface-100 dark:bg-surface-800 px-2 py-0.5 text-[10px] font-medium text-surface-500 dark:text-surface-400 ring-1 ring-inset ring-surface-200 dark:ring-surface-700"
                 >
-                  Optional
+                  Info
                 </span>
               </div>
               <div class="flex items-center gap-1.5 mt-0.5 ml-0">
@@ -642,20 +697,29 @@ function handleEditField(field: string) {
         <QuestionForm
           v-if="showAddForm && !editingQuestion"
           class="mt-4 mb-2"
+          :initial-type="addInitialType"
           @save="handleAddQuestion"
           @cancel="showAddForm = false"
         />
 
-        <div class="mt-4 flex items-center gap-3">
+        <div v-if="!showAddForm && !editingQuestion" class="mt-4 flex flex-wrap items-center gap-3">
           <button
-            v-if="!showAddForm && !editingQuestion"
             type="button"
             :disabled="model.questions.length >= 50"
             class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-surface-300 dark:border-surface-700 px-3 py-2 text-sm font-medium text-surface-600 dark:text-surface-400 hover:border-brand-400 dark:hover:border-brand-600 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50/50 dark:hover:bg-brand-950/30 transition-colors"
-            @click="startAdd"
+            @click="startAdd('short_text')"
           >
             <Plus class="size-4" />
             Add a question
+          </button>
+          <button
+            type="button"
+            :disabled="model.questions.length >= 50"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-surface-300 dark:border-surface-700 px-3 py-2 text-sm font-medium text-surface-600 dark:text-surface-400 hover:border-brand-400 dark:hover:border-brand-600 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50/50 dark:hover:bg-brand-950/30 transition-colors"
+            @click="startAdd('info')"
+          >
+            <Plus class="size-4" />
+            Add information block
           </button>
         </div>
       </div>

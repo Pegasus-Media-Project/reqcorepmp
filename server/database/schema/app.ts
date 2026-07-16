@@ -26,6 +26,8 @@ export const documentTypeEnum = pgEnum('document_type', ['resume', 'cover_letter
 export const questionTypeEnum = pgEnum('question_type', [
   'short_text', 'long_text', 'single_select', 'multi_select',
   'number', 'date', 'url', 'checkbox', 'file_upload',
+  // Display-only informational content block (rich HTML), not an input.
+  'info',
 ])
 export const propertyEntityTypeEnum = pgEnum('property_entity_type', ['candidate', 'application'])
 export const propertyTypeEnum = pgEnum('property_type', [
@@ -301,6 +303,8 @@ export const jobQuestion = pgTable('job_question', {
   type: questionTypeEnum('type').notNull().default('short_text'),
   label: text('label').notNull(),
   description: text('description'),
+  /** Rich HTML body for `info` content blocks (images embedded as data URLs). */
+  content: text('content'),
   required: boolean('required').notNull().default(false),
   options: jsonb('options').$type<string[]>(),
   displayOrder: integer('display_order').notNull().default(0),

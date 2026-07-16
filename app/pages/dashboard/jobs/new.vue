@@ -70,14 +70,24 @@ type QuestionType =
   | 'url'
   | 'checkbox'
   | 'file_upload'
+  | 'info'
 
 type DraftQuestion = {
   id: string
   label: string
   type: QuestionType
   description?: string | null
+  content?: string | null
   required: boolean
   options?: string[] | null
+  sectionId?: string | null
+}
+
+type DraftSection = {
+  id: string
+  title: string
+  description?: string | null
+  displayOrder: number
 }
 
 // Wizard state
@@ -107,6 +117,7 @@ const applicationForm = ref({
   requireResume: true,
   requireCoverLetter: false,
   questions: [] as DraftQuestion[],
+  sections: [] as DraftSection[],
 })
 
 // Step 3: AI scoring criteria
@@ -310,11 +321,20 @@ const formSchema = z.object({
 
 const draftQuestionSchema = z.object({
   id: z.string().min(1),
-  label: z.string().trim().min(1).max(500),
-  type: z.enum(['short_text', 'long_text', 'single_select', 'multi_select', 'number', 'date', 'url', 'checkbox', 'file_upload']),
+  label: z.string().trim().max(500).default(''),
+  type: z.enum(['short_text', 'long_text', 'single_select', 'multi_select', 'number', 'date', 'url', 'checkbox', 'file_upload', 'info']),
   description: z.string().trim().max(1000).nullish(),
+  content: z.string().max(5_000_000).nullish(),
   required: z.boolean(),
   options: z.array(z.string().trim().min(1).max(200)).max(50).nullish(),
+  sectionId: z.string().min(1).nullish(),
+})
+
+const draftSectionSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(1000).nullish(),
+  displayOrder: z.number().int().min(0),
 })
 
 const applicationFormSchema = z.object({
@@ -322,6 +342,7 @@ const applicationFormSchema = z.object({
   requireResume: z.boolean(),
   requireCoverLetter: z.boolean(),
   questions: z.array(draftQuestionSchema).max(50),
+  sections: z.array(draftSectionSchema).max(20).optional().default([]),
 })
 
 const scoringCriterionDraftSchema = z.object({
@@ -431,6 +452,7 @@ function resetState() {
     requireResume: true,
     requireCoverLetter: false,
     questions: [],
+    sections: [],
   }
   scoringCriteria.value = []
   scoringMode.value = 'none'
@@ -719,13 +741,23 @@ async function handleSubmit(mode: 'publish' | 'draft' = publishChoice.value) {
       requireCoverLetter: applicationForm.value.requireCoverLetter,
       autoScoreOnApply: scoringCriteria.value.length > 0 && autoScoreOnApply.value,
       status: mode === 'publish' ? 'open' : 'draft',
+      sections: [...applicationForm.value.sections]
+        .sort((a, b) => a.displayOrder - b.displayOrder)
+        .map(section => ({
+          ref: section.id,
+          title: section.title,
+          description: section.description || undefined,
+        })),
       questions: applicationForm.value.questions.map((question, index) => ({
         label: question.label,
         type: question.type,
         description: question.description || undefined,
+        content: question.content || undefined,
         required: question.required,
         options: question.options || undefined,
         displayOrder: index,
+        // Holds the draft section id (ref); the server maps it to the real id.
+        sectionId: question.sectionId ?? undefined,
       })),
       criteria: scoringCriteria.value.map((criterion, index) => ({
         key: criterion.key,

@@ -31,6 +31,7 @@ export function useJobQuestions(jobId: MaybeRefOrGetter<string>) {
     label: string
     type?: string
     description?: string
+    content?: string
     required?: boolean
     options?: string[]
     displayOrder?: number
@@ -54,6 +55,7 @@ export function useJobQuestions(jobId: MaybeRefOrGetter<string>) {
     label?: string
     type?: string
     description?: string | null
+    content?: string | null
     required?: boolean
     options?: string[] | null
     displayOrder?: number

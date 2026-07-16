@@ -61,6 +61,15 @@ export const createJobWizardSchema = createJobSchema.extend({
   status: z.enum(['draft', 'open']).optional().default('draft'),
   questions: z.array(createQuestionSchema).max(50).optional().default([]),
   criteria: z.array(createCriterionSchema).max(20).optional().default([]),
+  /**
+   * Wizard sections (pages). Each carries a client-side `ref`; a question's
+   * `sectionId` holds that ref, which the create route maps to the real id.
+   */
+  sections: z.array(z.object({
+    ref: z.string().min(1),
+    title: z.string().trim().min(1).max(200),
+    description: z.string().trim().max(1000).optional(),
+  })).max(20).optional().default([]),
 }).superRefine((data, ctx) => {
   const criterionKeys = data.criteria.map(criterion => criterion.key)
   if (new Set(criterionKeys).size !== criterionKeys.length) {

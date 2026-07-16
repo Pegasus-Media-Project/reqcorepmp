@@ -29,6 +29,7 @@ export default defineEventHandler(async (event) => {
       type: true,
       label: true,
       description: true,
+      content: true,
       required: true,
       options: true,
       displayOrder: true,

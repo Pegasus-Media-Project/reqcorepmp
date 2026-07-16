@@ -38,11 +38,18 @@ export function useJobs(options?: {
     status?: 'draft' | 'open'
     questions?: Array<{
       label: string
-      type: 'short_text' | 'long_text' | 'single_select' | 'multi_select' | 'number' | 'date' | 'url' | 'checkbox' | 'file_upload'
+      type: 'short_text' | 'long_text' | 'single_select' | 'multi_select' | 'number' | 'date' | 'url' | 'checkbox' | 'file_upload' | 'info'
       description?: string
+      content?: string
       required: boolean
       options?: string[]
       displayOrder: number
+      sectionId?: string | null
+    }>
+    sections?: Array<{
+      ref: string
+      title: string
+      description?: string
     }>
     criteria?: Array<{
       key: string
