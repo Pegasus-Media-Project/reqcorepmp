@@ -75,12 +75,10 @@ const onboardingQuery = computed(() => {
 });
 
 function onboardingCreateOrgPath() {
-    return onboardingQuery.value
-        ? localePath({
-            path: "/onboarding/create-org",
-            query: onboardingQuery.value,
-        })
-        : localePath("/onboarding/create-org");
+    // Single-org deployment: new accounts auto-join the shared organization via
+    // a server-side hook (server/utils/defaultOrg.ts), so there's no org-picker
+    // step — send them straight into the app.
+    return localePath("/dashboard");
 }
 
 async function handleSignUp() {

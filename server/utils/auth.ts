@@ -8,6 +8,7 @@ import { and, eq } from "drizzle-orm";
 import { ac, owner, admin, member } from "~~/shared/permissions";
 import { isBillingActionAllowed } from "~~/shared/billing";
 import { sendOrgInvitationEmail, sendPasswordResetEmail } from "./email";
+import { ensureDefaultOrgMembership, getUserPrimaryOrgId } from "./defaultOrg";
 import { getMissingStripeBillingVars, isStripeBillingConfigured } from "./env";
 import { buildStripePlans } from "./billing/stripe-plans";
 import { isDemoOrgId, isDemoAccountEmail } from "./demoOrg";
@@ -304,6 +305,46 @@ function getAuth(): Auth {
       // using BETTER_AUTH_SECRET as the encryption key.
       account: {
         encryptOAuthTokens: true,
+      },
+
+      // ── Single-org auto-join ────────────────────────────────
+      // Every new account joins the one shared organization instead of
+      // creating or picking its own (see server/utils/defaultOrg.ts). The
+      // first signup owns the org; the rest join as members. On every login
+      // we also stamp the user's org onto the session as the active org, so
+      // no org-selection step is ever required.
+      databaseHooks: {
+        user: {
+          create: {
+            after: async (createdUser) => {
+              try {
+                await ensureDefaultOrgMembership(createdUser.id);
+              } catch (e) {
+                console.error(
+                  "[Pegasus] Failed to auto-join the default organization:",
+                  e,
+                );
+              }
+            },
+          },
+        },
+        session: {
+          create: {
+            before: async (session) => {
+              try {
+                const orgId = await getUserPrimaryOrgId(session.userId);
+                if (orgId) {
+                  return { data: { ...session, activeOrganizationId: orgId } };
+                }
+              } catch (e) {
+                console.error(
+                  "[Pegasus] Failed to set active organization on session:",
+                  e,
+                );
+              }
+            },
+          },
+        },
       },
 
       // ── Rate Limiting (built-in, database-backed) ──────────
