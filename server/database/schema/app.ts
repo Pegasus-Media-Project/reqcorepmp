@@ -130,6 +130,11 @@ export const job = pgTable('job', {
   phoneRequirement: text('phone_requirement').$type<'hidden' | 'optional' | 'required'>().notNull().default('optional'),
   requireResume: boolean('require_resume').notNull().default(false),
   requireCoverLetter: boolean('require_cover_letter').notNull().default(false),
+  // ── Application questions display ──
+  /** Hide the on-page questions list on the public job listing. */
+  hideApplicationQuestions: boolean('hide_application_questions').notNull().default(false),
+  /** Optional external PDF link listing all application questions. */
+  applicationQuestionsPdfUrl: text('application_questions_pdf_url'),
   // ── Application fee (submission phase; staff manually verify payment) ──
   applicationFeeEnabled: boolean('application_fee_enabled').notNull().default(false),
   /** External payment link the applicant is sent to. */

@@ -97,6 +97,8 @@ export default defineEventHandler(async (event) => {
       phoneRequirement: job.phoneRequirement,
       requireResume: job.requireResume,
       requireCoverLetter: job.requireCoverLetter,
+      hideApplicationQuestions: job.hideApplicationQuestions,
+      applicationQuestionsPdfUrl: job.applicationQuestionsPdfUrl,
       applicationFeeEnabled: job.applicationFeeEnabled,
       applicationFeeUrl: job.applicationFeeUrl,
       applicationFeeAmount: job.applicationFeeAmount,

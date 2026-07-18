@@ -46,6 +46,9 @@ export const createJobSchema = z.object({
   phoneRequirement: z.enum(['hidden', 'optional', 'required']).optional().default('optional'),
   /** Whether the application form asks for a cover letter upload */
   requireCoverLetter: z.boolean().optional().default(false),
+  // ── Application questions display ──
+  hideApplicationQuestions: z.boolean().optional().default(false),
+  applicationQuestionsPdfUrl: z.string().trim().url().max(2048).nullable().optional(),
   // ── Application fee (submission phase) ──
   applicationFeeEnabled: z.boolean().optional().default(false),
   applicationFeeUrl: z.string().trim().url().max(2048).nullable().optional(),
@@ -135,6 +138,9 @@ export const updateJobSchema = z.object({
   requireResume: z.boolean().optional(),
   phoneRequirement: z.enum(['hidden', 'optional', 'required']).optional(),
   requireCoverLetter: z.boolean().optional(),
+  // ── Application questions display ──
+  hideApplicationQuestions: z.boolean().optional(),
+  applicationQuestionsPdfUrl: z.string().trim().url().max(2048).nullable().optional(),
   // ── Application fee (submission phase). Pass null to clear a field. ──
   applicationFeeEnabled: z.boolean().optional(),
   applicationFeeUrl: z.string().trim().url().max(2048).nullable().optional(),

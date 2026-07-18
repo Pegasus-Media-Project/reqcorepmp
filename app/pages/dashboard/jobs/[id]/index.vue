@@ -1782,6 +1782,16 @@ function closeDocPreview() {
                   <span v-if="applicationsWithInterviews.has(app.id)" class="inline-flex items-center text-warning-500 dark:text-warning-400" title="Interview scheduled">
                     <Calendar class="size-3" />
                   </span>
+                  <span
+                    v-if="app.applicationFeeEnabled"
+                    class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset"
+                    :class="app.feeStatus === 'verified'
+                      ? 'bg-success-50 text-success-700 ring-success-200 dark:bg-success-950/60 dark:text-success-400 dark:ring-success-800'
+                      : 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-400 dark:ring-amber-800'"
+                    :title="app.feeStatus === 'verified' ? 'Application fee verified' : 'Application fee not yet verified'"
+                  >
+                    {{ app.feeStatus === 'verified' ? 'Fee paid' : 'Fee due' }}
+                  </span>
                 </div>
               </div>
             </button>

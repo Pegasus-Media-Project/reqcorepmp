@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { MapPin, Briefcase, Building2, ArrowLeft, ExternalLink, Calendar, ChevronRight } from 'lucide-vue-next'
+import { MapPin, Briefcase, Building2, ArrowLeft, ExternalLink, Calendar, ChevronRight, CreditCard, FileText } from 'lucide-vue-next'
 
 definePageMeta({
   layout: 'public',
@@ -49,6 +49,31 @@ const { data: job, status: fetchStatus, error: fetchError } = useFetch(
 // Info blocks are display-only; they aren't "questions" the applicant answers.
 const answerableQuestions = computed(() =>
   (job.value?.questions ?? []).filter((q: { type: string }) => q.type !== 'info'))
+
+// Application fee (submission phase) — shown as a notice on the listing.
+const applicationFee = computed(() => {
+  const j = job.value as {
+    applicationFeeEnabled?: boolean
+    applicationFeeAmount?: number | null
+    applicationFeeCurrency?: string | null
+  } | null
+  return j?.applicationFeeEnabled ? j : null
+})
+const applicationFeeLabel = computed(() => {
+  const fee = applicationFee.value
+  if (!fee || fee.applicationFeeAmount == null) return null
+  const cur = (fee.applicationFeeCurrency || 'USD').toUpperCase()
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur }).format(fee.applicationFeeAmount / 100)
+  } catch {
+    return `${(fee.applicationFeeAmount / 100).toFixed(2)} ${cur}`
+  }
+})
+
+// When enabled, the org hides the on-page questions list and (optionally) links
+// to a PDF of all application questions instead.
+const hideApplicationQuestions = computed(() => !!(job.value as { hideApplicationQuestions?: boolean } | null)?.hideApplicationQuestions)
+const applicationQuestionsPdfUrl = computed(() => (job.value as { applicationQuestionsPdfUrl?: string | null } | null)?.applicationQuestionsPdfUrl || null)
 
 function markdownToPlainText(markdown?: string | null): string {
   if (!markdown) return ''
@@ -396,6 +421,24 @@ function formatSalary(min?: number | null, max?: number | null, currency?: strin
         </div>
       </div>
 
+      <!-- Application fee notice -->
+      <div
+        v-if="applicationFee"
+        class="mb-5 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-6 sm:px-8 py-5 dark:border-amber-900/50 dark:bg-amber-950/30"
+      >
+        <span class="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/40">
+          <CreditCard class="size-4.5 text-amber-700 dark:text-amber-300" />
+        </span>
+        <div>
+          <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">
+            This position has an application fee<span v-if="applicationFeeLabel"> of {{ applicationFeeLabel }}</span>
+          </p>
+          <p class="mt-1 text-sm leading-6 text-amber-800/80 dark:text-amber-200/70">
+            The fee is payable at submission. After you apply you'll receive a payment link, and a staff member will manually verify your payment.
+          </p>
+        </div>
+      </div>
+
       <!-- Description card -->
       <div v-if="job.description" class="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 shadow-sm overflow-hidden mb-5">
         <div class="border-b border-surface-100 dark:border-surface-800 px-6 sm:px-8 py-4">
@@ -406,8 +449,26 @@ function formatSalary(min?: number | null, max?: number | null, currency?: strin
         </div>
       </div>
 
+      <!-- Application questions PDF link (shown when the on-page list is hidden) -->
+      <a
+        v-if="hideApplicationQuestions && applicationQuestionsPdfUrl"
+        :href="applicationQuestionsPdfUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="group mb-5 flex items-center gap-3 rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 shadow-sm px-6 sm:px-8 py-5 transition-colors hover:border-brand-300 dark:hover:border-brand-800 no-underline"
+      >
+        <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-950/40">
+          <FileText class="size-4.5 text-brand-600 dark:text-brand-400" />
+        </span>
+        <span class="min-w-0 flex-1">
+          <span class="block text-sm font-semibold text-surface-900 dark:text-surface-100 group-hover:text-brand-700 dark:group-hover:text-brand-300">{{ t('jobs.detail.questionsTitle') }}</span>
+          <span class="mt-0.5 block text-xs text-surface-500 dark:text-surface-400">View all application questions (PDF)</span>
+        </span>
+        <ExternalLink class="size-4 shrink-0 text-surface-400 group-hover:text-brand-600 dark:group-hover:text-brand-300" />
+      </a>
+
       <!-- Questions preview card -->
-      <div v-if="answerableQuestions.length > 0" class="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 shadow-sm overflow-hidden mb-5">
+      <div v-if="answerableQuestions.length > 0 && !hideApplicationQuestions" class="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 shadow-sm overflow-hidden mb-5">
         <div class="border-b border-surface-100 dark:border-surface-800 px-6 sm:px-8 py-4 flex items-center justify-between">
           <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('jobs.detail.questionsTitle') }}</h2>
           <span class="rounded-full bg-surface-100 dark:bg-surface-800 px-2.5 py-0.5 text-xs font-medium text-surface-600 dark:text-surface-400">

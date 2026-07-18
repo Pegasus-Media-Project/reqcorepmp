@@ -49,6 +49,8 @@ export default defineEventHandler(async (event) => {
       phoneRequirement: body.phoneRequirement,
       requireResume: body.requireResume,
       requireCoverLetter: body.requireCoverLetter,
+      hideApplicationQuestions: body.hideApplicationQuestions,
+      applicationQuestionsPdfUrl: body.applicationQuestionsPdfUrl,
       applicationFeeEnabled: body.applicationFeeEnabled,
       applicationFeeUrl: body.applicationFeeUrl,
       applicationFeeAmount: body.applicationFeeAmount,

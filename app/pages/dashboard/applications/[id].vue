@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, User, Briefcase, Calendar, Clock, Hash, FileText, MessageSquare, Star } from 'lucide-vue-next'
+import { ArrowLeft, User, Briefcase, Calendar, Clock, Hash, FileText, MessageSquare, Star, Copy, Check } from 'lucide-vue-next'
 import { usePreviewReadOnly } from '~/composables/usePreviewReadOnly'
 
 definePageMeta({
@@ -91,6 +91,21 @@ async function handleTransition(newStatus: string) {
   } finally {
     isTransitioning.value = false
   }
+}
+
+// ─────────────────────────────────────────────
+// Confirmation code
+// ─────────────────────────────────────────────
+
+const codeCopied = ref(false)
+async function copyConfirmationCode() {
+  const code = application.value?.confirmationCode
+  if (!code) return
+  try {
+    await navigator.clipboard.writeText(code)
+    codeCopied.value = true
+    setTimeout(() => { codeCopied.value = false }, 2000)
+  } catch { /* clipboard unavailable — staff can still read the code */ }
 }
 
 // ─────────────────────────────────────────────
@@ -235,12 +250,23 @@ function formatResponseValue(value: unknown): string {
             Applied {{ new Date(application.createdAt).toLocaleDateString() }}
           </TimelineDateLink>
           <span
-            v-if="application.confirmationCode"
-            class="inline-flex items-center gap-1.5 text-sm text-surface-500 dark:text-surface-400"
+            class="inline-flex items-center gap-1.5 rounded-md border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/60 px-2 py-0.5 text-sm"
             title="Applicant's confirmation code — they use this to check status"
           >
-            <span class="text-surface-400">Code</span>
-            <span class="font-mono font-medium tracking-wider text-surface-700 dark:text-surface-300">{{ application.confirmationCode }}</span>
+            <span class="text-xs font-medium uppercase tracking-wide text-surface-400">Code</span>
+            <template v-if="application.confirmationCode">
+              <span class="font-mono font-semibold tracking-wider text-surface-800 dark:text-surface-200">{{ application.confirmationCode }}</span>
+              <button
+                type="button"
+                class="inline-flex items-center text-surface-400 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
+                :title="codeCopied ? 'Copied' : 'Copy code'"
+                @click="copyConfirmationCode"
+              >
+                <Check v-if="codeCopied" class="size-3.5 text-success-600" />
+                <Copy v-else class="size-3.5" />
+              </button>
+            </template>
+            <span v-else class="text-surface-400 dark:text-surface-500">Not generated</span>
           </span>
         </div>
       </div>

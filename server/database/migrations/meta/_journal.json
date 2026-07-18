@@ -337,6 +337,13 @@
       "when": 1784401812511,
       "tag": "0047_stormy_swordsman",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1784407038793,
+      "tag": "0048_oval_deathstrike",
+      "breakpoints": true
     }
   ]
 }

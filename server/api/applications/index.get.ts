@@ -165,6 +165,8 @@ export default defineEventHandler(async (event) => {
         jobId: application.jobId,
         jobTitle: job.title,
         jobStatus: job.status,
+        feeStatus: application.feeStatus,
+        applicationFeeEnabled: job.applicationFeeEnabled,
       })
       .from(application)
       .innerJoin(candidate, eq(candidate.id, application.candidateId))

@@ -51,6 +51,8 @@ const form = ref({
   requireResume: false,
   requireCoverLetter: false,
   autoScoreOnApply: false,
+  hideApplicationQuestions: false,
+  applicationQuestionsPdfUrl: '',
   applicationFeeEnabled: false,
   applicationFeeUrl: '',
   applicationFeeAmount: null as number | null,
@@ -90,6 +92,8 @@ watch(job, (j) => {
       requireResume: j.requireResume ?? false,
       requireCoverLetter: j.requireCoverLetter ?? false,
       autoScoreOnApply: j.autoScoreOnApply ?? false,
+      hideApplicationQuestions: (j as { hideApplicationQuestions?: boolean }).hideApplicationQuestions ?? false,
+      applicationQuestionsPdfUrl: (j as { applicationQuestionsPdfUrl?: string | null }).applicationQuestionsPdfUrl ?? '',
       applicationFeeEnabled: (j as { applicationFeeEnabled?: boolean }).applicationFeeEnabled ?? false,
       applicationFeeUrl: (j as { applicationFeeUrl?: string | null }).applicationFeeUrl ?? '',
       // DB stores minor units (cents); the input edits a decimal amount.
@@ -136,6 +140,8 @@ const editSchema = z.object({
   requireResume: z.boolean().optional(),
   requireCoverLetter: z.boolean().optional(),
   autoScoreOnApply: z.boolean().optional(),
+  hideApplicationQuestions: z.boolean().optional(),
+  applicationQuestionsPdfUrl: z.string().url('Enter a valid PDF URL').optional().or(z.literal('')),
   applicationFeeEnabled: z.boolean().optional(),
   applicationFeeUrl: z.string().url('Enter a valid payment URL').optional().or(z.literal('')),
   applicationFeeAmount: z.union([z.coerce.number().min(0), z.null()]).optional(),
@@ -179,6 +185,8 @@ async function handleSave() {
       requireResume: form.value.requireResume,
       requireCoverLetter: form.value.requireCoverLetter,
       autoScoreOnApply: form.value.autoScoreOnApply,
+      hideApplicationQuestions: form.value.hideApplicationQuestions,
+      applicationQuestionsPdfUrl: form.value.applicationQuestionsPdfUrl || null,
       // Application fee — send the decimal amount as minor units (cents).
       applicationFeeEnabled: form.value.applicationFeeEnabled,
       applicationFeeUrl: form.value.applicationFeeUrl || null,
@@ -591,6 +599,28 @@ function onSalaryMaxChange(e: Event) {
                 <p class="text-xs text-surface-400 dark:text-surface-500">Automatically run AI scoring when a candidate applies.</p>
               </div>
             </label>
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input
+                v-model="form.hideApplicationQuestions"
+                type="checkbox"
+                class="size-4 rounded border-surface-300 dark:border-surface-600 text-brand-600 focus:ring-brand-500"
+              />
+              <div>
+                <span class="text-sm font-medium text-surface-900 dark:text-surface-100">Hide questions on the listing</span>
+                <p class="text-xs text-surface-400 dark:text-surface-500">Don't list the application questions on the public job page. Optionally link a PDF of all questions instead.</p>
+              </div>
+            </label>
+            <div v-if="form.hideApplicationQuestions" class="ml-7">
+              <label for="questions-pdf-url" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Questions PDF link (optional)</label>
+              <input
+                id="questions-pdf-url"
+                v-model="form.applicationQuestionsPdfUrl"
+                type="url"
+                placeholder="https://… (link to a PDF of all questions)"
+                class="w-full rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+              <p v-if="errors.applicationQuestionsPdfUrl" class="mt-1 text-xs text-danger-600">{{ errors.applicationQuestionsPdfUrl }}</p>
+            </div>
           </div>
         </section>
 

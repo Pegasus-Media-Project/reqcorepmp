@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Briefcase } from 'lucide-vue-next'
+import { Briefcase, CreditCard } from 'lucide-vue-next'
 
 definePageMeta({
   layout: 'public',
@@ -323,16 +323,21 @@ async function handleSubmit() {
       <!-- Application fee notice -->
       <div
         v-if="applicationFee"
-        class="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 dark:border-amber-900/50 dark:bg-amber-950/30"
+        class="mt-6 mb-8 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 dark:border-amber-900/50 dark:bg-amber-950/30"
       >
-        <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">This application has a fee</p>
-        <p class="mt-1 text-sm leading-6 text-amber-800/80 dark:text-amber-200/70">
-          <template v-if="applicationFeeLabel">
-            A fee of <strong>{{ applicationFeeLabel }}</strong> is payable at submission.
-          </template>
-          <template v-else>A fee is payable at submission.</template>
-          You'll receive a payment link after you apply, and a staff member will manually verify your payment.
-        </p>
+        <span class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/40">
+          <CreditCard class="size-4 text-amber-700 dark:text-amber-300" />
+        </span>
+        <div>
+          <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">This application has a fee</p>
+          <p class="mt-1 text-sm leading-6 text-amber-800/80 dark:text-amber-200/70">
+            <template v-if="applicationFeeLabel">
+              A fee of <strong>{{ applicationFeeLabel }}</strong> is payable at submission.
+            </template>
+            <template v-else>A fee is payable at submission.</template>
+            You'll receive a payment link after you apply, and a staff member will manually verify your payment.
+          </p>
+        </div>
       </div>
 
       <!-- Closed: past the application deadline -->
