@@ -34,6 +34,10 @@ export default defineEventHandler(async (event) => {
       phoneRequirement: true,
       requireResume: true,
       requireCoverLetter: true,
+      applicationFeeEnabled: true,
+      applicationFeeUrl: true,
+      applicationFeeAmount: true,
+      applicationFeeCurrency: true,
       createdAt: true,
     },
     with: {

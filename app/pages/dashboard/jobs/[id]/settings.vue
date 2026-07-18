@@ -51,6 +51,12 @@ const form = ref({
   requireResume: false,
   requireCoverLetter: false,
   autoScoreOnApply: false,
+  applicationFeeEnabled: false,
+  applicationFeeUrl: '',
+  applicationFeeAmount: null as number | null,
+  applicationFeeCurrency: 'USD',
+  requireSignedDocuments: false,
+  signingUrl: '',
 })
 
 /**
@@ -84,6 +90,16 @@ watch(job, (j) => {
       requireResume: j.requireResume ?? false,
       requireCoverLetter: j.requireCoverLetter ?? false,
       autoScoreOnApply: j.autoScoreOnApply ?? false,
+      applicationFeeEnabled: (j as { applicationFeeEnabled?: boolean }).applicationFeeEnabled ?? false,
+      applicationFeeUrl: (j as { applicationFeeUrl?: string | null }).applicationFeeUrl ?? '',
+      // DB stores minor units (cents); the input edits a decimal amount.
+      applicationFeeAmount: (() => {
+        const cents = (j as { applicationFeeAmount?: number | null }).applicationFeeAmount
+        return cents == null ? null : cents / 100
+      })(),
+      applicationFeeCurrency: (j as { applicationFeeCurrency?: string | null }).applicationFeeCurrency ?? 'USD',
+      requireSignedDocuments: (j as { requireSignedDocuments?: boolean }).requireSignedDocuments ?? false,
+      signingUrl: (j as { signingUrl?: string | null }).signingUrl ?? '',
     }
   }
 }, { immediate: true })
@@ -120,6 +136,19 @@ const editSchema = z.object({
   requireResume: z.boolean().optional(),
   requireCoverLetter: z.boolean().optional(),
   autoScoreOnApply: z.boolean().optional(),
+  applicationFeeEnabled: z.boolean().optional(),
+  applicationFeeUrl: z.string().url('Enter a valid payment URL').optional().or(z.literal('')),
+  applicationFeeAmount: z.union([z.coerce.number().min(0), z.null()]).optional(),
+  applicationFeeCurrency: z.string().length(3).optional().or(z.literal('')),
+  requireSignedDocuments: z.boolean().optional(),
+  signingUrl: z.string().url('Enter a valid signing URL').optional().or(z.literal('')),
+}).superRefine((data, ctx) => {
+  if (data.applicationFeeEnabled && !data.applicationFeeUrl) {
+    ctx.addIssue({ code: 'custom', message: 'A payment link is required when the fee is enabled', path: ['applicationFeeUrl'] })
+  }
+  if (data.requireSignedDocuments && !data.signingUrl) {
+    ctx.addIssue({ code: 'custom', message: 'A signing link is required when documents are required', path: ['signingUrl'] })
+  }
 })
 
 const errors = ref<Record<string, string>>({})
@@ -150,6 +179,15 @@ async function handleSave() {
       requireResume: form.value.requireResume,
       requireCoverLetter: form.value.requireCoverLetter,
       autoScoreOnApply: form.value.autoScoreOnApply,
+      // Application fee — send the decimal amount as minor units (cents).
+      applicationFeeEnabled: form.value.applicationFeeEnabled,
+      applicationFeeUrl: form.value.applicationFeeUrl || null,
+      applicationFeeAmount: form.value.applicationFeeAmount == null
+        ? null
+        : Math.round(form.value.applicationFeeAmount * 100),
+      applicationFeeCurrency: form.value.applicationFeeCurrency || null,
+      requireSignedDocuments: form.value.requireSignedDocuments,
+      signingUrl: form.value.signingUrl || null,
       salaryNegotiable: form.value.salaryNegotiable,
       // Always send salary fields so cleared values write null to the DB
       salaryMin: form.value.salaryNegotiable ? null : (form.value.salaryMin ?? null),
@@ -553,6 +591,91 @@ function onSalaryMaxChange(e: Event) {
                 <p class="text-xs text-surface-400 dark:text-surface-500">Automatically run AI scoring when a candidate applies.</p>
               </div>
             </label>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════ -->
+        <!-- SECTION: Fees & Signed Documents         -->
+        <!-- ═══════════════════════════════════════ -->
+        <section class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-6">
+          <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100 mb-1">Fees &amp; Signed Documents</h2>
+          <p class="text-xs text-surface-400 dark:text-surface-500 mb-5">
+            Steps your team confirms manually. Applicants see their status and action links on their confirmation-code page and by email.
+          </p>
+
+          <!-- Application fee (submission phase) -->
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input
+              v-model="form.applicationFeeEnabled"
+              type="checkbox"
+              class="size-4 rounded border-surface-300 dark:border-surface-600 text-brand-600 focus:ring-brand-500"
+            />
+            <div>
+              <span class="text-sm font-medium text-surface-900 dark:text-surface-100">Require an application fee</span>
+              <p class="text-xs text-surface-400 dark:text-surface-500">Applicants pay on an external site; staff manually verify payment before review.</p>
+            </div>
+          </label>
+          <div v-if="form.applicationFeeEnabled" class="mt-3 ml-7 space-y-3">
+            <div>
+              <label for="fee-url" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Payment link</label>
+              <input
+                id="fee-url"
+                v-model="form.applicationFeeUrl"
+                type="url"
+                placeholder="https://…"
+                class="w-full rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+              <p v-if="errors.applicationFeeUrl" class="mt-1 text-xs text-danger-600">{{ errors.applicationFeeUrl }}</p>
+            </div>
+            <div class="flex gap-3">
+              <div class="flex-1">
+                <label for="fee-amount" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Amount</label>
+                <input
+                  id="fee-amount"
+                  v-model.number="form.applicationFeeAmount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="25.00"
+                  class="w-full rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+              <div class="w-28">
+                <label for="fee-currency" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Currency</label>
+                <input
+                  id="fee-currency"
+                  v-model="form.applicationFeeCurrency"
+                  type="text"
+                  maxlength="3"
+                  placeholder="USD"
+                  class="w-full rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm uppercase text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Signed documents (acceptance phase) -->
+          <label class="flex items-center gap-3 cursor-pointer mt-5 pt-5 border-t border-surface-100 dark:border-surface-800">
+            <input
+              v-model="form.requireSignedDocuments"
+              type="checkbox"
+              class="size-4 rounded border-surface-300 dark:border-surface-600 text-brand-600 focus:ring-brand-500"
+            />
+            <div>
+              <span class="text-sm font-medium text-surface-900 dark:text-surface-100">Require signed documents on acceptance</span>
+              <p class="text-xs text-surface-400 dark:text-surface-500">Once accepted, applicants sign binding documents at an external link; staff manually verify signing.</p>
+            </div>
+          </label>
+          <div v-if="form.requireSignedDocuments" class="mt-3 ml-7">
+            <label for="signing-url" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Signing link</label>
+            <input
+              id="signing-url"
+              v-model="form.signingUrl"
+              type="url"
+              placeholder="https://… (e.g. DocuSign)"
+              class="w-full rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+            <p v-if="errors.signingUrl" class="mt-1 text-xs text-danger-600">{{ errors.signingUrl }}</p>
           </div>
         </section>
 

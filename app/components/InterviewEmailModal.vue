@@ -42,9 +42,15 @@ const isSavingTemplate = ref(false)
 const templateSaveError = ref('')
 
 // ─── Computed ─────────────────────────────────────────────────────
+// Only interview-invitation templates are selectable here; other lifecycle
+// templates (acceptance, rejection, fee/documents verified) fire automatically.
 const allTemplates = computed(() => [
-  ...SYSTEM_TEMPLATES.map(t => ({ ...t, isSystem: true as const })),
-  ...(templates.value ?? []).map(t => ({ ...t, isSystem: false as const })),
+  ...SYSTEM_TEMPLATES
+    .filter(t => (t as { type?: string }).type === 'interview_invitation')
+    .map(t => ({ ...t, isSystem: true as const })),
+  ...(templates.value ?? [])
+    .filter(t => (t as { templateType?: string }).templateType === 'interview_invitation')
+    .map(t => ({ ...t, isSystem: false as const })),
 ])
 
 const selectedTemplate = computed(() =>

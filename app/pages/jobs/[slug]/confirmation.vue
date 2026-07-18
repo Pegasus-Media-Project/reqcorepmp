@@ -36,6 +36,16 @@ useSeoMeta({
   title: t('jobs.confirmation.metaTitle'),
   robots: 'noindex, nofollow',
 })
+
+function formatFee(amount: number | null, currency: string | null): string | null {
+  if (amount == null) return null
+  const cur = (currency || 'USD').toUpperCase()
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur }).format(amount / 100)
+  } catch {
+    return `${(amount / 100).toFixed(2)} ${cur}`
+  }
+}
 </script>
 
 <template>
@@ -91,6 +101,30 @@ useSeoMeta({
               <NuxtLink :to="`/status?code=${code}`" class="font-medium text-brand-600 hover:underline">check your application status</NuxtLink>.
               We've also emailed it to you.
             </p>
+          </div>
+
+          <!-- Application fee reminder -->
+          <div
+            v-if="job && (job as any).applicationFeeEnabled && (job as any).applicationFeeUrl"
+            class="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-900/50 dark:bg-amber-950/30"
+          >
+            <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">Action needed: pay your application fee</p>
+            <p class="mt-1 text-sm leading-6 text-amber-800/80 dark:text-amber-200/70">
+              <template v-if="formatFee((job as any).applicationFeeAmount, (job as any).applicationFeeCurrency)">
+                This application requires a fee of
+                <strong>{{ formatFee((job as any).applicationFeeAmount, (job as any).applicationFeeCurrency) }}</strong>, payable now.
+              </template>
+              <template v-else>This application requires a fee, payable now.</template>
+              A member of our team will manually verify your payment.
+            </p>
+            <a
+              :href="(job as any).applicationFeeUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="mt-4 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-700"
+            >
+              Pay application fee
+            </a>
           </div>
         </div>
       </div>

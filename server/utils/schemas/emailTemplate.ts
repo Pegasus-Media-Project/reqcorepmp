@@ -4,6 +4,19 @@ import { z } from 'zod'
 // Email template validation schemas
 // ─────────────────────────────────────────────
 
+/**
+ * Lifecycle events a template can be written for. Mirrors the
+ * `emailTemplateTypeEnum` in the DB schema.
+ */
+export const EMAIL_TEMPLATE_TYPES = [
+  'interview_invitation',
+  'application_accepted',
+  'application_rejected',
+  'fee_verified',
+  'documents_verified',
+] as const
+export type EmailTemplateType = (typeof EMAIL_TEMPLATE_TYPES)[number]
+
 /** Allowed placeholder variables for interview invitation templates */
 export const TEMPLATE_VARIABLES = [
   'candidateName',
@@ -21,12 +34,35 @@ export const TEMPLATE_VARIABLES = [
   'organizationName',
 ] as const
 
+/** Variables shared by every application-lifecycle template. */
+const COMMON_LIFECYCLE_VARIABLES = [
+  'candidateName',
+  'candidateFirstName',
+  'candidateLastName',
+  'jobTitle',
+  'organizationName',
+  'statusUrl',
+] as const
+
+/**
+ * The placeholder variables available per template type. Lifecycle events that
+ * carry an action link (pay, sign) also expose `actionUrl`.
+ */
+export const TEMPLATE_VARIABLES_BY_TYPE: Record<EmailTemplateType, readonly string[]> = {
+  interview_invitation: TEMPLATE_VARIABLES,
+  application_accepted: [...COMMON_LIFECYCLE_VARIABLES, 'actionUrl'],
+  application_rejected: COMMON_LIFECYCLE_VARIABLES,
+  fee_verified: COMMON_LIFECYCLE_VARIABLES,
+  documents_verified: COMMON_LIFECYCLE_VARIABLES,
+}
+
 const MAX_SUBJECT_LENGTH = 200
 const MAX_BODY_LENGTH = 10_000
 const MAX_NAME_LENGTH = 100
 
 /** Schema for creating a new email template */
 export const createEmailTemplateSchema = z.object({
+  templateType: z.enum(EMAIL_TEMPLATE_TYPES).optional().default('interview_invitation'),
   name: z.string().min(1, 'Template name is required').max(MAX_NAME_LENGTH),
   subject: z.string().min(1, 'Subject line is required').max(MAX_SUBJECT_LENGTH),
   body: z.string().min(1, 'Email body is required').max(MAX_BODY_LENGTH),
@@ -34,9 +70,15 @@ export const createEmailTemplateSchema = z.object({
 
 /** Schema for updating an email template */
 export const updateEmailTemplateSchema = z.object({
+  templateType: z.enum(EMAIL_TEMPLATE_TYPES).optional(),
   name: z.string().min(1).max(MAX_NAME_LENGTH).optional(),
   subject: z.string().min(1).max(MAX_SUBJECT_LENGTH).optional(),
   body: z.string().min(1).max(MAX_BODY_LENGTH).optional(),
+})
+
+/** Schema for the template list query (optional type filter) */
+export const emailTemplateQuerySchema = z.object({
+  type: z.enum(EMAIL_TEMPLATE_TYPES).optional(),
 })
 
 /** Schema for :id route params */

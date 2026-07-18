@@ -1,5 +1,5 @@
 export { SYSTEM_TEMPLATES } from '~~/shared/system-templates'
-export type { SystemTemplate } from '~~/shared/system-templates'
+export type { SystemTemplate, SystemTemplateType } from '~~/shared/system-templates'
 
 export const AVAILABLE_VARIABLES = [
   { key: '{{candidateName}}', desc: 'Full name' },
@@ -15,7 +15,18 @@ export const AVAILABLE_VARIABLES = [
   { key: '{{interviewLocation}}', desc: 'Location/link' },
   { key: '{{interviewers}}', desc: 'Interviewer names' },
   { key: '{{organizationName}}', desc: 'Your org name' },
+  { key: '{{statusUrl}}', desc: 'Application status link' },
+  { key: '{{actionUrl}}', desc: 'Next-step action link (sign/pay)' },
 ] as const
+
+/** Human-friendly labels for each lifecycle template type. */
+export const EMAIL_TEMPLATE_TYPE_LABELS: Record<string, string> = {
+  interview_invitation: 'Interview invitation',
+  application_accepted: 'Acceptance letter',
+  application_rejected: 'Rejection letter',
+  fee_verified: 'Application fee verified',
+  documents_verified: 'Documents verified',
+}
 
 export function renderTemplatePreview(template: string, variables: Record<string, string>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) => {

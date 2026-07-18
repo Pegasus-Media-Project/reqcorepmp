@@ -46,6 +46,14 @@ export const createJobSchema = z.object({
   phoneRequirement: z.enum(['hidden', 'optional', 'required']).optional().default('optional'),
   /** Whether the application form asks for a cover letter upload */
   requireCoverLetter: z.boolean().optional().default(false),
+  // ── Application fee (submission phase) ──
+  applicationFeeEnabled: z.boolean().optional().default(false),
+  applicationFeeUrl: z.string().trim().url().max(2048).nullable().optional(),
+  applicationFeeAmount: z.coerce.number().int().min(0).max(100_000_000).nullable().optional(),
+  applicationFeeCurrency: z.string().trim().length(3).toUpperCase().nullable().optional(),
+  // ── Signed documents (acceptance phase) ──
+  requireSignedDocuments: z.boolean().optional().default(false),
+  signingUrl: z.string().trim().url().max(2048).nullable().optional(),
   /** Whether to automatically run AI scoring when a candidate applies */
   autoScoreOnApply: z.boolean().optional().default(false),
   /** Experience level required for this role */
@@ -87,6 +95,22 @@ export const createJobWizardSchema = createJobSchema.extend({
       path: ['criteria'],
     })
   }
+
+  if (data.applicationFeeEnabled && !data.applicationFeeUrl) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'A payment link is required when the application fee is enabled',
+      path: ['applicationFeeUrl'],
+    })
+  }
+
+  if (data.requireSignedDocuments && !data.signingUrl) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'A signing link is required when signed documents are required',
+      path: ['signingUrl'],
+    })
+  }
 })
 
 /** Schema for updating an existing job (all fields optional, no defaults — PATCH semantics) */
@@ -111,6 +135,14 @@ export const updateJobSchema = z.object({
   requireResume: z.boolean().optional(),
   phoneRequirement: z.enum(['hidden', 'optional', 'required']).optional(),
   requireCoverLetter: z.boolean().optional(),
+  // ── Application fee (submission phase). Pass null to clear a field. ──
+  applicationFeeEnabled: z.boolean().optional(),
+  applicationFeeUrl: z.string().trim().url().max(2048).nullable().optional(),
+  applicationFeeAmount: z.coerce.number().int().min(0).max(100_000_000).nullable().optional(),
+  applicationFeeCurrency: z.string().trim().length(3).toUpperCase().nullable().optional(),
+  // ── Signed documents (acceptance phase) ──
+  requireSignedDocuments: z.boolean().optional(),
+  signingUrl: z.string().trim().url().max(2048).nullable().optional(),
   /** Whether to automatically run AI scoring when a candidate applies */
   autoScoreOnApply: z.boolean().optional(),
   /** Which optional candidate data sources the AI analysis reads */

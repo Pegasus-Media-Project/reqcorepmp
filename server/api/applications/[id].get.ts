@@ -35,7 +35,12 @@ export default defineEventHandler(async (event) => {
         },
       },
       job: {
-        columns: { id: true, title: true, status: true, slug: true },
+        columns: {
+          id: true, title: true, status: true, slug: true,
+          applicationFeeEnabled: true, applicationFeeUrl: true,
+          applicationFeeAmount: true, applicationFeeCurrency: true,
+          requireSignedDocuments: true, signingUrl: true,
+        },
       },
       responses: {
         with: {

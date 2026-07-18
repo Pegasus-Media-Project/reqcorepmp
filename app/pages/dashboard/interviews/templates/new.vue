@@ -20,10 +20,20 @@ const { handlePreviewReadOnlyError } = usePreviewReadOnly()
 
 // ─── Form state ──────────────────────────────────────────────────
 const form = reactive({
+  templateType: 'interview_invitation' as
+    | 'interview_invitation' | 'application_accepted' | 'application_rejected' | 'fee_verified' | 'documents_verified',
   name: '',
   subject: '',
   body: '',
 })
+
+const templateTypeOptions = [
+  'interview_invitation',
+  'application_accepted',
+  'application_rejected',
+  'fee_verified',
+  'documents_verified',
+] as const
 
 const showPreview = ref(false)
 const isSaving = ref(false)
@@ -66,6 +76,7 @@ async function handleCreate() {
   isSaving.value = true
   try {
     const created = await createTemplate({
+      templateType: form.templateType,
       name: form.name.trim(),
       subject: form.subject.trim(),
       body: form.body.trim(),
@@ -134,6 +145,25 @@ async function handleCreate() {
     <div class="grid gap-6" :class="showPreview ? 'lg:grid-cols-2' : 'lg:grid-cols-[1fr_320px]'">
       <!-- Editor panel -->
       <div class="space-y-5">
+        <!-- Type -->
+        <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
+          <label for="template-type" class="block text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400 mb-2">
+            Sends on
+          </label>
+          <select
+            id="template-type"
+            v-model="form.templateType"
+            class="w-full rounded-lg border border-surface-200 dark:border-surface-700 px-3.5 py-2.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all"
+          >
+            <option v-for="opt in templateTypeOptions" :key="opt" :value="opt">
+              {{ EMAIL_TEMPLATE_TYPE_LABELS[opt] ?? opt }}
+            </option>
+          </select>
+          <p class="mt-2 text-xs text-surface-400 dark:text-surface-500">
+            The lifecycle event that triggers this email. A custom template overrides the built-in default for that event.
+          </p>
+        </div>
+
         <!-- Name -->
         <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
           <label for="template-name" class="block text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400 mb-2">

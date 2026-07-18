@@ -20,6 +20,28 @@ const localePath = useLocalePath()
 const { templates, status: fetchStatus, deleteTemplate } = useEmailTemplates()
 const { handlePreviewReadOnlyError } = usePreviewReadOnly()
 
+// Lifecycle event types, in display order. Built-in defaults and custom
+// templates are grouped under these so every event is discoverable.
+const TYPE_ORDER = [
+  'interview_invitation',
+  'application_accepted',
+  'application_rejected',
+  'fee_verified',
+  'documents_verified',
+] as const
+
+const systemByType = computed(() =>
+  TYPE_ORDER.map(type => ({
+    type,
+    label: EMAIL_TEMPLATE_TYPE_LABELS[type] ?? type,
+    items: SYSTEM_TEMPLATES.filter(t => (t as { type?: string }).type === type),
+  })).filter(g => g.items.length > 0),
+)
+
+function typeLabel(type?: string): string {
+  return (type && EMAIL_TEMPLATE_TYPE_LABELS[type]) || 'Interview invitation'
+}
+
 const deletingId = ref<string | null>(null)
 const showDeleteConfirm = ref(false)
 const templateToDelete = ref<{ id: string; name: string } | null>(null)
@@ -67,7 +89,7 @@ async function handleDelete() {
           </h1>
         </div>
         <p class="text-sm text-surface-500 dark:text-surface-400 max-w-xl">
-          Manage reusable email templates for interview invitations. Use built-in templates or create your own with dynamic variables.
+          Customize the emails sent at each stage — interview invitations, acceptance and rejection letters, and fee/document verification. Use built-in defaults or create your own with dynamic variables.
         </p>
       </div>
       <NuxtLink
@@ -79,7 +101,7 @@ async function handleDelete() {
       </NuxtLink>
     </div>
 
-    <!-- Built-in templates section -->
+    <!-- Built-in templates section, grouped by lifecycle event -->
     <section class="mb-10">
       <div class="flex items-center gap-2 mb-4">
         <Sparkles class="size-4 text-brand-500" />
@@ -87,33 +109,38 @@ async function handleDelete() {
           Built-in Templates
         </h2>
       </div>
-      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <NuxtLink
-          v-for="t in SYSTEM_TEMPLATES"
-          :key="t.id"
-          :to="localePath(`/dashboard/interviews/templates/${t.id}`)"
-          class="group relative rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5 transition-all duration-200 hover:border-brand-300 dark:hover:border-brand-800 hover:shadow-lg hover:shadow-brand-500/5 no-underline"
-        >
-          <div class="flex items-start justify-between mb-3">
-            <div class="flex size-9 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-950/40">
-              <FileText class="size-4 text-brand-600 dark:text-brand-400" />
+      <div v-for="group in systemByType" :key="group.type" class="mb-6 last:mb-0">
+        <h3 class="text-xs font-semibold uppercase tracking-wide text-surface-400 dark:text-surface-500 mb-2">
+          {{ group.label }}
+        </h3>
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <NuxtLink
+            v-for="t in group.items"
+            :key="t.id"
+            :to="localePath(`/dashboard/interviews/templates/${t.id}`)"
+            class="group relative rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5 transition-all duration-200 hover:border-brand-300 dark:hover:border-brand-800 hover:shadow-lg hover:shadow-brand-500/5 no-underline"
+          >
+            <div class="flex items-start justify-between mb-3">
+              <div class="flex size-9 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-950/40">
+                <FileText class="size-4 text-brand-600 dark:text-brand-400" />
+              </div>
+              <span class="inline-flex items-center gap-1 rounded-md bg-surface-100 dark:bg-surface-800 px-2 py-0.5 text-[10px] uppercase tracking-wider font-semibold text-surface-400">
+                <Lock class="size-2.5" />
+                Built-in
+              </span>
             </div>
-            <span class="inline-flex items-center gap-1 rounded-md bg-surface-100 dark:bg-surface-800 px-2 py-0.5 text-[10px] uppercase tracking-wider font-semibold text-surface-400">
-              <Lock class="size-2.5" />
-              Built-in
-            </span>
-          </div>
-          <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200 mb-1 group-hover:text-brand-700 dark:group-hover:text-brand-300 transition-colors">
-            {{ t.name }}
-          </h3>
-          <p class="text-xs text-surface-500 dark:text-surface-400 line-clamp-2 mb-3">
-            {{ t.description }}
-          </p>
-          <p class="text-[11px] font-mono text-surface-400 dark:text-surface-500 truncate">
-            {{ t.subject }}
-          </p>
-          <ChevronRight class="absolute right-4 top-1/2 -translate-y-1/2 size-4 text-surface-300 dark:text-surface-600 opacity-0 group-hover:opacity-100 transition-opacity" />
-        </NuxtLink>
+            <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200 mb-1 group-hover:text-brand-700 dark:group-hover:text-brand-300 transition-colors">
+              {{ t.name }}
+            </h3>
+            <p class="text-xs text-surface-500 dark:text-surface-400 line-clamp-2 mb-3">
+              {{ t.description }}
+            </p>
+            <p class="text-[11px] font-mono text-surface-400 dark:text-surface-500 truncate">
+              {{ t.subject }}
+            </p>
+            <ChevronRight class="absolute right-4 top-1/2 -translate-y-1/2 size-4 text-surface-300 dark:text-surface-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </NuxtLink>
+        </div>
       </div>
     </section>
 
@@ -179,9 +206,14 @@ async function handleDelete() {
                 <FileText class="size-4.5 text-surface-500 dark:text-surface-400" />
               </div>
               <div class="min-w-0">
-                <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200 mb-0.5 group-hover:text-brand-700 dark:group-hover:text-brand-300 transition-colors">
-                  {{ t.name }}
-                </h3>
+                <div class="flex items-center gap-2 mb-0.5">
+                  <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200 group-hover:text-brand-700 dark:group-hover:text-brand-300 transition-colors">
+                    {{ t.name }}
+                  </h3>
+                  <span class="inline-flex items-center rounded-md bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400">
+                    {{ typeLabel((t as { templateType?: string }).templateType) }}
+                  </span>
+                </div>
                 <p class="text-[11px] font-mono text-surface-400 dark:text-surface-500 truncate mb-1.5">
                   {{ t.subject }}
                 </p>

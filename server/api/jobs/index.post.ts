@@ -49,6 +49,12 @@ export default defineEventHandler(async (event) => {
       phoneRequirement: body.phoneRequirement,
       requireResume: body.requireResume,
       requireCoverLetter: body.requireCoverLetter,
+      applicationFeeEnabled: body.applicationFeeEnabled,
+      applicationFeeUrl: body.applicationFeeUrl,
+      applicationFeeAmount: body.applicationFeeAmount,
+      applicationFeeCurrency: body.applicationFeeCurrency,
+      requireSignedDocuments: body.requireSignedDocuments,
+      signingUrl: body.signingUrl,
       autoScoreOnApply: body.autoScoreOnApply,
       experienceLevel: body.experienceLevel,
     }).returning({

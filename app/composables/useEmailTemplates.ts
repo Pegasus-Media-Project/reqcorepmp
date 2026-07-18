@@ -1,5 +1,13 @@
+export type EmailTemplateType =
+  | 'interview_invitation'
+  | 'application_accepted'
+  | 'application_rejected'
+  | 'fee_verified'
+  | 'documents_verified'
+
 export interface EmailTemplate {
   id: string
+  templateType: EmailTemplateType
   name: string
   subject: string
   body: string
@@ -22,6 +30,7 @@ export function useEmailTemplates() {
   })
 
   async function createTemplate(payload: {
+    templateType?: EmailTemplateType
     name: string
     subject: string
     body: string
@@ -40,6 +49,7 @@ export function useEmailTemplates() {
   }
 
   async function updateTemplate(id: string, payload: Partial<{
+    templateType: EmailTemplateType
     name: string
     subject: string
     body: string

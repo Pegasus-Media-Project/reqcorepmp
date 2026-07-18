@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
 import {
-  Building2, Users, UserCircle, ChevronLeft, Settings, Plug, Brain, ShieldCheck, Globe, Globe2, ShieldAlert, CreditCard, Lock, GraduationCap, Briefcase,
+  Building2, Users, UserCircle, ChevronLeft, Settings, Plug, Brain, ShieldCheck, Globe, Globe2, ShieldAlert, CreditCard, Lock, GraduationCap, Briefcase, Mail,
 } from 'lucide-vue-next'
 import type { PlanFeature } from '~~/shared/billing'
 
@@ -55,6 +55,13 @@ const settingsNav: SettingsNavItem[] = [
     to: '/dashboard/settings/employment-types',
     icon: Briefcase,
     exact: true,
+  },
+  {
+    label: 'Email Templates',
+    description: 'Lifecycle email copy',
+    to: '/dashboard/interviews/templates',
+    icon: Mail,
+    exact: false,
   },
   {
     label: 'Members',

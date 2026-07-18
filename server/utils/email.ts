@@ -1,6 +1,9 @@
 import { Resend } from 'resend'
 import nodemailer from 'nodemailer'
 import type { Transporter } from 'nodemailer'
+import { and, eq } from 'drizzle-orm'
+import { emailTemplate } from '../database/schema'
+import { SYSTEM_TEMPLATES, type SystemTemplateType } from '~~/shared/system-templates'
 
 // ─── Resend client ────────────────────────────────────────────────────────────
 
@@ -477,6 +480,26 @@ export interface ApplicationConfirmationParams {
   logoUrl?: string
   /** Read-only copy of what the applicant submitted, rendered in the email. */
   summary?: Array<{ label: string, value: string }>
+  /** When set, renders an application-fee reminder with a payment link. */
+  fee?: {
+    url: string
+    /** Amount in minor units (cents); optional. */
+    amount?: number | null
+    /** ISO 4217 currency code; optional. */
+    currency?: string | null
+  }
+}
+
+/** Format a minor-unit fee amount (e.g. 2500 → "$25.00") for display. */
+export function formatFeeAmount(amount?: number | null, currency?: string | null): string | null {
+  if (amount == null) return null
+  const code = (currency || 'USD').toUpperCase()
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: code }).format(amount / 100)
+  }
+  catch {
+    return `${(amount / 100).toFixed(2)} ${code}`
+  }
 }
 
 /**
@@ -518,6 +541,24 @@ function buildApplicationConfirmationHtml(params: ApplicationConfirmationParams)
                 </table>
               </div>`
     : ''
+  const feeAmount = params.fee ? formatFeeAmount(params.fee.amount, params.fee.currency) : null
+  const feeBlock = params.fee
+    ? `
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+                <tr>
+                  <td style="padding:16px;background-color:#fffbeb;border:1px solid #fde68a;border-radius:8px;">
+                    <div style="font-size:14px;font-weight:600;color:#92400e;margin-bottom:6px;">Action needed: pay your application fee</div>
+                    <p style="margin:0 0 12px;font-size:13px;line-height:1.5;color:#78716c;">
+                      This application requires a fee${feeAmount ? ` of <strong>${escapeHtml(feeAmount)}</strong>` : ''}, payable now. A member of our team will manually verify your payment.
+                    </p>
+                    <a href="${escapeHtml(params.fee.url)}" target="_blank" rel="noopener noreferrer"
+                       style="display:inline-block;padding:10px 24px;background-color:#d97706;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;border-radius:8px;line-height:1;">
+                      Pay application fee
+                    </a>
+                  </td>
+                </tr>
+              </table>`
+    : ''
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -543,6 +584,7 @@ function buildApplicationConfirmationHtml(params: ApplicationConfirmationParams)
                 Thanks for applying for <strong>${escapeHtml(params.jobTitle)}</strong>. Your application is now with the team. Use the confirmation code below to check your status at any time.
               </p>
               ${summaryBlock}
+              ${feeBlock}
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
                 <tr>
                   <td align="center" style="padding:16px;background-color:#f4f4f5;border-radius:8px;">
@@ -587,6 +629,15 @@ function buildApplicationConfirmationText(params: ApplicationConfirmationParams)
   const summaryBlock = summaryLines.length
     ? ['', 'Your application:', ...summaryLines]
     : []
+  const feeAmount = params.fee ? formatFeeAmount(params.fee.amount, params.fee.currency) : null
+  const feeBlock = params.fee
+    ? [
+        '',
+        'ACTION NEEDED — PAY YOUR APPLICATION FEE',
+        `This application requires a fee${feeAmount ? ` of ${feeAmount}` : ''}, payable now. A member of our team will manually verify your payment.`,
+        `Pay here: ${params.fee.url}`,
+      ]
+    : []
   return [
     'Application received',
     '',
@@ -594,6 +645,7 @@ function buildApplicationConfirmationText(params: ApplicationConfirmationParams)
     '',
     `Thanks for applying for ${params.jobTitle}. Your application is now with the team.`,
     ...summaryBlock,
+    ...feeBlock,
     '',
     `Your confirmation code: ${params.code}`,
     `Check your status: ${params.statusUrl}`,
@@ -602,6 +654,133 @@ function buildApplicationConfirmationText(params: ApplicationConfirmationParams)
     '',
     `— ${orgName}`,
   ].join('\n')
+}
+
+// ─────────────────────────────────────────────
+// Lifecycle emails (org-customizable, event-triggered)
+// ─────────────────────────────────────────────
+
+/**
+ * Replace {{variable}} placeholders with values from a plain map. Unknown
+ * placeholders are left intact — the map keys are the effective whitelist.
+ */
+export function renderTemplateGeneric(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) =>
+    key in vars ? vars[key]! : match)
+}
+
+/** A resolved template (org custom row, or a built-in system default). */
+interface ResolvedTemplate {
+  subject: string
+  body: string
+}
+
+/**
+ * Resolve the template to use for a lifecycle event: the org's custom template
+ * for that type if one exists, otherwise the built-in system default. Mirrors
+ * the resolution order in the interview send-invitation endpoint.
+ */
+export async function resolveLifecycleTemplate(
+  organizationId: string,
+  templateType: SystemTemplateType,
+): Promise<ResolvedTemplate | null> {
+  const custom = await db.query.emailTemplate.findFirst({
+    where: and(
+      eq(emailTemplate.organizationId, organizationId),
+      eq(emailTemplate.templateType, templateType),
+    ),
+    columns: { subject: true, body: true },
+  })
+  if (custom) return { subject: custom.subject, body: custom.body }
+
+  const system = SYSTEM_TEMPLATES.find(t => t.type === templateType)
+  return system ? { subject: system.subject, body: system.body } : null
+}
+
+/** Turn a rendered plain-text body into safe HTML: escape, linkify, break lines. */
+function lifecycleBodyToHtml(bodyText: string): string {
+  const escaped = escapeHtml(bodyText)
+  const linked = escaped.replace(
+    /(https?:\/\/[^\s<]+)/g,
+    '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;word-break:break-all;">$1</a>',
+  )
+  return linked.replace(/\n/g, '<br />')
+}
+
+/** Wrap a rendered lifecycle body in the standard branded email shell. */
+function buildLifecycleEmailHtml(params: { orgName: string, logoUrl?: string, bodyText: string }): string {
+  const header = params.logoUrl
+    ? `<img src="${escapeHtml(params.logoUrl)}" alt="${escapeHtml(params.orgName)}" height="40" style="max-height:40px;width:auto;display:inline-block;" />`
+    : `<h1 style="margin:0;font-size:20px;font-weight:600;color:#09090b;">${escapeHtml(params.orgName)}</h1>`
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e4e4e7;">
+          <tr>
+            <td style="padding:32px 32px 24px;text-align:center;border-bottom:1px solid #f4f4f5;">
+              ${header}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px;font-size:14px;line-height:1.6;color:#3f3f46;">
+              ${lifecycleBodyToHtml(params.bodyText)}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 32px;text-align:center;border-top:1px solid #f4f4f5;background-color:#fafafa;">
+              <p style="margin:0;font-size:12px;color:#a1a1aa;">Sent by ${escapeHtml(params.orgName)}</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
+}
+
+export interface LifecycleEmailParams {
+  to: string
+  organizationId: string
+  templateType: SystemTemplateType
+  /** Values substituted into the resolved subject/body template. */
+  vars: Record<string, string>
+  organizationName?: string
+  logoUrl?: string
+}
+
+/**
+ * Resolve, render, and send an org-customizable lifecycle email. Best-effort:
+ * falls back to a console log when no mail provider is configured. Returns
+ * without sending if no template (custom or system) exists for the type.
+ */
+export async function sendLifecycleEmail(params: LifecycleEmailParams): Promise<void> {
+  const template = await resolveLifecycleTemplate(params.organizationId, params.templateType)
+  if (!template) {
+    logError('email.lifecycle_template_missing', { template_type: params.templateType })
+    return
+  }
+  const orgName = params.organizationName?.trim() || 'Pegasus Media Project'
+  const vars = { organizationName: orgName, ...params.vars }
+  const subject = renderTemplateGeneric(template.subject, vars)
+  const body = renderTemplateGeneric(template.body, vars)
+
+  await sendEmail({
+    to: params.to,
+    subject,
+    html: buildLifecycleEmailHtml({ orgName, logoUrl: params.logoUrl, bodyText: body }),
+    text: body,
+    resendTags: [{ name: 'category', value: params.templateType.replace(/_/g, '-') }],
+    logFallback: `Lifecycle email (${params.templateType}) → ${params.to} | Subject: ${subject}`,
+    errorCategory: `email.${params.templateType}_send_failed`,
+  })
 }
 
 // ─────────────────────────────────────────────

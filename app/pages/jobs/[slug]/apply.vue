@@ -32,6 +32,28 @@ useSeoMeta({
   robots: 'noindex, nofollow',
 })
 
+// Remind applicants up-front when this posting charges an application fee, so
+// it isn't a surprise at the end. Rendered as an inline banner (the toast
+// container isn't mounted on the public layout).
+const applicationFee = computed(() => {
+  const j = job.value as {
+    applicationFeeEnabled?: boolean
+    applicationFeeAmount?: number | null
+    applicationFeeCurrency?: string | null
+  } | null
+  return j?.applicationFeeEnabled ? j : null
+})
+const applicationFeeLabel = computed(() => {
+  const fee = applicationFee.value
+  if (!fee || fee.applicationFeeAmount == null) return null
+  const cur = (fee.applicationFeeCurrency || 'USD').toUpperCase()
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur }).format(fee.applicationFeeAmount / 100)
+  } catch {
+    return `${(fee.applicationFeeAmount / 100).toFixed(2)} ${cur}`
+  }
+})
+
 // ─────────────────────────────────────────────
 // Form state
 // ─────────────────────────────────────────────
@@ -297,6 +319,21 @@ async function handleSubmit() {
       </NuxtLink>
 
       <PublicJobApplicationHeader :job="job" />
+
+      <!-- Application fee notice -->
+      <div
+        v-if="applicationFee"
+        class="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 dark:border-amber-900/50 dark:bg-amber-950/30"
+      >
+        <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">This application has a fee</p>
+        <p class="mt-1 text-sm leading-6 text-amber-800/80 dark:text-amber-200/70">
+          <template v-if="applicationFeeLabel">
+            A fee of <strong>{{ applicationFeeLabel }}</strong> is payable at submission.
+          </template>
+          <template v-else>A fee is payable at submission.</template>
+          You'll receive a payment link after you apply, and a staff member will manually verify your payment.
+        </p>
+      </div>
 
       <!-- Closed: past the application deadline -->
       <div

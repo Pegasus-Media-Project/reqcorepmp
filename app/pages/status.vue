@@ -12,11 +12,32 @@ useSeoMeta({
 
 const route = useRoute()
 
+interface OnboardingStep {
+  status: 'pending' | 'submitted' | 'verified'
+  actionUrl: string | null
+  awaitingManualVerification: boolean
+}
+interface FeeStep extends OnboardingStep {
+  amount: number | null
+  currency: string | null
+}
 interface StatusResult {
   statusKey: string
   status: string
   jobTitle: string
   submittedAt: string
+  fee: FeeStep | null
+  documents: OnboardingStep | null
+}
+
+function formatFee(amount: number | null, currency: string | null): string | null {
+  if (amount == null) return null
+  const code = (currency || 'USD').toUpperCase()
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: code }).format(amount / 100)
+  } catch {
+    return `${(amount / 100).toFixed(2)} ${code}`
+  }
 }
 
 const code = ref(((route.query.code as string) ?? '').toUpperCase())
@@ -129,6 +150,64 @@ onMounted(() => {
           </dd>
         </div>
       </dl>
+    </div>
+
+    <!-- Application fee (submission phase) -->
+    <div v-if="result && result.fee" class="mt-4 rounded-xl border border-surface-200 bg-white p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h2 class="text-sm font-semibold text-surface-900">Application fee</h2>
+          <p class="mt-1 text-xs text-surface-500">
+            <template v-if="formatFee(result.fee.amount, result.fee.currency)">
+              A fee of <strong>{{ formatFee(result.fee.amount, result.fee.currency) }}</strong> is required for this application.
+            </template>
+            <template v-else>A fee is required for this application.</template>
+            A member of the team will manually confirm your payment.
+          </p>
+        </div>
+        <span
+          class="shrink-0 rounded-full px-3 py-1 text-xs font-semibold"
+          :class="result.fee.status === 'verified' ? 'bg-success-50 text-success-700' : 'bg-amber-50 text-amber-700'"
+        >
+          {{ result.fee.status === 'verified' ? 'Verified' : 'Awaiting staff verification' }}
+        </span>
+      </div>
+      <a
+        v-if="result.fee.actionUrl && result.fee.status !== 'verified'"
+        :href="result.fee.actionUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="mt-4 inline-block rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+      >
+        Pay application fee
+      </a>
+    </div>
+
+    <!-- Signed documents (acceptance phase) -->
+    <div v-if="result && result.documents" class="mt-4 rounded-xl border border-surface-200 bg-white p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h2 class="text-sm font-semibold text-surface-900">Sign your documents</h2>
+          <p class="mt-1 text-xs text-surface-500">
+            Please review and sign the required documents. Your electronic signature is legally binding. A member of the team will manually confirm your signed documents.
+          </p>
+        </div>
+        <span
+          class="shrink-0 rounded-full px-3 py-1 text-xs font-semibold"
+          :class="result.documents.status === 'verified' ? 'bg-success-50 text-success-700' : 'bg-amber-50 text-amber-700'"
+        >
+          {{ result.documents.status === 'verified' ? 'Verified' : 'Awaiting staff verification' }}
+        </span>
+      </div>
+      <a
+        v-if="result.documents.actionUrl && result.documents.status !== 'verified'"
+        :href="result.documents.actionUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="mt-4 inline-block rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+      >
+        Sign documents
+      </a>
     </div>
 
     <!-- Not found -->

@@ -20,6 +20,21 @@ export const updateApplicationSchema = z.object({
   score: z.number().int().min(0).max(100).nullish(),
 })
 
+/** Allowed values for a manual onboarding-step verification. */
+export const applicationStepStatusValues = ['pending', 'submitted', 'verified'] as const
+
+/**
+ * Schema for staff manually setting the fee / signed-documents verification
+ * state on an application. At least one field must be present.
+ */
+export const updateVerificationsSchema = z.object({
+  feeStatus: z.enum(applicationStepStatusValues).optional(),
+  documentsStatus: z.enum(applicationStepStatusValues).optional(),
+}).refine(
+  (data) => data.feeStatus !== undefined || data.documentsStatus !== undefined,
+  { message: 'Provide feeStatus and/or documentsStatus' },
+)
+
 /** Schema for application list query params */
 export const applicationQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),

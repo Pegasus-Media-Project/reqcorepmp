@@ -330,6 +330,13 @@
       "when": 1784180722209,
       "tag": "0046_equal_mercury",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1784401812511,
+      "tag": "0047_stormy_swordsman",
+      "breakpoints": true
     }
   ]
 }

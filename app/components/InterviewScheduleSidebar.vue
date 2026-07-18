@@ -70,8 +70,12 @@ const selectedTemplateId = ref('system-standard')
 const showTemplateDropdown = ref(false)
 
 const allTemplates = computed(() => [
-  ...SYSTEM_TEMPLATES.map(t => ({ id: t.id, name: t.name, description: t.description, isSystem: true as const })),
-  ...(customTemplates.value ?? []).map(t => ({ id: t.id, name: t.name, description: '', isSystem: false as const })),
+  ...SYSTEM_TEMPLATES
+    .filter(t => (t as { type?: string }).type === 'interview_invitation')
+    .map(t => ({ id: t.id, name: t.name, description: t.description, isSystem: true as const })),
+  ...(customTemplates.value ?? [])
+    .filter(t => (t as { templateType?: string }).templateType === 'interview_invitation')
+    .map(t => ({ id: t.id, name: t.name, description: '', isSystem: false as const })),
 ])
 
 const selectedTemplateName = computed(() => {

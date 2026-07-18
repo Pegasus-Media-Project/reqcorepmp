@@ -23,6 +23,13 @@ export const applicationStatusEnum = pgEnum('application_status', [
   'new', 'screening', 'interview', 'offer', 'hired', 'rejected',
 ])
 export const documentTypeEnum = pgEnum('document_type', ['resume', 'cover_letter', 'other'])
+/**
+ * Verification state for a per-application onboarding step (application fee,
+ * signed documents). `submitted` is reserved for applicant self-report / a
+ * future DocuSign webhook; v1 goes straight from `pending` to a staff-set
+ * `verified`.
+ */
+export const applicationStepStatusEnum = pgEnum('application_step_status', ['pending', 'submitted', 'verified'])
 export const questionTypeEnum = pgEnum('question_type', [
   'short_text', 'long_text', 'single_select', 'multi_select',
   'number', 'date', 'url', 'checkbox', 'file_upload',
@@ -123,6 +130,18 @@ export const job = pgTable('job', {
   phoneRequirement: text('phone_requirement').$type<'hidden' | 'optional' | 'required'>().notNull().default('optional'),
   requireResume: boolean('require_resume').notNull().default(false),
   requireCoverLetter: boolean('require_cover_letter').notNull().default(false),
+  // ── Application fee (submission phase; staff manually verify payment) ──
+  applicationFeeEnabled: boolean('application_fee_enabled').notNull().default(false),
+  /** External payment link the applicant is sent to. */
+  applicationFeeUrl: text('application_fee_url'),
+  /** Fee amount in minor units (e.g. cents); displayed formatted. */
+  applicationFeeAmount: integer('application_fee_amount'),
+  /** ISO 4217 currency code, e.g. 'USD'. */
+  applicationFeeCurrency: text('application_fee_currency'),
+  // ── Signed documents (acceptance phase; staff manually verify signing) ──
+  requireSignedDocuments: boolean('require_signed_documents').notNull().default(false),
+  /** External signing / DocuSign link (scaffold; embed comes later). */
+  signingUrl: text('signing_url'),
   // ── AI scoring settings ──
   autoScoreOnApply: boolean('auto_score_on_apply').notNull().default(false),
   /**
@@ -234,6 +253,15 @@ export const application = pgTable('application', {
   // /status. Unique so a code maps to exactly one application. Nullable because
   // rows created before this feature (and any internal inserts) have none.
   confirmationCode: text('confirmation_code'),
+  // ── Onboarding-step verification (only meaningful when the job requires them) ──
+  // Application fee (submission phase).
+  feeStatus: applicationStepStatusEnum('fee_status').notNull().default('pending'),
+  feeVerifiedById: text('fee_verified_by_id').references(() => user.id),
+  feeVerifiedAt: timestamp('fee_verified_at'),
+  // Signed documents (acceptance phase).
+  documentsStatus: applicationStepStatusEnum('documents_status').notNull().default('pending'),
+  documentsVerifiedById: text('documents_verified_by_id').references(() => user.id),
+  documentsVerifiedAt: timestamp('documents_verified_at'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (t) => ([
@@ -684,13 +712,29 @@ export const interviewReviewer = pgTable('interview_reviewer', {
 // ─────────────────────────────────────────────
 
 /**
- * Reusable email templates for interview invitations.
- * Each org can create custom templates or use the system defaults.
- * Template body supports placeholder variables like {{candidateName}}, {{jobTitle}}, etc.
+ * The lifecycle event a template is written for. `interview_invitation` is the
+ * original (manually chosen at interview-send time); the rest fire automatically
+ * on the corresponding application event.
+ */
+export const emailTemplateTypeEnum = pgEnum('email_template_type', [
+  'interview_invitation',
+  'application_accepted',
+  'application_rejected',
+  'fee_verified',
+  'documents_verified',
+])
+
+/**
+ * Reusable, org-customizable email templates keyed by lifecycle event
+ * (`templateType`). Each org can create a custom template per event or fall back
+ * to the built-in system defaults. Body/subject support placeholder variables
+ * like {{candidateName}}, {{jobTitle}}, etc.
  */
 export const emailTemplate = pgTable('email_template', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  /** Which lifecycle event this template is used for. */
+  templateType: emailTemplateTypeEnum('template_type').notNull().default('interview_invitation'),
   name: text('name').notNull(),
   subject: text('subject').notNull(),
   body: text('body').notNull(),
@@ -700,6 +744,7 @@ export const emailTemplate = pgTable('email_template', {
 }, (t) => ([
   index('email_template_organization_id_idx').on(t.organizationId),
   index('email_template_created_by_id_idx').on(t.createdById),
+  index('email_template_org_type_idx').on(t.organizationId, t.templateType),
 ]))
 
 export const commentTargetEnum = pgEnum('comment_target', ['candidate', 'application', 'job'])

@@ -44,6 +44,14 @@ export default defineEventHandler(async (event) => {
       status: application.status,
       submittedAt: application.createdAt,
       jobTitle: job.title,
+      feeStatus: application.feeStatus,
+      documentsStatus: application.documentsStatus,
+      applicationFeeEnabled: job.applicationFeeEnabled,
+      applicationFeeUrl: job.applicationFeeUrl,
+      applicationFeeAmount: job.applicationFeeAmount,
+      applicationFeeCurrency: job.applicationFeeCurrency,
+      requireSignedDocuments: job.requireSignedDocuments,
+      signingUrl: job.signingUrl,
     })
     .from(application)
     .innerJoin(job, eq(application.jobId, job.id))
@@ -52,10 +60,35 @@ export default defineEventHandler(async (event) => {
 
   if (!row) throw notFound()
 
+  // Onboarding steps the applicant can see & act on. The fee (submission phase)
+  // is visible from the start; signed documents (acceptance phase) only once
+  // they've reached the offer/hired stage. No PII is exposed either way.
+  const isAcceptedStage = row.status === 'offer' || row.status === 'hired'
+
+  const fee = row.applicationFeeEnabled
+    ? {
+        status: row.feeStatus,
+        amount: row.applicationFeeAmount,
+        currency: row.applicationFeeCurrency,
+        actionUrl: row.applicationFeeUrl,
+        awaitingManualVerification: row.feeStatus !== 'verified',
+      }
+    : null
+
+  const documents = (isAcceptedStage && row.requireSignedDocuments)
+    ? {
+        status: row.documentsStatus,
+        actionUrl: row.signingUrl,
+        awaitingManualVerification: row.documentsStatus !== 'verified',
+      }
+    : null
+
   return {
     statusKey: row.status,
     status: STATUS_LABELS[row.status] ?? 'Received',
     jobTitle: row.jobTitle,
     submittedAt: row.submittedAt,
+    fee,
+    documents,
   }
 })

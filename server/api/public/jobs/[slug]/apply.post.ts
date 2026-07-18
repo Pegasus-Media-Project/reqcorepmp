@@ -188,6 +188,10 @@ export default defineEventHandler(async (event) => {
       requireCoverLetter: true,
       autoScoreOnApply: true,
       validThrough: true,
+      applicationFeeEnabled: true,
+      applicationFeeUrl: true,
+      applicationFeeAmount: true,
+      applicationFeeCurrency: true,
     },
   })
 
@@ -494,6 +498,14 @@ export default defineEventHandler(async (event) => {
   if (resumeUpload) summary.push({ label: 'Resume', value: resumeUpload.filename })
   if (coverLetterText) summary.push({ label: 'Cover letter', value: coverLetterText })
 
+  const feeReminder = (existingJob.applicationFeeEnabled && existingJob.applicationFeeUrl)
+    ? {
+        url: existingJob.applicationFeeUrl,
+        amount: existingJob.applicationFeeAmount,
+        currency: existingJob.applicationFeeCurrency,
+      }
+    : undefined
+
   void sendApplicationConfirmationEmail({
     to: email,
     firstName,
@@ -503,6 +515,7 @@ export default defineEventHandler(async (event) => {
     organizationName: org?.name ?? undefined,
     logoUrl,
     summary,
+    fee: feeReminder,
   }).catch((e) => console.error('[Pegasus] Failed to send application confirmation email:', e))
 
   // ─────────────────────────────────────────────
@@ -756,7 +769,12 @@ export default defineEventHandler(async (event) => {
   })
 
   setResponseStatus(event, 201)
-  return { success: true, confirmationCode }
+  return {
+    success: true,
+    confirmationCode,
+    // Lets the success screen render a "pay your application fee" callout.
+    fee: feeReminder ?? null,
+  }
 })
 
 // ─────────────────────────────────────────────

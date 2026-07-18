@@ -306,8 +306,12 @@ const showEmailPreview = ref(false)
 const { templates: emailTemplates, sendInvitation } = useEmailTemplates()
 
 const allTemplates = computed(() => [
-  ...SYSTEM_TEMPLATES.map(t => ({ ...t, isSystem: true as const })),
-  ...(emailTemplates.value ?? []).map(t => ({ ...t, isSystem: false as const, description: '' })),
+  ...SYSTEM_TEMPLATES
+    .filter(t => (t as { type?: string }).type === 'interview_invitation')
+    .map(t => ({ ...t, isSystem: true as const })),
+  ...(emailTemplates.value ?? [])
+    .filter(t => (t as { templateType?: string }).templateType === 'interview_invitation')
+    .map(t => ({ ...t, isSystem: false as const, description: '' })),
 ])
 
 const selectedTemplate = computed(() =>

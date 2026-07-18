@@ -1,5 +1,15 @@
+/** Lifecycle event a template applies to (mirrors emailTemplateTypeEnum). */
+export type SystemTemplateType =
+  | 'interview_invitation'
+  | 'application_accepted'
+  | 'application_rejected'
+  | 'fee_verified'
+  | 'documents_verified'
+
 export interface SystemTemplate {
   id: string
+  /** Which lifecycle event this template is a default for. */
+  type: SystemTemplateType
   name: string
   description: string
   subject: string
@@ -9,6 +19,7 @@ export interface SystemTemplate {
 export const SYSTEM_TEMPLATES: SystemTemplate[] = [
   {
     id: 'system-standard',
+    type: 'interview_invitation',
     name: 'Standard Interview Invitation',
     description: 'A professional and formal invitation suitable for most interview types.',
     subject: 'Interview Invitation: {{jobTitle}} at {{organizationName}}',
@@ -34,6 +45,7 @@ Best regards,
   },
   {
     id: 'system-friendly',
+    type: 'interview_invitation',
     name: 'Friendly & Casual',
     description: 'A warm, conversational tone that puts candidates at ease.',
     subject: "Let's chat! Interview for {{jobTitle}}",
@@ -56,6 +68,7 @@ The {{organizationName}} Team`,
   },
   {
     id: 'system-technical',
+    type: 'interview_invitation',
     name: 'Technical Interview',
     description: 'Tailored for technical interviews with preparation tips for candidates.',
     subject: 'Technical Interview: {{jobTitle}} — {{organizationName}}',
@@ -79,6 +92,74 @@ To help you prepare:
 - Feel free to ask questions about our tech stack and development practices
 
 Please confirm your attendance by replying to this email.
+
+Best regards,
+{{organizationName}}`,
+  },
+  {
+    id: 'system-application-accepted',
+    type: 'application_accepted',
+    name: 'Acceptance Letter',
+    description: 'Sent when an applicant is moved to the offer stage. Links to their next steps.',
+    subject: "Congratulations — you've been accepted for {{jobTitle}}",
+    body: `Dear {{candidateFirstName}},
+
+Congratulations! We're delighted to offer you a place for the {{jobTitle}} position at {{organizationName}}.
+
+As a next step, please review and sign the required documents. Your electronic signature is legally binding.
+
+Sign your documents here: {{actionUrl}}
+
+You can track the status of your application and remaining steps at any time here: {{statusUrl}}
+
+A member of our team will manually confirm each step once it's complete.
+
+Warm regards,
+{{organizationName}}`,
+  },
+  {
+    id: 'system-application-rejected',
+    type: 'application_rejected',
+    name: 'Rejection Letter',
+    description: 'Sent when an application is not moving forward.',
+    subject: 'Update on your application for {{jobTitle}}',
+    body: `Dear {{candidateFirstName}},
+
+Thank you for your interest in the {{jobTitle}} position at {{organizationName}} and for the time you invested in your application.
+
+After careful consideration, we've decided not to move forward with your application at this time. This decision was not easy, and we encourage you to apply for future opportunities that match your experience.
+
+We wish you the very best in your search.
+
+Sincerely,
+{{organizationName}}`,
+  },
+  {
+    id: 'system-fee-verified',
+    type: 'fee_verified',
+    name: 'Application Fee Verified',
+    description: 'Sent when staff confirm the application fee has been paid.',
+    subject: 'Your application fee has been confirmed — {{jobTitle}}',
+    body: `Dear {{candidateFirstName}},
+
+Good news — we've confirmed your application fee for the {{jobTitle}} position at {{organizationName}}. No further action is needed for this step.
+
+You can check your application status here: {{statusUrl}}
+
+Thank you,
+{{organizationName}}`,
+  },
+  {
+    id: 'system-documents-verified',
+    type: 'documents_verified',
+    name: 'Documents Verified',
+    description: 'Sent when staff confirm the signed documents have been received.',
+    subject: 'Your signed documents have been received — {{jobTitle}}',
+    body: `Dear {{candidateFirstName}},
+
+We've confirmed receipt of your signed documents for the {{jobTitle}} position at {{organizationName}}. Thank you for completing this step.
+
+You can check your application status here: {{statusUrl}}
 
 Best regards,
 {{organizationName}}`,

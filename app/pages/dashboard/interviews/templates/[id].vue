@@ -33,6 +33,16 @@ const notFound = computed(() => {
   return templates.value !== null && !customTemplate.value
 })
 
+// Lifecycle event this template applies to (for the badge + duplication).
+const sourceTemplateType = computed(() => {
+  const source = isSystemTemplate.value ? systemTemplate.value : customTemplate.value
+  return ((source as { type?: string, templateType?: string })?.type
+    ?? (source as { templateType?: string })?.templateType
+    ?? 'interview_invitation') as
+    'interview_invitation' | 'application_accepted' | 'application_rejected' | 'fee_verified' | 'documents_verified'
+})
+const sourceTemplateTypeLabel = computed(() => EMAIL_TEMPLATE_TYPE_LABELS[sourceTemplateType.value] ?? sourceTemplateType.value)
+
 // ─── Form state ──────────────────────────────────────────────────
 const form = reactive({
   name: '',
@@ -97,6 +107,7 @@ async function handleDuplicate() {
   isDuplicating.value = true
   try {
     const created = await createTemplate({
+      templateType: sourceTemplateType.value,
       name: `${form.name} (Copy)`,
       subject: form.subject,
       body: form.body,
@@ -202,6 +213,9 @@ useSeoMeta({
               >
                 <Lock class="size-2.5" />
                 Built-in
+              </span>
+              <span class="inline-flex items-center rounded-md bg-brand-50 dark:bg-brand-950/40 px-2 py-0.5 text-[10px] uppercase tracking-wider font-semibold text-brand-600 dark:text-brand-400">
+                {{ sourceTemplateTypeLabel }}
               </span>
             </div>
             <p v-if="isSystemTemplate && systemTemplate" class="text-sm text-surface-500 dark:text-surface-400 mt-0.5">

@@ -94,6 +94,47 @@ async function handleTransition(newStatus: string) {
 }
 
 // ─────────────────────────────────────────────
+// Onboarding-step verification (application fee, signed documents)
+// ─────────────────────────────────────────────
+
+const app = computed(() => application.value as any)
+// The application fee is a submission-phase step; documents are acceptance phase
+// (only relevant once the applicant reaches offer/hired).
+const showFeeStep = computed(() => !!app.value?.job?.applicationFeeEnabled)
+const showDocumentsStep = computed(() =>
+  !!app.value?.job?.requireSignedDocuments
+  && (app.value?.status === 'offer' || app.value?.status === 'hired'),
+)
+const verifyingStep = ref<'fee' | 'documents' | null>(null)
+
+const feeAmountLabel = computed(() => {
+  const amount = app.value?.job?.applicationFeeAmount
+  if (amount == null) return null
+  const cur = (app.value?.job?.applicationFeeCurrency || 'USD').toUpperCase()
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur }).format(amount / 100)
+  } catch {
+    return `${(amount / 100).toFixed(2)} ${cur}`
+  }
+})
+
+async function setStepStatus(step: 'fee' | 'documents', status: 'pending' | 'verified') {
+  verifyingStep.value = step
+  try {
+    await $fetch(`/api/applications/${applicationId}/verifications`, {
+      method: 'PATCH',
+      body: step === 'fee' ? { feeStatus: status } : { documentsStatus: status },
+    })
+    await refresh()
+  } catch (err: any) {
+    if (handlePreviewReadOnlyError(err)) return
+    toast.error('Failed to update verification', { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
+  } finally {
+    verifyingStep.value = null
+  }
+}
+
+// ─────────────────────────────────────────────
 // Notes editing
 // ─────────────────────────────────────────────
 
@@ -385,6 +426,91 @@ function formatResponseValue(value: unknown): string {
           {{ application.notes }}
         </p>
         <p v-else class="text-sm text-surface-400 italic">No notes yet.</p>
+      </div>
+
+      <!-- Onboarding steps (fee / signed documents) -->
+      <div
+        v-if="showFeeStep || showDocumentsStep"
+        class="mt-4 rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5 mb-4"
+      >
+        <div class="flex items-center gap-2 mb-3">
+          <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Onboarding</h2>
+        </div>
+        <div class="space-y-3">
+          <!-- Application fee -->
+          <div v-if="showFeeStep" class="flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-surface-800 dark:text-surface-100">
+                Application fee<span v-if="feeAmountLabel" class="text-surface-500"> · {{ feeAmountLabel }}</span>
+              </p>
+              <p class="text-xs text-surface-500 dark:text-surface-400">
+                {{ app?.feeStatus === 'verified' ? 'Payment verified' : 'Awaiting manual verification of payment' }}
+              </p>
+            </div>
+            <div class="flex shrink-0 items-center gap-2">
+              <span
+                class="rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                :class="app?.feeStatus === 'verified' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'"
+              >
+                {{ app?.feeStatus === 'verified' ? 'Verified' : 'Pending' }}
+              </span>
+              <button
+                v-if="canManageApplication && app?.feeStatus !== 'verified'"
+                type="button"
+                :disabled="verifyingStep === 'fee'"
+                class="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+                @click="setStepStatus('fee', 'verified')"
+              >
+                {{ verifyingStep === 'fee' ? 'Saving…' : 'Mark verified' }}
+              </button>
+              <button
+                v-else-if="canManageApplication && app?.feeStatus === 'verified'"
+                type="button"
+                :disabled="verifyingStep === 'fee'"
+                class="rounded-md border border-surface-300 dark:border-surface-600 px-3 py-1.5 text-xs font-medium text-surface-600 dark:text-surface-300 transition hover:bg-surface-100 dark:hover:bg-surface-800 disabled:opacity-60"
+                @click="setStepStatus('fee', 'pending')"
+              >
+                Undo
+              </button>
+            </div>
+          </div>
+
+          <!-- Signed documents -->
+          <div v-if="showDocumentsStep" class="flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-surface-800 dark:text-surface-100">Signed documents</p>
+              <p class="text-xs text-surface-500 dark:text-surface-400">
+                {{ app?.documentsStatus === 'verified' ? 'Signed documents verified' : 'Awaiting manual verification of signed documents' }}
+              </p>
+            </div>
+            <div class="flex shrink-0 items-center gap-2">
+              <span
+                class="rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                :class="app?.documentsStatus === 'verified' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'"
+              >
+                {{ app?.documentsStatus === 'verified' ? 'Verified' : 'Pending' }}
+              </span>
+              <button
+                v-if="canManageApplication && app?.documentsStatus !== 'verified'"
+                type="button"
+                :disabled="verifyingStep === 'documents'"
+                class="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+                @click="setStepStatus('documents', 'verified')"
+              >
+                {{ verifyingStep === 'documents' ? 'Saving…' : 'Mark verified' }}
+              </button>
+              <button
+                v-else-if="canManageApplication && app?.documentsStatus === 'verified'"
+                type="button"
+                :disabled="verifyingStep === 'documents'"
+                class="rounded-md border border-surface-300 dark:border-surface-600 px-3 py-1.5 text-xs font-medium text-surface-600 dark:text-surface-300 transition hover:bg-surface-100 dark:hover:bg-surface-800 disabled:opacity-60"
+                @click="setStepStatus('documents', 'pending')"
+              >
+                Undo
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Reviewer ratings -->
