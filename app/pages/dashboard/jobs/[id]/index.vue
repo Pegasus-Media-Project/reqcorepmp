@@ -420,6 +420,14 @@ type SwipeApplicationDetail = {
   coverLetterText: string | null
   createdAt: string | Date
   updatedAt: string | Date
+  feeStatus?: string | null
+  documentsStatus?: string | null
+  job?: {
+    applicationFeeEnabled?: boolean | null
+    applicationFeeAmount?: number | null
+    applicationFeeCurrency?: string | null
+    requireSignedDocuments?: boolean | null
+  } | null
   candidate: {
     id: string
     firstName: string
@@ -503,6 +511,12 @@ watch(currentApplicationId, () => {
   timelineLoaded.value = false
   timelineError.value = null
 })
+
+// After a fee/documents verification, refetch the open detail and the list so
+// the panel and the pipeline "Fee due/paid" badge both reflect the change.
+async function onOnboardingUpdated() {
+  await Promise.all([executeDetailFetch(), refreshApps()])
+}
 
 watch(currentApplicationId, async (id) => {
   if (!id) return
@@ -2170,6 +2184,19 @@ function closeDocPreview() {
               <!-- OVERVIEW BODY: application sections (left) + reviews rail (right) -->
               <div :class="detailTab === 'overview' ? 'xl:flex xl:gap-6 xl:items-start' : ''">
                 <div class="min-w-0 xl:flex-1">
+
+              <!-- ONBOARDING SECTION (fee / signed documents) -->
+              <div v-if="resolvedCurrentApplication" class="mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-6' : '']">
+                <ApplicationOnboardingSection
+                  :application-id="resolvedCurrentApplication.id"
+                  :status="resolvedCurrentApplication.status"
+                  :fee-status="resolvedCurrentApplication.feeStatus"
+                  :documents-status="resolvedCurrentApplication.documentsStatus"
+                  :job="resolvedCurrentApplication.job"
+                  :can-manage="canManageApplication"
+                  @updated="onOnboardingUpdated"
+                />
+              </div>
 
               <!-- INTERVIEWS SECTION -->
               <div v-if="showSection.interviews" ref="interviewsRef" class="space-y-3 mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-6' : '']">

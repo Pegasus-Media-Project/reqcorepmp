@@ -78,6 +78,9 @@ const { data: application, status: fetchStatus, refresh } = useFetch(
 
 const candidateId = computed(() => application.value?.candidate?.id ?? null)
 
+// Fee/documents verification state + job flags for the onboarding section.
+const onboarding = computed(() => application.value as any)
+
 const { data: candidateData, refresh: refreshCandidate } = useFetch(
   () => candidateId.value ? `/api/candidates/${candidateId.value}` : null!,
   {
@@ -720,6 +723,17 @@ function formatInterviewDate(dateStr: string) {
                 </div>
               </dl>
             </div>
+
+            <!-- Onboarding (fee / signed documents) -->
+            <ApplicationOnboardingSection
+              :application-id="applicationId"
+              :status="application.status"
+              :fee-status="onboarding?.feeStatus"
+              :documents-status="onboarding?.documentsStatus"
+              :job="onboarding?.job"
+              :can-manage="canManageApplication"
+              @updated="() => { refresh(); emit('updated') }"
+            />
 
             <!-- Notes -->
             <div class="rounded-xl border border-surface-200/80 dark:border-surface-800/60 bg-white dark:bg-surface-950 p-5 shadow-sm shadow-surface-900/[0.03] dark:shadow-none">

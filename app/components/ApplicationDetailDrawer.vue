@@ -20,6 +20,9 @@ const { application, status: fetchStatus, error, refresh, updateApplication } = 
 // Group question responses by form page (section) to match the application form.
 const responseGroups = computed(() => groupResponsesBySection(application.value?.responses ?? []))
 const showResponsePages = computed(() => responseGroups.value.some(g => g.section))
+
+// Fee/documents verification state + job flags for the onboarding section.
+const onboarding = computed(() => application.value as any)
 const { formatCandidateName } = useOrgSettings()
 
 // AI resume scoring is hidden by default; human reviewer averages take its place.
@@ -370,6 +373,17 @@ onUnmounted(() => {
                 </div>
               </dl>
             </div>
+
+            <!-- Onboarding (fee / signed documents) -->
+            <ApplicationOnboardingSection
+              :application-id="applicationId"
+              :status="application.status"
+              :fee-status="onboarding?.feeStatus"
+              :documents-status="onboarding?.documentsStatus"
+              :job="onboarding?.job"
+              :can-manage="canManageApplication"
+              @updated="refresh()"
+            />
 
             <!-- Notes -->
             <div class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
