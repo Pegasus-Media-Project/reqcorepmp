@@ -63,6 +63,7 @@
     "pdf-parse": "^2.4.5",
     "postgres": "^3.4.8",
     "posthog-node": "^5.28.0",
+    "puppeteer-core": "^25.3.0",
     "resend": "^6.12.2",
     "sharp": "^0.35.3",
     "stripe": "^22.2.2",

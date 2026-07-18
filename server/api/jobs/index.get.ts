@@ -6,6 +6,7 @@ interface PipelineCounts {
   new: number
   screening: number
   interview: number
+  waitlist: number
   offer: number
   hired: number
   rejected: number
@@ -68,14 +69,14 @@ export default defineEventHandler(async (event) => {
       .groupBy(application.jobId, application.status)
 
     for (const row of pipelineRows) {
-      const entry = (pipelineMap[row.jobId] ??= { new: 0, screening: 0, interview: 0, offer: 0, hired: 0, rejected: 0 })
+      const entry = (pipelineMap[row.jobId] ??= { new: 0, screening: 0, interview: 0, waitlist: 0, offer: 0, hired: 0, rejected: 0 })
       entry[row.status as keyof PipelineCounts] = row.count
     }
   }
 
   const enrichedData = data.map((j) => ({
     ...j,
-    pipeline: pipelineMap[j.id] ?? { new: 0, screening: 0, interview: 0, offer: 0, hired: 0, rejected: 0 },
+    pipeline: pipelineMap[j.id] ?? { new: 0, screening: 0, interview: 0, waitlist: 0, offer: 0, hired: 0, rejected: 0 },
   }))
 
   return { data: enrichedData, total, page: query.page, limit: query.limit }

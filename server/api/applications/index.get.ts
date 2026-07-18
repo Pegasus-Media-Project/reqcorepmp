@@ -11,7 +11,7 @@ import {
 type StatusCountRow = { status: (typeof applicationStatusEnum.enumValues)[number], count: number }
 
 function tallyStatusCounts(rows: StatusCountRow[]) {
-  const counts = { new: 0, screening: 0, interview: 0, offer: 0, hired: 0, rejected: 0 }
+  const counts = { new: 0, screening: 0, interview: 0, waitlist: 0, offer: 0, hired: 0, rejected: 0 }
   for (const row of rows) {
     counts[row.status] = Number(row.count)
   }

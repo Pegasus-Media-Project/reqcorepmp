@@ -49,6 +49,7 @@ const statusClasses: Record<string, string> = {
   new: 'bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-300',
   screening: 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
   interview: 'bg-violet-100 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300',
+  waitlist: 'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300',
   offer: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
   hired: 'bg-success-100 text-success-700 dark:bg-success-950/50 dark:text-success-300',
   rejected: 'bg-danger-100 text-danger-700 dark:bg-danger-950/50 dark:text-danger-300',

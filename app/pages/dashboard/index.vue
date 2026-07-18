@@ -62,6 +62,7 @@ const stageConfig = [
   { key: 'new', label: 'New', color: 'bg-blue-500', textColor: 'text-blue-600 dark:text-blue-400', bgColor: 'bg-blue-50 dark:bg-blue-950/40' },
   { key: 'screening', label: 'Screening', color: 'bg-violet-500', textColor: 'text-violet-600 dark:text-violet-400', bgColor: 'bg-violet-50 dark:bg-violet-950/40' },
   { key: 'interview', label: 'Interview', color: 'bg-amber-500', textColor: 'text-amber-600 dark:text-amber-400', bgColor: 'bg-amber-50 dark:bg-amber-950/40' },
+  { key: 'waitlist', label: 'Waitlist', color: 'bg-rose-500', textColor: 'text-rose-600 dark:text-rose-400', bgColor: 'bg-rose-50 dark:bg-rose-950/40' },
   { key: 'offer', label: 'Offer', color: 'bg-teal-500', textColor: 'text-teal-600 dark:text-teal-400', bgColor: 'bg-teal-50 dark:bg-teal-950/40' },
   { key: 'hired', label: 'Hired', color: 'bg-green-600', textColor: 'text-green-600 dark:text-green-400', bgColor: 'bg-green-50 dark:bg-green-950/40' },
   { key: 'rejected', label: 'Rejected', color: 'bg-surface-400', textColor: 'text-surface-500 dark:text-surface-400', bgColor: 'bg-surface-100 dark:bg-surface-800' },
@@ -71,6 +72,7 @@ const stageCountKeys: Record<string, string> = {
   new: 'newCount',
   screening: 'screeningCount',
   interview: 'interviewCount',
+  waitlist: 'waitlistCount',
   offer: 'offerCount',
   hired: 'hiredCount',
   rejected: 'rejectedCount',
@@ -86,6 +88,7 @@ function getJobActiveTotal(job: (typeof topJobs.value)[number]): number {
   return getJobStageCount(job, 'new')
     + getJobStageCount(job, 'screening')
     + getJobStageCount(job, 'interview')
+    + getJobStageCount(job, 'waitlist')
     + getJobStageCount(job, 'offer')
 }
 
@@ -93,6 +96,7 @@ const statusBadgeClasses: Record<string, string> = {
   new: 'bg-blue-50 text-blue-700 ring-blue-200/60 dark:bg-blue-950 dark:text-blue-400 dark:ring-blue-800/40',
   screening: 'bg-violet-50 text-violet-700 ring-violet-200/60 dark:bg-violet-950 dark:text-violet-400 dark:ring-violet-800/40',
   interview: 'bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-950 dark:text-amber-400 dark:ring-amber-800/40',
+  waitlist: 'bg-rose-50 text-rose-700 ring-rose-200/60 dark:bg-rose-950 dark:text-rose-400 dark:ring-rose-800/40',
   offer: 'bg-teal-50 text-teal-700 ring-teal-200/60 dark:bg-teal-950 dark:text-teal-400 dark:ring-teal-800/40',
   hired: 'bg-green-50 text-green-700 ring-green-200/60 dark:bg-green-950 dark:text-green-400 dark:ring-green-800/40',
   rejected: 'bg-surface-100 text-surface-600 ring-surface-200 dark:bg-surface-800 dark:text-surface-400 dark:ring-surface-700',

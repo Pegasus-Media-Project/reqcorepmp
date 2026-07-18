@@ -22,6 +22,7 @@ export function useDashboard() {
     new: 0,
     screening: 0,
     interview: 0,
+    waitlist: 0,
     offer: 0,
     hired: 0,
     rejected: 0,

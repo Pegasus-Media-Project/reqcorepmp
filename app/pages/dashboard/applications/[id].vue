@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, User, Briefcase, Calendar, Clock, Hash, FileText, MessageSquare, Star, Copy, Check } from 'lucide-vue-next'
+import { ArrowLeft, User, Briefcase, Calendar, Clock, Hash, FileText, FileDown, MessageSquare, Star, Copy, Check } from 'lucide-vue-next'
 import { usePreviewReadOnly } from '~/composables/usePreviewReadOnly'
 
 definePageMeta({
@@ -50,6 +50,7 @@ const transitionLabels: Record<string, string> = {
   new: 'Re-open',
   screening: 'Move to Screening',
   interview: 'Move to Interview',
+  waitlist: 'Move to Waitlist',
   offer: 'Make Offer',
   hired: 'Mark Hired',
   rejected: 'Reject',
@@ -59,6 +60,7 @@ const transitionClasses: Record<string, string> = {
   new: 'border border-surface-300 dark:border-surface-700 bg-white/80 dark:bg-surface-900 text-surface-700 dark:text-surface-300 hover:border-surface-400 dark:hover:border-surface-600 hover:bg-surface-50 dark:hover:bg-surface-800',
   screening: 'bg-violet-600 text-white shadow-sm shadow-violet-900/20 hover:bg-violet-700',
   interview: 'bg-amber-600 text-white shadow-sm shadow-amber-900/20 hover:bg-amber-700',
+  waitlist: 'bg-rose-600 text-white shadow-sm shadow-rose-900/20 hover:bg-rose-700',
   offer: 'bg-teal-600 text-white shadow-sm shadow-teal-900/20 hover:bg-teal-700',
   hired: 'bg-green-700 text-white shadow-sm shadow-green-900/30 hover:bg-green-800',
   rejected: 'bg-danger-600 text-white shadow-sm shadow-danger-900/20 hover:bg-danger-700',
@@ -68,6 +70,7 @@ const transitionDotClasses: Record<string, string> = {
   new: 'bg-surface-400 dark:bg-surface-500',
   screening: 'bg-violet-200',
   interview: 'bg-amber-200',
+  waitlist: 'bg-rose-200',
   offer: 'bg-teal-200',
   hired: 'bg-green-100',
   rejected: 'bg-danger-200',
@@ -146,6 +149,7 @@ const statusBadgeClasses: Record<string, string> = {
   new: 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400',
   screening: 'bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-400',
   interview: 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400',
+  waitlist: 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-400',
   offer: 'bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-400',
   hired: 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400',
   rejected: 'bg-surface-100 text-surface-500 dark:bg-surface-800 dark:text-surface-400',
@@ -187,9 +191,19 @@ function formatResponseValue(value: unknown): string {
     <template v-else-if="application">
       <!-- Header -->
       <div class="mb-4 rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
-        <p class="mb-2 text-xs font-medium uppercase tracking-wide text-surface-500 dark:text-surface-400">
-          Application Overview
-        </p>
+        <div class="mb-2 flex items-center justify-between gap-2">
+          <p class="text-xs font-medium uppercase tracking-wide text-surface-500 dark:text-surface-400">
+            Application Overview
+          </p>
+          <a
+            :href="`/api/applications/${application.id}/export.pdf`"
+            target="_blank"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-surface-300 dark:border-surface-700 px-2.5 py-1.5 text-xs font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+          >
+            <FileDown class="size-3.5" />
+            Export PDF
+          </a>
+        </div>
         <div class="mb-2 flex flex-wrap items-center gap-2 text-surface-400">
           <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50 truncate">
             {{ formatCandidateName(application.candidate) }}

@@ -18,7 +18,7 @@ export function useApplication(id: MaybeRefOrGetter<string>) {
 
   /** Update application fields (status, notes, score) and refresh caches */
   async function updateApplication(payload: Partial<{
-    status: 'new' | 'screening' | 'interview' | 'offer' | 'hired' | 'rejected'
+    status: 'new' | 'screening' | 'interview' | 'waitlist' | 'offer' | 'hired' | 'rejected'
     notes: string | null
     score: number | null
   }>) {

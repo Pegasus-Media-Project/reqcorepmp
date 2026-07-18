@@ -22,6 +22,9 @@ definePageMeta({
 const route = useRoute()
 const localePath = useLocalePath()
 const jobId = route.params.id as string
+
+// Interview slot self-scheduling manager (modal)
+const showSlotManager = ref(false)
 const { handlePreviewReadOnlyError } = usePreviewReadOnly()
 const { track } = useTrack()
 const toast = useToast()
@@ -37,7 +40,7 @@ const { job: jobData, status: jobFetchStatus, error: jobError } = useJob(jobId)
 // Applications data
 // ─────────────────────────────────────────────
 
-const PIPELINE_STATUSES = ['new', 'screening', 'interview', 'offer', 'hired', 'rejected'] as const
+const PIPELINE_STATUSES = ['new', 'screening', 'interview', 'waitlist', 'offer', 'hired', 'rejected'] as const
 type PipelineStatus = typeof PIPELINE_STATUSES[number]
 
 // Read initial pipeline stage from URL query param (?stage=screening)
@@ -161,13 +164,14 @@ type StatusCountMap = {
   new: number
   screening: number
   interview: number
+  waitlist: number
   offer: number
   hired: number
   rejected: number
 }
 
 const statusCounts = computed(() => {
-  const counts: StatusCountMap = { new: 0, screening: 0, interview: 0, offer: 0, hired: 0, rejected: 0 }
+  const counts: StatusCountMap = { new: 0, screening: 0, interview: 0, waitlist: 0, offer: 0, hired: 0, rejected: 0 }
   const apiCounts = appData.value?.statusCounts
   if (apiCounts) {
     for (const status of PIPELINE_STATUSES) {
@@ -750,6 +754,7 @@ const transitionLabels: Record<string, string> = {
   new: 'Re-open',
   screening: 'Screening',
   interview: 'Interview',
+  waitlist: 'Waitlist',
   offer: 'Offer',
   hired: 'Hired',
   rejected: 'Reject',
@@ -759,6 +764,7 @@ const transitionClasses: Record<string, string> = {
   new: 'border border-surface-300 dark:border-surface-600 text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800',
   screening: 'bg-violet-600 text-white hover:bg-violet-700',
   interview: 'bg-amber-600 text-white hover:bg-amber-700',
+  waitlist: 'bg-rose-600 text-white hover:bg-rose-700',
   offer: 'bg-teal-600 text-white hover:bg-teal-700',
   hired: 'bg-green-700 text-white hover:bg-green-800',
   rejected: 'bg-danger-600 text-white hover:bg-danger-700',
@@ -1505,6 +1511,7 @@ function closeDocPreview() {
               'bg-blue-500 dark:bg-blue-400': status === 'new',
               'bg-violet-500 dark:bg-violet-400': status === 'screening',
               'bg-amber-500 dark:bg-amber-400': status === 'interview',
+              'bg-rose-500 dark:bg-rose-400': status === 'waitlist',
               'bg-teal-500 dark:bg-teal-400': status === 'offer',
               'bg-green-600 dark:bg-green-300': status === 'hired',
               'bg-surface-400 dark:bg-surface-500': status === 'rejected',
@@ -1520,9 +1527,31 @@ function closeDocPreview() {
             </span>
           </button>
 
+          <!-- Manage bookable interview slots (candidate self-scheduling) -->
+          <button
+            type="button"
+            class="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-surface-500 hover:bg-surface-100 hover:text-surface-700 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:text-surface-200 transition-all duration-200 focus:outline-none"
+            title="Manage interview slots"
+            @click="showSlotManager = true"
+          >
+            <Calendar class="size-4" />
+            <span class="hidden sm:inline">Interview slots</span>
+          </button>
+
+          <!-- Export the current stage's applications to PDF -->
+          <a
+            :href="`/api/jobs/${jobId}/applications/export.pdf?status=${focusStatus}`"
+            target="_blank"
+            class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-surface-500 hover:bg-surface-100 hover:text-surface-700 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:text-surface-200 transition-all duration-200 focus:outline-none"
+            :title="`Export ${focusStatus} applications to PDF`"
+          >
+            <Download class="size-4" />
+            <span class="hidden sm:inline">Export PDF</span>
+          </a>
+
           <!-- Fullscreen toggle -->
           <button
-            class="ml-auto flex shrink-0 cursor-pointer items-center justify-center rounded-lg p-2 text-surface-400 hover:bg-surface-100 hover:text-surface-600 dark:text-surface-500 dark:hover:bg-surface-800 dark:hover:text-surface-300 transition-all duration-200 focus:outline-none"
+            class="flex shrink-0 cursor-pointer items-center justify-center rounded-lg p-2 text-surface-400 hover:bg-surface-100 hover:text-surface-600 dark:text-surface-500 dark:hover:bg-surface-800 dark:hover:text-surface-300 transition-all duration-200 focus:outline-none"
             :title="isFullscreen ? 'Exit focus mode (Esc)' : 'Focus mode'"
             @click="toggleFullscreen"
           >
@@ -1873,6 +1902,7 @@ function closeDocPreview() {
                             'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:ring-blue-800': currentSummary.status === 'new',
                             'bg-violet-50 text-violet-700 ring-violet-200 dark:bg-violet-950/50 dark:text-violet-400 dark:ring-violet-800': currentSummary.status === 'screening',
                             'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:ring-amber-800': currentSummary.status === 'interview',
+                            'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-950/50 dark:text-rose-400 dark:ring-rose-800': currentSummary.status === 'waitlist',
                             'bg-teal-50 text-teal-700 ring-teal-200 dark:bg-teal-950/50 dark:text-teal-400 dark:ring-teal-800': currentSummary.status === 'offer',
                             'bg-green-50 text-green-700 ring-green-200 dark:bg-green-950/50 dark:text-green-400 dark:ring-green-800': currentSummary.status === 'hired',
                             'bg-surface-100 text-surface-500 ring-surface-200 dark:bg-surface-800/50 dark:text-surface-400 dark:ring-surface-700': currentSummary.status === 'rejected',
@@ -3045,6 +3075,13 @@ function closeDocPreview() {
       :teleport-target="teleportTarget"
       @close="showInterviewSidebar = false"
       @scheduled="handleInterviewScheduled"
+    />
+
+    <!-- Interview slot manager (candidate self-scheduling) -->
+    <InterviewSlotManager
+      :open="showSlotManager"
+      :job-id="jobId"
+      @close="showSlotManager = false"
     />
 
     <!-- Document Preview Modal -->

@@ -14,12 +14,15 @@
 /**
  * Allowed status transitions for applications.
  * - `hired` is terminal — no forward transitions
+ * - `waitlist` is a holding stage reachable from screening/interview; it can be
+ *   re-activated into the pipeline or resolved to offer/rejected
  * - `rejected` can be re-opened back to `new`
  */
 export const APPLICATION_STATUS_TRANSITIONS: Record<string, string[]> = {
   new: ['screening', 'interview', 'rejected'],
-  screening: ['interview', 'offer', 'rejected'],
-  interview: ['offer', 'rejected'],
+  screening: ['interview', 'waitlist', 'offer', 'rejected'],
+  interview: ['waitlist', 'offer', 'rejected'],
+  waitlist: ['interview', 'offer', 'rejected'],
   offer: ['hired', 'rejected'],
   hired: [],
   rejected: ['new'],

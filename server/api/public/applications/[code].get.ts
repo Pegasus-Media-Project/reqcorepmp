@@ -22,6 +22,7 @@ const STATUS_LABELS: Record<string, string> = {
   new: 'Received',
   screening: 'Under review',
   interview: 'Interviewing',
+  waitlist: 'Waitlisted',
   offer: 'Offer extended',
   hired: 'Hired',
   rejected: 'Not selected',

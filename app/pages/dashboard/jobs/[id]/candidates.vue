@@ -33,7 +33,7 @@ useSeoMeta({
 // Fetch applications for this job
 // ─────────────────────────────────────────────
 
-const STATUS_OPTIONS = ['new', 'screening', 'interview', 'offer', 'hired', 'rejected'] as const
+const STATUS_OPTIONS = ['new', 'screening', 'interview', 'waitlist', 'offer', 'hired', 'rejected'] as const
 type Status = typeof STATUS_OPTIONS[number]
 
 // useState scoped to this job so state persists across sub-navigation
@@ -92,6 +92,7 @@ const statusBadgeClasses: Record<string, string> = {
   new: 'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:ring-blue-800',
   screening: 'bg-violet-50 text-violet-700 ring-violet-200 dark:bg-violet-950/50 dark:text-violet-400 dark:ring-violet-800',
   interview: 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:ring-amber-800',
+  waitlist: 'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-950/50 dark:text-rose-400 dark:ring-rose-800',
   offer: 'bg-teal-50 text-teal-700 ring-teal-200 dark:bg-teal-950/50 dark:text-teal-400 dark:ring-teal-800',
   hired: 'bg-green-50 text-green-700 ring-green-200 dark:bg-green-950/50 dark:text-green-400 dark:ring-green-800',
   rejected: 'bg-surface-100 text-surface-500 ring-surface-200 dark:bg-surface-800/50 dark:text-surface-400 dark:ring-surface-700',
@@ -107,6 +108,7 @@ const statusLabels: Record<Status, string> = {
   new: 'New',
   screening: 'Screening',
   interview: 'Interview',
+  waitlist: 'Waitlist',
   offer: 'Offer',
   hired: 'Hired',
   rejected: 'Rejected',

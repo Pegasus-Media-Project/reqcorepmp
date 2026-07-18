@@ -17,8 +17,8 @@ const STAGES: { key: ReviewStage, label: string }[] = [
 ]
 
 // The interview review only appears once the applicant has reached the
-// interview stage (interview / offer / hired). Screening is always available.
-const INTERVIEW_REACHED = new Set(['interview', 'offer', 'hired'])
+// interview stage (interview / waitlist / offer / hired). Screening is always available.
+const INTERVIEW_REACHED = new Set(['interview', 'waitlist', 'offer', 'hired'])
 const visibleStages = computed(() =>
   STAGES.filter(s => s.key !== 'interview' || INTERVIEW_REACHED.has(props.status ?? '')),
 )

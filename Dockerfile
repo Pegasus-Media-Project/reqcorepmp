@@ -29,8 +29,12 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# PostgreSQL client tools for database backup via /api/updates/backup
-RUN apk add --no-cache postgresql16-client
+# PostgreSQL client tools for database backup via /api/updates/backup.
+# Chromium + fonts power server-side PDF export (server/utils/pdf.ts via
+# puppeteer-core). PUPPETEER_EXECUTABLE_PATH points puppeteer at the system binary.
+RUN apk add --no-cache postgresql16-client \
+  chromium nss freetype harfbuzz ca-certificates ttf-freefont
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 RUN addgroup -S reqcore && adduser -S reqcore -G reqcore
 

@@ -149,7 +149,7 @@ export function buildChatbotTools(ctx: ChatbotToolContext) {
         'use get_candidate / read_resume for deeper analysis.',
       inputSchema: z.object({
         jobId: z.string().min(1).describe('The job to list applications for.'),
-        status: z.enum(['new', 'screening', 'interview', 'offer', 'hired', 'rejected']).optional(),
+        status: z.enum(['new', 'screening', 'interview', 'waitlist', 'offer', 'hired', 'rejected']).optional(),
         limit: z.number().int().min(1).max(100).default(50),
       }),
       execute: async ({ jobId, status, limit }) => {

@@ -15,7 +15,7 @@ export const createApplicationSchema = z.object({
 
 /** Schema for updating an existing application (status transitions, notes, score) */
 export const updateApplicationSchema = z.object({
-  status: z.enum(['new', 'screening', 'interview', 'offer', 'hired', 'rejected']).optional(),
+  status: z.enum(['new', 'screening', 'interview', 'waitlist', 'offer', 'hired', 'rejected']).optional(),
   notes: z.string().max(5000).nullish(),
   score: z.number().int().min(0).max(100).nullish(),
 })
@@ -41,7 +41,7 @@ export const applicationQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   jobId: z.string().min(1).optional(),
   candidateId: z.string().min(1).optional(),
-  status: z.enum(['new', 'screening', 'interview', 'offer', 'hired', 'rejected']).optional(),
+  status: z.enum(['new', 'screening', 'interview', 'waitlist', 'offer', 'hired', 'rejected']).optional(),
   search: z.string().trim().max(200).optional(),
   score: z.enum(['high', 'medium', 'low', 'none']).optional(),
   interview: z.enum(['has-interview', 'no-interview']).optional(),
@@ -53,6 +53,17 @@ export const applicationQuerySchema = z.object({
 /** Reusable schema for `:id` route params */
 export const applicationIdParamSchema = z.object({
   id: z.string().min(1),
+})
+
+/**
+ * Schema for sending a custom email to a hand-picked set of applications.
+ * Subject/body may contain {{candidateName}}, {{candidateFirstName}},
+ * {{jobTitle}}, {{organizationName}} placeholders, rendered per-recipient.
+ */
+export const bulkEmailSchema = z.object({
+  applicationIds: z.array(z.string().min(1)).min(1, 'Select at least one applicant').max(500, 'Select at most 500 applicants'),
+  subject: z.string().trim().min(1, 'Subject is required').max(300),
+  body: z.string().trim().min(1, 'Message body is required').max(20000),
 })
 
 // Status transition rules are now in shared/status-transitions.ts

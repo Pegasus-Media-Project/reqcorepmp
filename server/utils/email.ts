@@ -783,6 +783,128 @@ export async function sendLifecycleEmail(params: LifecycleEmailParams): Promise<
   })
 }
 
+export interface BulkApplicantEmailParams {
+  to: string
+  /** Already-rendered subject (placeholders substituted by the caller). */
+  subject: string
+  /** Already-rendered plain-text body (placeholders substituted by the caller). */
+  body: string
+  organizationName?: string
+  logoUrl?: string
+}
+
+/**
+ * Send a one-off custom email to an applicant, wrapped in the standard branded
+ * shell. Used by the bulk-email tool to message a hand-picked set of applicants.
+ * Reuses the same provider routing and console fallback as every other email.
+ * Throws on transport failure so the caller can tally per-recipient results.
+ */
+export async function sendBulkApplicantEmail(params: BulkApplicantEmailParams): Promise<void> {
+  const orgName = params.organizationName?.trim() || 'Pegasus Media Project'
+  await sendEmail({
+    to: params.to,
+    subject: params.subject,
+    html: buildLifecycleEmailHtml({ orgName, logoUrl: params.logoUrl, bodyText: params.body }),
+    text: params.body,
+    resendTags: [{ name: 'category', value: 'bulk-applicant' }],
+    logFallback: `Bulk applicant email → ${params.to} | Subject: ${params.subject}`,
+    errorCategory: 'email.bulk_applicant_send_failed',
+  })
+}
+
+/** Built-in default template for a slot self-scheduling invitation. */
+export const DEFAULT_SLOT_INVITATION_SUBJECT = 'Schedule your interview for {{jobTitle}}'
+export const DEFAULT_SLOT_INVITATION_BODY = [
+  'Hi {{candidateFirstName}},',
+  '',
+  'We\'d like to invite you to interview for {{jobTitle}} at {{organizationName}}.',
+  '',
+  'Please pick a time that works for you using the link below:',
+  '{{bookingUrl}}',
+  '',
+  'This link expires on {{expiresAt}}.',
+  '',
+  'We look forward to speaking with you.',
+  '',
+  '{{organizationName}}',
+].join('\n')
+
+export interface SlotInvitationEmailParams {
+  to: string
+  /** Already-rendered subject (placeholders substituted by the caller). */
+  subject: string
+  /** Already-rendered plain-text body (placeholders substituted by the caller). */
+  body: string
+  organizationName?: string
+  logoUrl?: string
+}
+
+/**
+ * Send a "pick your interview time" invitation. Unlike a fixed-time interview
+ * invitation, there is no date/time or .ics at send time — the body carries a
+ * booking link the candidate uses to choose an available slot.
+ */
+export async function sendSlotInvitationEmail(params: SlotInvitationEmailParams): Promise<void> {
+  const orgName = params.organizationName?.trim() || 'Pegasus Media Project'
+  await sendEmail({
+    to: params.to,
+    subject: params.subject,
+    html: buildLifecycleEmailHtml({ orgName, logoUrl: params.logoUrl, bodyText: params.body }),
+    text: params.body,
+    resendTags: [{ name: 'category', value: 'slot-invitation' }],
+    logFallback: `Slot invitation email → ${params.to} | Subject: ${params.subject}`,
+    errorCategory: 'email.slot_invitation_send_failed',
+  })
+}
+
+/**
+ * Confirm a candidate's self-scheduled interview booking. Sent best-effort
+ * right after a slot is booked; attaches an .ics for the chosen time.
+ */
+export async function sendBookingConfirmationEmail(params: {
+  to: string
+  candidateFirstName: string
+  jobTitle: string
+  organizationName: string
+  interviewTitle: string
+  interviewDate: string
+  interviewTime: string
+  interviewLocation: string | null
+  icsContent?: string
+}): Promise<void> {
+  const lines = [
+    `${params.interviewTitle} — ${params.jobTitle}`,
+    `When: ${params.interviewDate} at ${params.interviewTime}`,
+    ...(params.interviewLocation ? [`Where: ${params.interviewLocation}`] : []),
+  ]
+  const subject = `Interview confirmed: ${params.interviewDate} at ${params.interviewTime}`
+  const html = `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;margin:0 auto;color:#09090b;">
+      <p style="font-size:14px;">Hi ${escapeHtml(params.candidateFirstName)},</p>
+      <p style="font-size:14px;">Your interview with ${escapeHtml(params.organizationName)} is confirmed.</p>
+      <table style="font-size:14px;border-collapse:collapse;margin:16px 0;">
+        ${lines.map(l => `<tr><td style="padding:4px 0;">${escapeHtml(l)}</td></tr>`).join('')}
+      </table>
+      <p style="font-size:13px;color:#52525b;">A calendar invite is attached. If you need to change this time, reply to this email.</p>
+    </div>
+  `.trim()
+  const text = `Hi ${params.candidateFirstName},\n\nYour interview with ${params.organizationName} is confirmed.\n\n${lines.join('\n')}\n\nA calendar invite is attached. If you need to change this time, reply to this email.`
+
+  await sendEmail({
+    to: params.to,
+    subject,
+    html,
+    text,
+    icsAttachment: params.icsContent ? Buffer.from(params.icsContent) : undefined,
+    resendTags: [{ name: 'category', value: 'slot-booking-confirmation' }],
+    logFallback:
+      `Booking confirmation → ${params.to} | ${params.interviewTitle} | ` +
+      `${params.interviewDate} at ${params.interviewTime}` +
+      (params.icsContent ? ' | .ics attached' : ''),
+    errorCategory: 'email.booking_confirmation_send_failed',
+  })
+}
+
 // ─────────────────────────────────────────────
 // Interview invitation emails
 // ─────────────────────────────────────────────

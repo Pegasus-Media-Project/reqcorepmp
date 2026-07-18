@@ -73,7 +73,7 @@ watch(searchInput, (val) => {
 
 // ── Status filter ─────────────────────────────────────────────────────────────
 
-const STATUS_OPTIONS = ['new', 'screening', 'interview', 'offer', 'hired', 'rejected'] as const
+const STATUS_OPTIONS = ['new', 'screening', 'interview', 'waitlist', 'offer', 'hired', 'rejected'] as const
 type Status = typeof STATUS_OPTIONS[number]
 
 const initialAppStatus = STATUS_OPTIONS.includes(route.query.status as any)
@@ -252,6 +252,7 @@ const statusLabels: Record<Status, string> = {
   new: 'New',
   screening: 'Screening',
   interview: 'Interview',
+  waitlist: 'Waitlist',
   offer: 'Offer',
   hired: 'Hired',
   rejected: 'Rejected',
@@ -370,6 +371,42 @@ function getPropertyValue(entity: { properties?: import('~~/shared/properties').
 
 // ── Application detail drawer ─────────────────────────────────────────────────
 const selectedApplicationId = ref<string | null>(null)
+
+// ── Bulk selection + email ────────────────────────────────────────────────────
+const selectedIds = ref<Set<string>>(new Set())
+const showBulkEmail = ref(false)
+
+function isSelected(id: string) {
+  return selectedIds.value.has(id)
+}
+
+function toggleSelect(id: string) {
+  const next = new Set(selectedIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  selectedIds.value = next
+}
+
+const allOnPageSelected = computed(() =>
+  filteredApplications.value.length > 0
+  && filteredApplications.value.every((a) => selectedIds.value.has(a.id)),
+)
+
+function toggleSelectAll() {
+  const next = new Set(selectedIds.value)
+  if (allOnPageSelected.value) {
+    for (const a of filteredApplications.value) next.delete(a.id)
+  } else {
+    for (const a of filteredApplications.value) next.add(a.id)
+  }
+  selectedIds.value = next
+}
+
+function clearSelection() {
+  selectedIds.value = new Set()
+}
+
+const selectedIdList = computed(() => [...selectedIds.value])
 </script>
 
 <template>
@@ -430,6 +467,32 @@ const selectedApplicationId = ref<string | null>(null)
       >
         <Maximize2 v-if="!isFullscreen" class="size-4" />
         <Minimize2 v-else class="size-4" />
+      </button>
+    </div>
+
+    <!-- Bulk selection action bar -->
+    <div
+      v-if="selectedIds.size > 0"
+      class="flex items-center gap-3 mb-4 rounded-lg border border-brand-200 dark:border-brand-800/60 bg-brand-50 dark:bg-brand-950/40 px-4 py-2.5"
+    >
+      <span class="text-sm font-medium text-brand-800 dark:text-brand-200">
+        {{ selectedIds.size }} selected
+      </span>
+      <button
+        type="button"
+        class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 transition-colors"
+        @click="showBulkEmail = true"
+      >
+        <Mail class="size-4" />
+        Email selected
+      </button>
+      <button
+        type="button"
+        class="ml-auto inline-flex items-center gap-1 text-xs text-brand-700 dark:text-brand-300 hover:text-brand-900 dark:hover:text-brand-100 transition-colors"
+        @click="clearSelection"
+      >
+        <X class="size-3" />
+        Clear selection
       </button>
     </div>
 
@@ -604,6 +667,17 @@ const selectedApplicationId = ref<string | null>(null)
         <table class="w-full text-sm">
           <thead>
             <tr class="bg-surface-50 dark:bg-surface-800/50 border-b border-surface-200 dark:border-surface-800">
+              <th class="w-10 px-4 py-3">
+                <button
+                  type="button"
+                  class="size-4 shrink-0 rounded border flex items-center justify-center transition-colors align-middle"
+                  :class="allOnPageSelected ? 'bg-brand-600 border-brand-600 text-white' : 'border-surface-300 dark:border-surface-600'"
+                  :aria-label="allOnPageSelected ? 'Deselect all' : 'Select all'"
+                  @click="toggleSelectAll"
+                >
+                  <Check v-if="allOnPageSelected" class="size-3" />
+                </button>
+              </th>
               <th class="text-left px-4 py-3 font-medium text-surface-500 dark:text-surface-400">
                 <button class="inline-flex items-center gap-1 hover:text-surface-900 dark:hover:text-surface-100 transition-colors" @click="toggleSort('name')">
                   Candidate
@@ -664,8 +738,20 @@ const selectedApplicationId = ref<string | null>(null)
               v-for="app in filteredApplications"
               :key="app.id"
               class="group bg-white dark:bg-surface-900 hover:bg-surface-50 dark:hover:bg-surface-800/60 transition-colors cursor-pointer [&>td]:align-top"
+              :class="isSelected(app.id) ? 'bg-brand-50/60 dark:bg-brand-950/20' : ''"
               @click="selectedApplicationId = app.id"
             >
+              <td class="w-10 px-4 py-3" @click.stop>
+                <button
+                  type="button"
+                  class="size-4 shrink-0 rounded border flex items-center justify-center transition-colors align-middle"
+                  :class="isSelected(app.id) ? 'bg-brand-600 border-brand-600 text-white' : 'border-surface-300 dark:border-surface-600'"
+                  :aria-label="isSelected(app.id) ? 'Deselect' : 'Select'"
+                  @click="toggleSelect(app.id)"
+                >
+                  <Check v-if="isSelected(app.id)" class="size-3" />
+                </button>
+              </td>
               <td class="px-4 py-3">
                 <button
                   type="button"
@@ -780,5 +866,13 @@ const selectedApplicationId = ref<string | null>(null)
     v-if="selectedApplicationId"
     :application-id="selectedApplicationId"
     @close="selectedApplicationId = null"
+  />
+
+  <!-- Bulk email modal -->
+  <BulkEmailModal
+    :open="showBulkEmail"
+    :application-ids="selectedIdList"
+    @close="showBulkEmail = false"
+    @sent="clearSelection"
   />
 </template>

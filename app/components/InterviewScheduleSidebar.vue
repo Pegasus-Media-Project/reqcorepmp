@@ -359,6 +359,32 @@ async function handleMoveToInterview() {
     isMoving.value = false
   }
 }
+
+// ─── Let the candidate self-schedule (send booking invite) ────────
+const isSendingInvite = ref(false)
+async function handleSendSlotInvite() {
+  isSendingInvite.value = true
+  errors.value = {}
+  try {
+    // Send the "pick a time" invitation, then advance the application to the
+    // interview stage (the actual interview row materializes when the candidate
+    // books a slot).
+    await $fetch(`/api/applications/${props.applicationId}/send-slot-invitation`, {
+      method: 'POST',
+      body: {},
+    })
+    await $fetch(`/api/applications/${props.applicationId}`, {
+      method: 'PATCH',
+      body: { status: 'interview' },
+    }).catch(() => { /* already in interview / non-fatal */ })
+    await refreshNuxtData('interviews')
+    emit('scheduled')
+  } catch (err: any) {
+    errors.value.submit = err?.data?.statusMessage ?? 'Failed to send scheduling invitation'
+  } finally {
+    isSendingInvite.value = false
+  }
+}
 </script>
 
 <template>
@@ -983,10 +1009,23 @@ async function handleMoveToInterview() {
                 {{ isSubmitting ? 'Scheduling…' : 'Schedule Interview' }}
               </button>
             </div>
+            <div
+              v-if="canScheduleInterviews"
+              class="mt-2.5 text-center"
+            >
+              <button
+                type="button"
+                :disabled="isSubmitting || isMoving || isSendingInvite"
+                class="text-[12px] font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 underline underline-offset-2 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                @click="handleSendSlotInvite"
+              >
+                {{ isSendingInvite ? 'Sending…' : 'Let the candidate pick a time (send scheduling link)' }}
+              </button>
+            </div>
             <div class="mt-2.5 text-center">
               <button
                 type="button"
-                :disabled="isSubmitting || isMoving"
+                :disabled="isSubmitting || isMoving || isSendingInvite"
                 class="text-[12px] text-surface-400 hover:text-surface-600 dark:text-surface-500 dark:hover:text-surface-300 underline underline-offset-2 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 @click="handleMoveToInterview"
               >

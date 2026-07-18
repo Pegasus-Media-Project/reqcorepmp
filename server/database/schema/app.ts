@@ -9,6 +9,7 @@ import {
   index,
   uniqueIndex,
   numeric,
+  check,
 } from 'drizzle-orm/pg-core'
 import { relations, sql } from 'drizzle-orm'
 import { organization, user } from './auth'
@@ -20,7 +21,7 @@ import { organization, user } from './auth'
 export const jobStatusEnum = pgEnum('job_status', ['draft', 'open', 'closed', 'archived'])
 export const jobTypeEnum = pgEnum('job_type', ['full_time', 'part_time', 'contract', 'internship'])
 export const applicationStatusEnum = pgEnum('application_status', [
-  'new', 'screening', 'interview', 'offer', 'hired', 'rejected',
+  'new', 'screening', 'interview', 'waitlist', 'offer', 'hired', 'rejected',
 ])
 export const documentTypeEnum = pgEnum('document_type', ['resume', 'cover_letter', 'other'])
 /**
@@ -679,6 +680,15 @@ export const interview = pgTable('interview', {
   googleCalendarEventLink: text('google_calendar_event_link'),
   /** IANA timezone for the scheduled time (e.g. 'America/New_York') */
   timezone: text('timezone').notNull().default('UTC'),
+  /**
+   * When this interview was created by a candidate booking a shared open slot,
+   * this references that slot. Null for recruiter-scheduled fixed-time interviews.
+   */
+  // NOTE: deliberately a plain column, not a Drizzle `.references()`. The FK is
+  // enforced by a hand-written statement in migration 0050 that the snapshot
+  // does not track; declaring it here as well would make the next `db:generate`
+  // emit a duplicate ADD CONSTRAINT.
+  slotId: text('slot_id'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (t) => ([
@@ -687,6 +697,7 @@ export const interview = pgTable('interview', {
   index('interview_scheduled_at_idx').on(t.scheduledAt),
   index('interview_status_idx').on(t.status),
   index('interview_created_by_id_idx').on(t.createdById),
+  index('interview_slot_id_idx').on(t.slotId),
 ]))
 
 /**
@@ -710,6 +721,77 @@ export const interviewReviewer = pgTable('interview_reviewer', {
   uniqueIndex('interview_reviewer_interview_user_idx').on(t.interviewId, t.userId),
   index('interview_reviewer_organization_id_idx').on(t.organizationId),
   index('interview_reviewer_interview_id_idx').on(t.interviewId),
+]))
+
+// ─────────────────────────────────────────────
+// Interview Slots (candidate self-scheduling)
+// ─────────────────────────────────────────────
+
+/** open = taking bookings, closed = no new bookings, cancelled = withdrawn. */
+export const interviewSlotStatusEnum = pgEnum('interview_slot_status', [
+  'open', 'closed', 'cancelled',
+])
+
+export const slotBookingStatusEnum = pgEnum('slot_booking_status', [
+  'confirmed', 'cancelled',
+])
+
+/**
+ * A shared, capacity-bounded, bookable interview time slot for a job.
+ * Recruiters define a pool of these; invited candidates book one first-come.
+ * A booking materializes a normal `interview` row (see interviewSlotBooking).
+ */
+export const interviewSlot = pgTable('interview_slot', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  jobId: text('job_id').notNull().references(() => job.id, { onDelete: 'cascade' }),
+  createdById: text('created_by_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  type: interviewTypeEnum('type').notNull().default('video'),
+  startsAt: timestamp('starts_at').notNull(),
+  duration: integer('duration').notNull().default(60),
+  timezone: text('timezone').notNull().default('UTC'),
+  location: text('location'),
+  interviewers: jsonb('interviewers').$type<string[]>(),
+  notes: text('notes'),
+  /** Maximum number of candidates that can book this slot. */
+  capacity: integer('capacity').notNull().default(1),
+  /** Current number of confirmed bookings — the race-safe availability counter. */
+  bookedCount: integer('booked_count').notNull().default(0),
+  status: interviewSlotStatusEnum('status').notNull().default('open'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (t) => ([
+  check('interview_slot_capacity_check', sql`${t.bookedCount} <= ${t.capacity}`),
+  index('interview_slot_organization_id_idx').on(t.organizationId),
+  index('interview_slot_job_id_idx').on(t.jobId),
+  index('interview_slot_starts_at_idx').on(t.startsAt),
+  index('interview_slot_status_idx').on(t.status),
+]))
+
+/**
+ * A candidate's booking of an interview slot. Carries the uniqueness constraint
+ * that prevents one application from holding more than one active booking, and
+ * links to the materialized `interview` row.
+ */
+export const interviewSlotBooking = pgTable('interview_slot_booking', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  slotId: text('slot_id').notNull().references(() => interviewSlot.id, { onDelete: 'cascade' }),
+  applicationId: text('application_id').notNull().references(() => application.id, { onDelete: 'cascade' }),
+  interviewId: text('interview_id').references(() => interview.id, { onDelete: 'set null' }),
+  status: slotBookingStatusEnum('status').notNull().default('confirmed'),
+  bookedAt: timestamp('booked_at').notNull().defaultNow(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (t) => ([
+  // One active (confirmed) booking per application, enforced at the DB level.
+  uniqueIndex('slot_booking_app_active_idx').on(t.applicationId).where(sql`status = 'confirmed'`),
+  // Exact-duplicate backstop: a given application books a given slot at most once.
+  uniqueIndex('slot_booking_slot_app_idx').on(t.slotId, t.applicationId),
+  index('slot_booking_organization_id_idx').on(t.organizationId),
+  index('slot_booking_slot_id_idx').on(t.slotId),
+  index('slot_booking_application_id_idx').on(t.applicationId),
 ]))
 
 // ─────────────────────────────────────────────
@@ -1230,6 +1312,8 @@ export const interviewReviewerRelations = relations(interviewReviewer, ({ one })
   interview: one(interview, { fields: [interviewReviewer.interviewId], references: [interview.id] }),
   user: one(user, { fields: [interviewReviewer.userId], references: [user.id] }),
 }))
+
+// (no relations() declared for the slot tables — the endpoints use explicit joins)
 
 export const emailTemplateRelations = relations(emailTemplate, ({ one }) => ({
   organization: one(organization, { fields: [emailTemplate.organizationId], references: [organization.id] }),

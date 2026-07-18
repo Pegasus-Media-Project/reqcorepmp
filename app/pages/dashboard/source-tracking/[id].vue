@@ -61,7 +61,7 @@ const {
 })
 
 const link = computed(() => detail.value?.link)
-const funnel = computed(() => detail.value?.funnel ?? { new: 0, screening: 0, interview: 0, offer: 0, hired: 0, rejected: 0 })
+const funnel = computed(() => detail.value?.funnel ?? { new: 0, screening: 0, interview: 0, waitlist: 0, offer: 0, hired: 0, rejected: 0 })
 const dailyTrend = computed(() => detail.value?.dailyTrend ?? [])
 const applications = computed(() => detail.value?.attributedApplications ?? [])
 const referrerDomains = computed(() => detail.value?.referrerDomains ?? [])
@@ -130,6 +130,7 @@ const statusBadgeClasses: Record<string, string> = {
   new: 'bg-blue-50 text-blue-700 ring-blue-200/60 dark:bg-blue-950 dark:text-blue-400 dark:ring-blue-800/40',
   screening: 'bg-violet-50 text-violet-700 ring-violet-200/60 dark:bg-violet-950 dark:text-violet-400 dark:ring-violet-800/40',
   interview: 'bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-950 dark:text-amber-400 dark:ring-amber-800/40',
+  waitlist: 'bg-rose-50 text-rose-700 ring-rose-200/60 dark:bg-rose-950 dark:text-rose-400 dark:ring-rose-800/40',
   offer: 'bg-teal-50 text-teal-700 ring-teal-200/60 dark:bg-teal-950 dark:text-teal-400 dark:ring-teal-800/40',
   hired: 'bg-green-50 text-green-700 ring-green-200/60 dark:bg-green-950 dark:text-green-400 dark:ring-green-800/40',
   rejected: 'bg-surface-100 text-surface-600 ring-surface-200 dark:bg-surface-800 dark:text-surface-400 dark:ring-surface-700',
@@ -177,7 +178,7 @@ const funnelTotal = computed(() =>
 )
 
 const funnelStages = computed(() => {
-  const stages = ['new', 'screening', 'interview', 'offer', 'hired', 'rejected'] as const
+  const stages = ['new', 'screening', 'interview', 'waitlist', 'offer', 'hired', 'rejected'] as const
   return stages.map((stage) => ({
     stage,
     count: funnel.value[stage] ?? 0,
@@ -562,6 +563,7 @@ async function handleSidebarUpdated() {
                       'bg-blue-500': s.stage === 'new',
                       'bg-violet-500': s.stage === 'screening',
                       'bg-amber-500': s.stage === 'interview',
+                      'bg-rose-500': s.stage === 'waitlist',
                       'bg-teal-500': s.stage === 'offer',
                       'bg-green-500': s.stage === 'hired',
                       'bg-surface-400 dark:bg-surface-500': s.stage === 'rejected',

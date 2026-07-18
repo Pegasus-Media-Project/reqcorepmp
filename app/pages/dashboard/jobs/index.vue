@@ -184,7 +184,7 @@ const statusPriority: Record<string, number> = {
 }
 
 function totalActive(pipeline: any) {
-  return (pipeline?.new ?? 0) + (pipeline?.screening ?? 0) + (pipeline?.interview ?? 0) + (pipeline?.offer ?? 0) + (pipeline?.hired ?? 0)
+  return (pipeline?.new ?? 0) + (pipeline?.screening ?? 0) + (pipeline?.interview ?? 0) + (pipeline?.waitlist ?? 0) + (pipeline?.offer ?? 0) + (pipeline?.hired ?? 0)
 }
 
 const sortedJobs = computed(() => {

@@ -127,7 +127,7 @@ export default defineEventHandler(async (event) => {
   ])
 
   // ─── Build funnel map ─────────────────────
-  const funnel: Record<string, number> = { new: 0, screening: 0, interview: 0, offer: 0, hired: 0, rejected: 0 }
+  const funnel: Record<string, number> = { new: 0, screening: 0, interview: 0, waitlist: 0, offer: 0, hired: 0, rejected: 0 }
   for (const row of statusBreakdown) {
     funnel[row.status] = row.count
   }
