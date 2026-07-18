@@ -131,8 +131,10 @@ async function send() {
           />
         </div>
 
+        <!-- v-text keeps the literal {{…}} placeholders out of template interpolation,
+             where a `}}` inside the string would terminate the expression early. -->
         <p class="text-[11px] text-surface-400 dark:text-surface-500 mb-4">
-          Placeholders: <code>{{ '{{candidateName}}' }}</code>, <code>{{ '{{candidateFirstName}}' }}</code>, <code>{{ '{{jobTitle}}' }}</code>, <code>{{ '{{organizationName}}' }}</code>
+          Placeholders: <code v-text="'{{candidateName}}'" />, <code v-text="'{{candidateFirstName}}'" />, <code v-text="'{{jobTitle}}'" />, <code v-text="'{{organizationName}}'" />
         </p>
 
         <div class="flex justify-end gap-2">
