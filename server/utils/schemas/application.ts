@@ -66,5 +66,10 @@ export const bulkEmailSchema = z.object({
   body: z.string().trim().min(1, 'Message body is required').max(20000),
 })
 
+/** Schema for exporting a hand-picked set of applications as one PDF. */
+export const bulkExportSchema = z.object({
+  applicationIds: z.array(z.string().min(1)).min(1, 'Select at least one applicant').max(200, 'Select at most 200 applicants'),
+})
+
 // Status transition rules are now in shared/status-transitions.ts
 // and re-exported above for backward compatibility.

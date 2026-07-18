@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FileText, Search, X, Briefcase, Mail, Clock, ArrowUp, ArrowDown, ArrowUpDown, SlidersHorizontal, Maximize2, Minimize2, Check, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { FileText, FileDown, Search, X, Briefcase, Mail, Clock, ArrowUp, ArrowDown, ArrowUpDown, SlidersHorizontal, Maximize2, Minimize2, Check, ChevronLeft, ChevronRight, Loader2 } from 'lucide-vue-next'
 
 definePageMeta({
   layout: 'dashboard',
@@ -407,6 +407,38 @@ function clearSelection() {
 }
 
 const selectedIdList = computed(() => [...selectedIds.value])
+
+const PDF_EXPORT_LIMIT = 200
+const exportingPdf = ref(false)
+const exportToast = useToast()
+
+async function exportSelectedPdf() {
+  if (exportingPdf.value) return
+  if (selectedIds.value.size > PDF_EXPORT_LIMIT) {
+    exportToast.error('Too many selected', { message: `PDF export is limited to ${PDF_EXPORT_LIMIT} applications at once.` })
+    return
+  }
+  exportingPdf.value = true
+  try {
+    const blob = await $fetch<Blob>('/api/applications/bulk/export.pdf', {
+      method: 'POST',
+      body: { applicationIds: selectedIdList.value },
+      responseType: 'blob',
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'applications-export.pdf'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+  catch (err: any) {
+    exportToast.error('PDF export failed', { message: err?.data?.statusMessage, statusCode: err?.data?.statusCode })
+  }
+  finally {
+    exportingPdf.value = false
+  }
+}
 </script>
 
 <template>
@@ -485,6 +517,16 @@ const selectedIdList = computed(() => [...selectedIds.value])
       >
         <Mail class="size-4" />
         Email selected
+      </button>
+      <button
+        type="button"
+        :disabled="exportingPdf"
+        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-300 dark:border-brand-700 px-3 py-1.5 text-sm font-semibold text-brand-700 dark:text-brand-300 hover:bg-brand-100 dark:hover:bg-brand-900/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        @click="exportSelectedPdf"
+      >
+        <Loader2 v-if="exportingPdf" class="size-4 animate-spin" />
+        <FileDown v-else class="size-4" />
+        {{ exportingPdf ? 'Exporting…' : 'Export PDFs' }}
       </button>
       <button
         type="button"
