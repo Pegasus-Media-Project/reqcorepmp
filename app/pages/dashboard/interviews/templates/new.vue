@@ -21,7 +21,7 @@ const { handlePreviewReadOnlyError } = usePreviewReadOnly()
 // ─── Form state ──────────────────────────────────────────────────
 const form = reactive({
   templateType: 'interview_invitation' as
-    | 'interview_invitation' | 'application_accepted' | 'application_rejected' | 'fee_verified' | 'documents_verified',
+    | 'interview_invitation' | 'application_accepted' | 'application_rejected' | 'fee_verified' | 'documents_verified' | 'self_schedule_invitation',
   name: '',
   subject: '',
   body: '',
@@ -33,6 +33,7 @@ const templateTypeOptions = [
   'application_rejected',
   'fee_verified',
   'documents_verified',
+  'self_schedule_invitation',
 ] as const
 
 const showPreview = ref(false)

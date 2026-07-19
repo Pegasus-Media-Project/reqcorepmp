@@ -14,6 +14,7 @@ export const EMAIL_TEMPLATE_TYPES = [
   'application_rejected',
   'fee_verified',
   'documents_verified',
+  'self_schedule_invitation',
 ] as const
 export type EmailTemplateType = (typeof EMAIL_TEMPLATE_TYPES)[number]
 
@@ -54,6 +55,15 @@ export const TEMPLATE_VARIABLES_BY_TYPE: Record<EmailTemplateType, readonly stri
   application_rejected: COMMON_LIFECYCLE_VARIABLES,
   fee_verified: COMMON_LIFECYCLE_VARIABLES,
   documents_verified: COMMON_LIFECYCLE_VARIABLES,
+  self_schedule_invitation: [
+    'candidateName',
+    'candidateFirstName',
+    'candidateLastName',
+    'jobTitle',
+    'organizationName',
+    'bookingUrl',
+    'expiresAt',
+  ],
 }
 
 const MAX_SUBJECT_LENGTH = 200

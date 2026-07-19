@@ -6,7 +6,7 @@ import {
   ChevronDown, Menu, X, Users, ChevronLeft,
   LayoutDashboard, Calendar, ArrowUpCircle,
   Sparkles, Radio, History,
-  MessageCircle, Lock, Star,
+  MessageCircle, Lock, Star, CalendarDays,
 } from 'lucide-vue-next'
 import type { PlanFeature } from '~~/shared/billing'
 
@@ -111,7 +111,7 @@ if (import.meta.client) {
 }
 const isGuest = computed(() => memberRole.value === 'guest')
 // Job sub-tabs a guest may see (review-only, no editing/settings).
-const GUEST_JOB_TABS = new Set(['Pipeline', 'Table', 'Ratings'])
+const GUEST_JOB_TABS = new Set(['Pipeline', 'Table', 'Ratings', 'Interviews'])
 // Top-level nav a guest may see.
 const GUEST_NAV = new Set(['Jobs', 'Interviews', 'Ratings'])
 
@@ -122,6 +122,7 @@ const jobTabs = computed(() => {
     { label: 'Pipeline', to: base, icon: Kanban, exact: true },
     { label: 'Table', to: `${base}/candidates`, icon: Table2, exact: true },
     { label: 'Ratings', to: `${base}/ratings`, icon: Star, exact: true },
+    { label: 'Interviews', to: `${base}/interviews`, icon: CalendarDays, exact: true },
     { label: 'Application Form', to: `${base}/application-form`, icon: FileText, exact: true },
     { label: 'Source Tracking', to: `${base}/source-tracking`, icon: Radio, exact: true },
     ...(aiScoringEnabled.value ? [{ label: 'AI Analysis', to: `${base}/ai-analysis`, icon: Sparkles, exact: true }] : []),

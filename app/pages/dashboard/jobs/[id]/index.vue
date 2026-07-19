@@ -1000,7 +1000,8 @@ const interviewEditErrors = ref<Record<string, string>>({})
 const isInterviewSaving = ref(false)
 const isInterviewTransitioning = ref(false)
 
-// Reschedule state
+// Reschedule state — slot-aware: prefer moving onto an open block; a one-off
+// time creates a matching block server-side.
 const rescheduleInterviewId = ref<string | null>(null)
 const rescheduleForm = reactive({
   date: '',
@@ -1009,6 +1010,52 @@ const rescheduleForm = reactive({
 })
 const isRescheduling = ref(false)
 const rescheduleError = ref('')
+
+interface RescheduleSlot {
+  id: string
+  startsAt: string
+  duration: number
+  status: string
+  available: number
+}
+const rescheduleSlots = ref<RescheduleSlot[]>([])
+const rescheduleSelectedSlotId = ref<string>('')
+const rescheduleSlotsLoading = ref(false)
+
+async function loadRescheduleSlots() {
+  rescheduleSlotsLoading.value = true
+  try {
+    const res = await $fetch<{ data: RescheduleSlot[] }>('/api/interview-slots', { query: { jobId } })
+    rescheduleSlots.value = res.data
+      .filter(s => s.status === 'open' && s.available > 0 && new Date(s.startsAt) > new Date())
+      .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
+  }
+  catch {
+    rescheduleSlots.value = []
+  }
+  finally {
+    rescheduleSlotsLoading.value = false
+  }
+}
+
+function selectRescheduleSlot(slotId: string) {
+  rescheduleSelectedSlotId.value = rescheduleSelectedSlotId.value === slotId ? '' : slotId
+  if (rescheduleSelectedSlotId.value) {
+    rescheduleForm.date = ''
+    rescheduleForm.time = ''
+  }
+}
+
+/** Typing a manual time switches back to the one-off path. */
+function clearRescheduleSlotSelection() {
+  rescheduleSelectedSlotId.value = ''
+}
+
+function formatRescheduleSlot(s: RescheduleSlot) {
+  return new Date(s.startsAt).toLocaleString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true,
+  })
+}
 
 function toggleInterviewExpand(id: string) {
   if (expandedInterviewId.value === id) {
@@ -1093,11 +1140,12 @@ async function handleInterviewTransition(interviewId: string, newStatus: Intervi
 
 function openReschedule(iv: Interview) {
   rescheduleInterviewId.value = iv.id
-  const d = new Date(iv.scheduledAt)
-  rescheduleForm.date = d.toISOString().slice(0, 10)
-  rescheduleForm.time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  rescheduleForm.date = ''
+  rescheduleForm.time = ''
   rescheduleForm.duration = iv.duration
+  rescheduleSelectedSlotId.value = ''
   rescheduleError.value = ''
+  loadRescheduleSlots()
 }
 
 function cancelReschedule() {
@@ -1107,27 +1155,36 @@ function cancelReschedule() {
 
 async function handleReschedule() {
   rescheduleError.value = ''
-  if (!rescheduleForm.date || !rescheduleForm.time) {
-    rescheduleError.value = 'Date and time are required'
+  const useSlot = !!rescheduleSelectedSlotId.value
+  if (!useSlot && (!rescheduleForm.date || !rescheduleForm.time)) {
+    rescheduleError.value = 'Pick an open block or enter a one-off date and time'
     return
   }
 
   isRescheduling.value = true
   try {
-    const scheduledAt = new Date(`${rescheduleForm.date}T${rescheduleForm.time}`).toISOString()
-    await $fetch(`/api/interviews/${rescheduleInterviewId.value}`, {
-      method: 'PATCH',
-      body: {
-        scheduledAt,
-        duration: rescheduleForm.duration,
-        status: 'scheduled',
-      },
-    })
+    const body = useSlot
+      ? { slotId: rescheduleSelectedSlotId.value }
+      : {
+          startsAt: new Date(`${rescheduleForm.date}T${rescheduleForm.time}`).toISOString(),
+          duration: rescheduleForm.duration,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }
+    const res = await $fetch<{ success: boolean, emailSent: boolean }>(
+      `/api/interviews/${rescheduleInterviewId.value}/reschedule`,
+      { method: 'POST', body },
+    )
+    toast.success('Interview rescheduled', res.emailSent ? 'Updated invite emailed to the candidate' : undefined)
     rescheduleInterviewId.value = null
     await refreshJobInterviews()
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
     rescheduleError.value = err?.data?.statusMessage ?? 'Failed to reschedule'
+    // A 409 means the block filled meanwhile — refresh the choices.
+    if (err?.status === 409 || err?.statusCode === 409) {
+      rescheduleSelectedSlotId.value = ''
+      loadRescheduleSlots()
+    }
   } finally {
     isRescheduling.value = false
   }
@@ -2336,6 +2393,32 @@ function closeDocPreview() {
                           <Calendar class="size-3.5" />
                           Reschedule Interview
                         </h4>
+
+                        <!-- Open blocks for this job -->
+                        <div class="mb-3">
+                          <label class="block text-[11px] font-medium text-surface-500 dark:text-surface-400 mb-1.5">Open blocks</label>
+                          <div v-if="rescheduleSlotsLoading" class="text-xs text-surface-400">Loading open blocks…</div>
+                          <div v-else-if="!rescheduleSlots.length" class="text-xs text-surface-400 dark:text-surface-500">
+                            No open blocks for this job — use a one-off time below (this adds a matching block).
+                          </div>
+                          <div v-else class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+                            <button
+                              v-for="s in rescheduleSlots"
+                              :key="s.id"
+                              type="button"
+                              class="rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors"
+                              :class="rescheduleSelectedSlotId === s.id
+                                ? 'border-brand-600 bg-brand-600 text-white'
+                                : 'border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-700 dark:text-surface-300 hover:border-brand-400'"
+                              @click.stop="selectRescheduleSlot(s.id)"
+                            >
+                              {{ formatRescheduleSlot(s) }} · {{ s.duration }}m
+                            </button>
+                          </div>
+                        </div>
+
+                        <!-- One-off fallback -->
+                        <label class="block text-[11px] font-medium text-surface-500 dark:text-surface-400 mb-1.5">…or a one-off time (adds a matching block)</label>
                         <div class="grid grid-cols-3 gap-3">
                           <div>
                             <label class="block text-[11px] font-medium text-surface-500 dark:text-surface-400 mb-1">Date</label>
@@ -2344,6 +2427,7 @@ function closeDocPreview() {
                               type="date"
                               class="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-2.5 py-1.5 text-sm text-surface-900 dark:text-surface-100 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                               @click.stop
+                              @input="clearRescheduleSlotSelection"
                             />
                           </div>
                           <div>
@@ -2353,6 +2437,7 @@ function closeDocPreview() {
                               type="time"
                               class="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-2.5 py-1.5 text-sm text-surface-900 dark:text-surface-100 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                               @click.stop
+                              @input="clearRescheduleSlotSelection"
                             />
                           </div>
                           <div>
@@ -2367,6 +2452,9 @@ function closeDocPreview() {
                             />
                           </div>
                         </div>
+                        <p class="mt-2 text-[11px] text-surface-400 dark:text-surface-500">
+                          The candidate gets an updated email and calendar invite for the new time.
+                        </p>
                         <p v-if="rescheduleError" class="mt-2 text-xs text-danger-600 dark:text-danger-400">{{ rescheduleError }}</p>
                         <div class="flex items-center justify-end gap-2 mt-3">
                           <button

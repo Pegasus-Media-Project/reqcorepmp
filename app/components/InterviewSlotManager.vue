@@ -81,7 +81,18 @@ const avail = reactive({
   breakStart: '',
   breakEnd: '',
   buffer: 0,
+  invitationTemplateId: '',
 })
+
+// Invitation template choices: the built-in default + this org's custom
+// self-schedule templates (other types use variables that don't exist here).
+const { templates: orgTemplates } = useEmailTemplates()
+const invitationTemplateOptions = computed(() => [
+  { value: '', label: 'Built-in: Self-Schedule Invitation' },
+  ...orgTemplates.value
+    .filter(t => (t as { templateType?: string }).templateType === 'self_schedule_invitation')
+    .map(t => ({ value: t.id, label: t.name })),
+])
 const hasAvailability = ref(false)
 const savingAvailability = ref(false)
 
@@ -111,6 +122,7 @@ async function loadAvailability() {
       avail.breakStart = (res.availability as any).breakStart ?? ''
       avail.breakEnd = (res.availability as any).breakEnd ?? ''
       avail.buffer = (res.availability as any).buffer ?? 0
+      avail.invitationTemplateId = (res.availability as any).invitationTemplateId ?? ''
     }
   }
   catch {
@@ -147,6 +159,7 @@ async function saveAvailability() {
           breakStart: avail.breakStart || null,
           breakEnd: avail.breakEnd || null,
           buffer: avail.buffer,
+          invitationTemplateId: avail.invitationTemplateId || null,
         },
       },
     )
@@ -345,6 +358,12 @@ function formatSlot(s: Slot) {
             </label>
           </div>
           <input v-model="avail.location" type="text" placeholder="Location / link (optional)" class="mt-2 w-full rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          <label class="mt-2 flex flex-col gap-1 text-[11px] text-surface-500">
+            Invitation email template
+            <select v-model="avail.invitationTemplateId" class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-2 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option v-for="o in invitationTemplateOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+            </select>
+          </label>
           <div class="flex items-center justify-between gap-4 mt-2.5">
             <span class="min-w-0 text-[11px] text-surface-500 dark:text-surface-400">
               Saving replaces future auto-generated times nobody has booked. Manual and booked times are kept.

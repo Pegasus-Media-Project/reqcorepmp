@@ -17,6 +17,8 @@ export const AVAILABLE_VARIABLES = [
   { key: '{{organizationName}}', desc: 'Your org name' },
   { key: '{{statusUrl}}', desc: 'Application status link' },
   { key: '{{actionUrl}}', desc: 'Next-step action link (sign/pay)' },
+  { key: '{{bookingUrl}}', desc: 'Self-schedule booking link' },
+  { key: '{{expiresAt}}', desc: 'Booking link expiry date' },
 ] as const
 
 /** Human-friendly labels for each lifecycle template type. */
@@ -26,6 +28,7 @@ export const EMAIL_TEMPLATE_TYPE_LABELS: Record<string, string> = {
   application_rejected: 'Rejection letter',
   fee_verified: 'Application fee verified',
   documents_verified: 'Documents verified',
+  self_schedule_invitation: 'Self-schedule invitation',
 }
 
 export function renderTemplatePreview(template: string, variables: Record<string, string>): string {

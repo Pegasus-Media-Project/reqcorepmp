@@ -681,6 +681,12 @@ export const interview = pgTable('interview', {
   /** IANA timezone for the scheduled time (e.g. 'America/New_York') */
   timezone: text('timezone').notNull().default('UTC'),
   /**
+   * iCalendar SEQUENCE for this interview's event — incremented on every
+   * reschedule so calendar clients treat the new .ics as an update to the
+   * original invite (same UID), not a second event.
+   */
+  icsSequence: integer('ics_sequence').notNull().default(0),
+  /**
    * When this interview was created by a candidate booking a shared open slot,
    * this references that slot. Null for recruiter-scheduled fixed-time interviews.
    */
@@ -809,6 +815,12 @@ export const jobInterviewAvailability = pgTable('job_interview_availability', {
   breakEnd: text('break_end'),
   /** Gap in minutes between consecutive interviews (0 = back-to-back). */
   buffer: integer('buffer').notNull().default(0),
+  /**
+   * Email template for the self-schedule invitation: a system template id
+   * (e.g. 'system-self-schedule') or a custom emailTemplate row id.
+   * Null = the built-in default.
+   */
+  invitationTemplateId: text('invitation_template_id'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (t) => ([
@@ -856,6 +868,7 @@ export const emailTemplateTypeEnum = pgEnum('email_template_type', [
   'application_rejected',
   'fee_verified',
   'documents_verified',
+  'self_schedule_invitation',
 ])
 
 /**

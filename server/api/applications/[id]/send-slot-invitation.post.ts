@@ -1,5 +1,6 @@
 import { and, eq, gt, lt, sql } from 'drizzle-orm'
-import { application, candidate, job, organization, careerPage, interviewSlot } from '../../../database/schema'
+import { application, candidate, job, organization, careerPage, interviewSlot, jobInterviewAvailability, emailTemplate } from '../../../database/schema'
+import { SYSTEM_TEMPLATES } from '~~/shared/system-templates'
 import { applicationIdParamSchema } from '../../../utils/schemas/application'
 import { sendSlotInvitationSchema } from '../../../utils/schemas/interviewSlot'
 import { buildBookingUrl } from '../../../utils/interview-token'
@@ -110,8 +111,41 @@ export default defineEventHandler(async (event) => {
     expiresAt,
   }
 
-  const subjectTemplate = body.customSubject || DEFAULT_SLOT_INVITATION_SUBJECT
-  const bodyTemplate = body.customBody || DEFAULT_SLOT_INVITATION_BODY
+  // Template resolution: explicit custom text → the job's configured template
+  // (system id or custom emailTemplate row) → the built-in default.
+  let subjectTemplate = DEFAULT_SLOT_INVITATION_SUBJECT
+  let bodyTemplate = DEFAULT_SLOT_INVITATION_BODY
+  if (body.customSubject && body.customBody) {
+    subjectTemplate = body.customSubject
+    bodyTemplate = body.customBody
+  }
+  else {
+    const availability = await db.query.jobInterviewAvailability.findFirst({
+      where: and(
+        eq(jobInterviewAvailability.jobId, app.jobId),
+        eq(jobInterviewAvailability.organizationId, orgId),
+      ),
+      columns: { invitationTemplateId: true },
+    })
+    const templateId = availability?.invitationTemplateId
+    if (templateId) {
+      const system = SYSTEM_TEMPLATES.find(t => t.id === templateId)
+      if (system) {
+        subjectTemplate = system.subject
+        bodyTemplate = system.body
+      }
+      else {
+        const custom = await db.query.emailTemplate.findFirst({
+          where: and(eq(emailTemplate.id, templateId), eq(emailTemplate.organizationId, orgId)),
+          columns: { subject: true, body: true },
+        })
+        if (custom) {
+          subjectTemplate = custom.subject
+          bodyTemplate = custom.body
+        }
+      }
+    }
+  }
 
   await sendSlotInvitationEmail({
     to: app.candidate.email,

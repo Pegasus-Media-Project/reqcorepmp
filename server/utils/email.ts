@@ -829,6 +829,25 @@ export const DEFAULT_SLOT_INVITATION_BODY = [
   '{{organizationName}}',
 ].join('\n')
 
+/** Built-in template for a reschedule notification (uses interview vars). */
+export const DEFAULT_RESCHEDULE_SUBJECT = 'Interview rescheduled: {{jobTitle}} at {{organizationName}}'
+export const DEFAULT_RESCHEDULE_BODY = [
+  'Hi {{candidateFirstName}},',
+  '',
+  'Your interview for {{jobTitle}} at {{organizationName}} has been rescheduled.',
+  '',
+  'New time:',
+  '- Date: {{interviewDate}}',
+  '- Time: {{interviewTime}}',
+  '- Duration: {{interviewDuration}} minutes',
+  '- Type: {{interviewType}}',
+  '- Location: {{interviewLocation}}',
+  '',
+  'The attached calendar invite replaces the previous one. Please confirm the new time using the links below.',
+  '',
+  '{{organizationName}}',
+].join('\n')
+
 export interface SlotInvitationEmailParams {
   to: string
   /** Already-rendered subject (placeholders substituted by the caller). */

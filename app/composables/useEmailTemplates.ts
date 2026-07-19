@@ -4,6 +4,7 @@ export type EmailTemplateType =
   | 'application_rejected'
   | 'fee_verified'
   | 'documents_verified'
+  | 'self_schedule_invitation'
 
 export interface EmailTemplate {
   id: string

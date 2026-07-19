@@ -25,6 +25,38 @@ const { interview, status: fetchStatus, error, updateInterview, deleteInterview,
 // Guests are read-only on interviews (can rate via ReviewPanel, not manage).
 const { allowed: canManageInterview } = usePermission({ interview: ['update'] })
 
+// ─── The application (right-hand panel) ──────────────────────────
+// While interviewing, the full application sits beside the interview info.
+const { data: interviewApplication } = useFetch(
+  () => interview.value?.applicationId ? `/api/applications/${interview.value.applicationId}` : null!,
+  {
+    key: computed(() => `interview-application-${interview.value?.applicationId ?? 'none'}`),
+    headers: useRequestHeaders(['cookie']),
+    watch: [() => interview.value?.applicationId],
+  },
+)
+
+const applicationResponseGroups = computed(() =>
+  groupResponsesBySection(interviewApplication.value?.responses ?? []),
+)
+
+const applicationStatusBadges: Record<string, string> = {
+  new: 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400',
+  screening: 'bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-400',
+  interview: 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400',
+  waitlist: 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-400',
+  offer: 'bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-400',
+  hired: 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400',
+  rejected: 'bg-surface-100 text-surface-500 dark:bg-surface-800 dark:text-surface-400',
+}
+
+function formatResponseValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '—'
+  if (Array.isArray(value)) return value.join(', ')
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  return String(value)
+}
+
 // ─── Assigned reviewers ──────────────────────────────────────────
 const showReviewersModal = ref(false)
 const { data: reviewersData, refresh: refreshReviewers } = useFetch(
@@ -187,7 +219,10 @@ async function saveNotes() {
   }
 }
 
-// ─── Reschedule ──────────────────────────────────────────────────
+// ─── Reschedule (slot-aware) ─────────────────────────────────────
+// Prefer moving onto one of the job's open blocks; a one-off time creates a
+// matching block server-side. Either way the candidate gets an updated email
+// and calendar invite.
 const showReschedule = ref(false)
 const rescheduleForm = reactive({
   date: '',
@@ -197,35 +232,96 @@ const rescheduleForm = reactive({
 const isRescheduling = ref(false)
 const rescheduleError = ref('')
 
+interface RescheduleSlot {
+  id: string
+  startsAt: string
+  duration: number
+  status: string
+  available: number
+}
+const rescheduleSlots = ref<RescheduleSlot[]>([])
+const rescheduleSelectedSlotId = ref('')
+const rescheduleSlotsLoading = ref(false)
+
+async function loadRescheduleSlots() {
+  if (!interview.value) return
+  rescheduleSlotsLoading.value = true
+  try {
+    const res = await $fetch<{ data: RescheduleSlot[] }>('/api/interview-slots', {
+      query: { jobId: interview.value.jobId },
+    })
+    rescheduleSlots.value = res.data
+      .filter(s => s.status === 'open' && s.available > 0 && new Date(s.startsAt) > new Date())
+      .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
+  }
+  catch {
+    rescheduleSlots.value = []
+  }
+  finally {
+    rescheduleSlotsLoading.value = false
+  }
+}
+
+function selectRescheduleSlot(slotId: string) {
+  rescheduleSelectedSlotId.value = rescheduleSelectedSlotId.value === slotId ? '' : slotId
+  if (rescheduleSelectedSlotId.value) {
+    rescheduleForm.date = ''
+    rescheduleForm.time = ''
+  }
+}
+
+function clearRescheduleSlotSelection() {
+  rescheduleSelectedSlotId.value = ''
+}
+
+function formatRescheduleSlot(s: RescheduleSlot) {
+  return new Date(s.startsAt).toLocaleString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true,
+  })
+}
+
 function openReschedule() {
   if (!interview.value) return
-  const d = new Date(interview.value.scheduledAt)
-  rescheduleForm.date = d.toISOString().slice(0, 10)
-  rescheduleForm.time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  rescheduleForm.date = ''
+  rescheduleForm.time = ''
   rescheduleForm.duration = interview.value.duration
+  rescheduleSelectedSlotId.value = ''
   rescheduleError.value = ''
   showReschedule.value = true
+  loadRescheduleSlots()
 }
 
 async function handleReschedule() {
   rescheduleError.value = ''
-  if (!rescheduleForm.date || !rescheduleForm.time) {
-    rescheduleError.value = 'Date and time are required'
+  const useSlot = !!rescheduleSelectedSlotId.value
+  if (!useSlot && (!rescheduleForm.date || !rescheduleForm.time)) {
+    rescheduleError.value = 'Pick an open block or enter a one-off date and time'
     return
   }
 
   isRescheduling.value = true
   try {
-    const scheduledAt = new Date(`${rescheduleForm.date}T${rescheduleForm.time}`).toISOString()
-    await updateInterview({
-      scheduledAt,
-      duration: rescheduleForm.duration,
-      status: 'scheduled',
-    })
+    const body = useSlot
+      ? { slotId: rescheduleSelectedSlotId.value }
+      : {
+          startsAt: new Date(`${rescheduleForm.date}T${rescheduleForm.time}`).toISOString(),
+          duration: rescheduleForm.duration,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }
+    const res = await $fetch<{ success: boolean, emailSent: boolean }>(
+      `/api/interviews/${interviewId}/reschedule`,
+      { method: 'POST', body },
+    )
+    toast.success('Interview rescheduled', res.emailSent ? 'Updated invite emailed to the candidate' : undefined)
     showReschedule.value = false
+    await refresh()
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
     rescheduleError.value = err.data?.statusMessage ?? 'Failed to reschedule'
+    if (err?.status === 409 || err?.statusCode === 409) {
+      rescheduleSelectedSlotId.value = ''
+      loadRescheduleSlots()
+    }
   } finally {
     isRescheduling.value = false
   }
@@ -480,6 +576,9 @@ const localePath = useLocalePath()
         </div>
       </div>
 
+      <!-- Two columns on large screens: interview process left, application right -->
+      <div class="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
+      <div>
       <!-- Reviewers -->
       <div class="mb-6 rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
         <div class="flex items-center justify-between mb-3">
@@ -714,8 +813,8 @@ const localePath = useLocalePath()
         </div>
       </Transition>
 
-      <!-- Detail cards -->
-      <div class="grid gap-4 md:grid-cols-2">
+      <!-- Interview detail cards -->
+      <div class="space-y-4 mb-6">
         <!-- Schedule info -->
         <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
           <div class="flex items-center gap-2 mb-3">
@@ -767,53 +866,8 @@ const localePath = useLocalePath()
           </dl>
         </div>
 
-        <!-- Candidate info -->
-        <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
-          <div class="flex items-center justify-between gap-2 mb-3">
-            <div class="flex items-center gap-2">
-              <UserRound class="size-4 text-surface-500 dark:text-surface-400" />
-              <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Candidate</h2>
-            </div>
-            <NuxtLink
-              :to="$localePath(`/dashboard/candidates/${interview.candidateId}`)"
-              class="inline-flex items-center gap-1 text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
-            >
-              View Profile
-              <ExternalLink class="size-3" />
-            </NuxtLink>
-          </div>
-          <dl class="grid grid-cols-1 gap-3 text-sm">
-            <div>
-              <dt class="text-surface-400">Name</dt>
-              <dd class="text-surface-700 dark:text-surface-200 font-medium">
-                {{ formatPersonName(interview.candidateFirstName, interview.candidateLastName) }}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-surface-400">Email</dt>
-              <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ interview.candidateEmail }}</dd>
-            </div>
-            <div v-if="interview.candidatePhone">
-              <dt class="text-surface-400">Phone</dt>
-              <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ interview.candidatePhone }}</dd>
-            </div>
-            <div>
-              <dt class="text-surface-400">Job</dt>
-              <dd>
-                <NuxtLink
-                  :to="$localePath(`/dashboard/jobs/${interview.jobId}`)"
-                  class="inline-flex items-center gap-1 font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
-                >
-                  {{ interview.jobTitle }}
-                  <ExternalLink class="size-3" />
-                </NuxtLink>
-              </dd>
-            </div>
-          </dl>
-        </div>
-
         <!-- Interviewers -->
-        <div v-if="interview.interviewers?.length" class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5 md:col-span-2">
+        <div v-if="interview.interviewers?.length" class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
           <div class="flex items-center gap-2 mb-3">
             <Users class="size-4 text-surface-500 dark:text-surface-400" />
             <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Interviewers</h2>
@@ -831,7 +885,7 @@ const localePath = useLocalePath()
         </div>
 
         <!-- Timestamps -->
-        <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5 md:col-span-2">
+        <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
           <dl class="flex flex-wrap gap-x-8 gap-y-2 text-sm">
             <div>
               <dt class="text-surface-400 inline-flex items-center gap-1"><Clock class="size-3.5" /> Created</dt>
@@ -905,6 +959,134 @@ const localePath = useLocalePath()
           Delete Interview
         </button>
       </div>
+      </div>
+
+      <!-- RIGHT column: the application -->
+      <div class="mt-6 lg:mt-0 space-y-4">
+        <!-- Candidate info -->
+        <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
+          <div class="flex items-center justify-between gap-2 mb-3">
+            <div class="flex items-center gap-2">
+              <UserRound class="size-4 text-surface-500 dark:text-surface-400" />
+              <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Candidate</h2>
+            </div>
+            <NuxtLink
+              :to="$localePath(`/dashboard/candidates/${interview.candidateId}`)"
+              class="inline-flex items-center gap-1 text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
+            >
+              View Profile
+              <ExternalLink class="size-3" />
+            </NuxtLink>
+          </div>
+          <dl class="grid grid-cols-1 gap-3 text-sm">
+            <div>
+              <dt class="text-surface-400">Name</dt>
+              <dd class="text-surface-700 dark:text-surface-200 font-medium">
+                {{ formatPersonName(interview.candidateFirstName, interview.candidateLastName) }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-surface-400">Email</dt>
+              <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ interview.candidateEmail }}</dd>
+            </div>
+            <div v-if="interview.candidatePhone">
+              <dt class="text-surface-400">Phone</dt>
+              <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ interview.candidatePhone }}</dd>
+            </div>
+            <div>
+              <dt class="text-surface-400">Job</dt>
+              <dd>
+                <NuxtLink
+                  :to="$localePath(`/dashboard/jobs/${interview.jobId}`)"
+                  class="inline-flex items-center gap-1 font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
+                >
+                  {{ interview.jobTitle }}
+                  <ExternalLink class="size-3" />
+                </NuxtLink>
+              </dd>
+            </div>
+          </dl>
+        </div>
+
+        <!-- Application -->
+        <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
+          <div class="flex items-center justify-between gap-2 mb-3">
+            <div class="flex items-center gap-2">
+              <FileText class="size-4 text-surface-500 dark:text-surface-400" />
+              <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Application</h2>
+              <span
+                v-if="interviewApplication?.status"
+                class="rounded-full px-2 py-0.5 text-[11px] font-medium capitalize"
+                :class="applicationStatusBadges[interviewApplication.status] ?? ''"
+              >
+                {{ interviewApplication.status }}
+              </span>
+            </div>
+            <NuxtLink
+              :to="$localePath(`/dashboard/applications/${interview.applicationId}`)"
+              class="inline-flex items-center gap-1 text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
+            >
+              Open Full Application
+              <ExternalLink class="size-3" />
+            </NuxtLink>
+          </div>
+
+          <div v-if="!interviewApplication" class="py-6 text-center text-sm text-surface-400">
+            Loading application…
+          </div>
+          <template v-else>
+            <dl class="flex flex-wrap gap-x-8 gap-y-2 text-sm mb-4">
+              <div v-if="interviewApplication.score != null">
+                <dt class="text-surface-400">Score</dt>
+                <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ interviewApplication.score }} / 100</dd>
+              </div>
+              <div>
+                <dt class="text-surface-400">Applied</dt>
+                <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ formatDate(interviewApplication.createdAt) }}</dd>
+              </div>
+            </dl>
+
+            <!-- Cover letter -->
+            <div v-if="interviewApplication.coverLetterText" class="mb-4">
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-1.5">Cover letter</h3>
+              <p class="text-sm text-surface-600 dark:text-surface-300 whitespace-pre-wrap max-h-48 overflow-y-auto">{{ interviewApplication.coverLetterText }}</p>
+            </div>
+
+            <!-- Question responses grouped by section -->
+            <div v-if="applicationResponseGroups.length" class="space-y-4">
+              <div v-for="group in applicationResponseGroups" :key="group.section?.id ?? 'default'">
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 border-b border-surface-100 dark:border-surface-800 pb-1 mb-2">
+                  {{ group.section?.title ?? 'Responses' }}
+                </h3>
+                <div class="space-y-2.5">
+                  <div v-for="r in group.responses" :key="(r as any).id">
+                    <div class="text-[13px] font-medium text-surface-700 dark:text-surface-300">{{ (r as any).question?.label }}</div>
+                    <div class="text-sm text-surface-600 dark:text-surface-400 whitespace-pre-wrap">{{ formatResponseValue((r as any).value) }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p v-else class="text-sm text-surface-400 italic">No question responses.</p>
+
+            <!-- Documents -->
+            <div v-if="interviewApplication.candidate?.documents?.length" class="mt-4">
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-1.5">Documents</h3>
+              <ul class="space-y-1">
+                <li
+                  v-for="doc in interviewApplication.candidate.documents"
+                  :key="doc.id"
+                  class="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-300"
+                >
+                  <FileText class="size-3.5 text-surface-400 shrink-0" />
+                  <span class="truncate">{{ doc.originalFilename ?? doc.type }}</span>
+                  <span class="text-xs text-surface-400">({{ doc.type }})</span>
+                </li>
+              </ul>
+            </div>
+          </template>
+        </div>
+      </div>
+      </div>
     </template>
 
     <!-- Reschedule Modal -->
@@ -919,26 +1101,52 @@ const localePath = useLocalePath()
           </div>
 
           <form class="space-y-4" @submit.prevent="handleReschedule">
+            <!-- Open blocks for this job -->
+            <div>
+              <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">Open blocks</label>
+              <div v-if="rescheduleSlotsLoading" class="text-xs text-surface-400">Loading open blocks…</div>
+              <div v-else-if="!rescheduleSlots.length" class="text-xs text-surface-400 dark:text-surface-500">
+                No open blocks for this job — use a one-off time below (this adds a matching block).
+              </div>
+              <div v-else class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                <button
+                  v-for="s in rescheduleSlots"
+                  :key="s.id"
+                  type="button"
+                  class="rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors"
+                  :class="rescheduleSelectedSlotId === s.id
+                    ? 'border-brand-600 bg-brand-600 text-white'
+                    : 'border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-700 dark:text-surface-300 hover:border-brand-400'"
+                  @click="selectRescheduleSlot(s.id)"
+                >
+                  {{ formatRescheduleSlot(s) }} · {{ s.duration }}m
+                </button>
+              </div>
+            </div>
+
+            <div class="text-xs font-medium text-surface-500 dark:text-surface-400">…or a one-off time (adds a matching block)</div>
             <div>
               <label for="reschedule-date" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-                Date <span class="text-danger-500">*</span>
+                Date
               </label>
               <input
                 id="reschedule-date"
                 v-model="rescheduleForm.date"
                 type="date"
                 class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
+                @input="clearRescheduleSlotSelection"
               />
             </div>
             <div>
               <label for="reschedule-time" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-                Time <span class="text-danger-500">*</span>
+                Time
               </label>
               <input
                 id="reschedule-time"
                 v-model="rescheduleForm.time"
                 type="time"
                 class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
+                @input="clearRescheduleSlotSelection"
               />
             </div>
             <div>
@@ -952,6 +1160,9 @@ const localePath = useLocalePath()
                 class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
               />
             </div>
+            <p class="text-[11px] text-surface-400 dark:text-surface-500">
+              The candidate gets an updated email and calendar invite for the new time.
+            </p>
 
             <div class="flex items-center justify-end gap-3 pt-2">
               <button

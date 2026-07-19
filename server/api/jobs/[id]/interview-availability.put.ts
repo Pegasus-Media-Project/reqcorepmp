@@ -63,6 +63,7 @@ export default defineEventHandler(async (event) => {
       breakStart: body.breakStart ?? null,
       breakEnd: body.breakEnd ?? null,
       buffer: body.buffer,
+      invitationTemplateId: body.invitationTemplateId ?? null,
       updatedAt: new Date(),
     }
     const [availability] = existing

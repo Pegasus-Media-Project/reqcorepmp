@@ -5,6 +5,7 @@ export type SystemTemplateType =
   | 'application_rejected'
   | 'fee_verified'
   | 'documents_verified'
+  | 'self_schedule_invitation'
 
 export interface SystemTemplate {
   id: string
@@ -162,6 +163,25 @@ We've confirmed receipt of your signed documents for the {{jobTitle}} position a
 You can check your application status here: {{statusUrl}}
 
 Best regards,
+{{organizationName}}`,
+  },
+  {
+    id: 'system-self-schedule',
+    type: 'self_schedule_invitation',
+    name: 'Self-Schedule Invitation',
+    description: 'Invites the candidate to pick their own interview time via a private booking link.',
+    subject: 'Schedule your interview for {{jobTitle}}',
+    body: `Hi {{candidateFirstName}},
+
+We'd like to invite you to interview for {{jobTitle}} at {{organizationName}}.
+
+Please pick a time that works for you using the link below:
+{{bookingUrl}}
+
+This link expires on {{expiresAt}}.
+
+We look forward to speaking with you.
+
 {{organizationName}}`,
   },
 ]

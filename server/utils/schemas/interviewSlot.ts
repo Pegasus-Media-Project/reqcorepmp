@@ -77,6 +77,8 @@ export const jobAvailabilitySchema = z.object({
   breakStart: z.string().regex(HHMM, 'Use 24h HH:MM').nullish(),
   breakEnd: z.string().regex(HHMM, 'Use 24h HH:MM').nullish(),
   buffer: z.number().int().min(0).max(120).default(0),
+  /** System template id or custom emailTemplate id; null = built-in default. */
+  invitationTemplateId: z.string().max(100).nullish(),
 }).refine(d => d.dateFrom <= d.dateTo, { message: 'End date must be on or after the start date', path: ['dateTo'] })
   .refine(d => d.windowStart < d.windowEnd, { message: 'Window end must be after its start', path: ['windowEnd'] })
   .refine((d) => {
@@ -86,6 +88,18 @@ export const jobAvailabilitySchema = z.object({
   }, { message: 'The daily window must fit at least one interview', path: ['windowEnd'] })
   .refine(d => !!d.breakStart === !!d.breakEnd, { message: 'Set both break times or neither', path: ['breakEnd'] })
   .refine(d => !d.breakStart || !d.breakEnd || d.breakStart < d.breakEnd, { message: 'Break end must be after its start', path: ['breakEnd'] })
+
+/**
+ * Recruiter: reschedule an interview onto an open block, or onto a one-off
+ * time (which materializes a matching block). Exactly one of slotId/startsAt.
+ */
+export const rescheduleInterviewSchema = z.object({
+  slotId: z.string().min(1).optional(),
+  startsAt: z.string().datetime({ message: 'Valid ISO 8601 datetime required' }).optional(),
+  duration: z.number().int().min(5).max(480).optional(),
+  timezone: z.string().max(100).optional(),
+}).refine(d => !!d.slotId !== !!d.startsAt, { message: 'Provide either a slot or a one-off time' })
+  .refine(d => !d.startsAt || new Date(d.startsAt) > new Date(), { message: 'The new time must be in the future', path: ['startsAt'] })
 
 /** Public: token identifies the invited application. */
 export const publicSlotsQuerySchema = z.object({
