@@ -123,6 +123,57 @@ describe('generateSlotStartTimes', () => {
     expect(withBreak).toEqual(without)
   })
 
+  it('explicit dates: only the given dates get slots', () => {
+    const times = generateSlotStartTimes(
+      cfg({ dates: [{ date: '2026-07-20' }, { date: '2026-07-23' }], windowEnd: '11:00' }),
+      PAST,
+    )
+    const dates = new Set(times.map(t => t.toISOString().slice(0, 10)))
+    expect([...dates].sort()).toEqual(['2026-07-20', '2026-07-23'])
+    // daysOfWeek is ignored in dates mode — Thursday (4) not in cfg's [1-5]? it is;
+    // use a Sunday to prove it: explicitly offered dates win over weekday filters.
+    const sunday = generateSlotStartTimes(
+      cfg({ dates: [{ date: '2026-07-26' }], daysOfWeek: [1], windowEnd: '10:00' }),
+      PAST,
+    )
+    expect(sunday.length).toBeGreaterThan(0)
+    expect(sunday[0]!.toISOString().slice(0, 10)).toBe('2026-07-26')
+  })
+
+  it('explicit dates: per-date windows override the default', () => {
+    const times = generateSlotStartTimes(
+      cfg({
+        dates: [
+          { date: '2026-07-20' }, // default window 09:00–17:00
+          { date: '2026-07-21', windowStart: '14:00', windowEnd: '16:00' },
+        ],
+      }),
+      PAST,
+    ).map(t => t.toISOString())
+    // Monday: 8 hourly starts from 13:00Z; Tuesday: only 18:00Z and 19:00Z (14:00/15:00 ET).
+    expect(times.filter(t => t.startsWith('2026-07-20'))).toHaveLength(8)
+    expect(times.filter(t => t.startsWith('2026-07-21'))).toEqual([
+      '2026-07-21T18:00:00.000Z',
+      '2026-07-21T19:00:00.000Z',
+    ])
+  })
+
+  it('explicit dates: break and buffer still apply', () => {
+    const times = generateSlotStartTimes(
+      cfg({
+        dates: [{ date: '2026-07-20', windowStart: '09:00', windowEnd: '12:00' }],
+        duration: 30,
+        buffer: 15,
+        breakStart: '10:00',
+        breakEnd: '10:30',
+      }),
+      PAST,
+    ).map(t => t.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: false, timeZone: 'America/New_York' }))
+    // Morning segment 09:00–10:00: 09:00 (09:45 next start won't fit before 10:00).
+    // After the break 10:30–12:00: 10:30, 11:15.
+    expect(times).toEqual(['09:00', '10:30', '11:15'])
+  })
+
   it('keeps wall-clock times stable across a DST transition', () => {
     // Fri 2026-03-06 (EST, UTC-5) and Mon 2026-03-09 (EDT, UTC-4) both offer 09:00 local.
     const times = generateSlotStartTimes(

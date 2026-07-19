@@ -805,8 +805,13 @@ export const jobInterviewAvailability = pgTable('job_interview_availability', {
   /** First and last calendar day (inclusive, in `timezone`) to offer times. */
   dateFrom: text('date_from').notNull(),
   dateTo: text('date_to').notNull(),
-  /** Days of week offered: 0 = Sunday … 6 = Saturday. */
+  /** Days of week offered: 0 = Sunday … 6 = Saturday (legacy weekday mode). */
   daysOfWeek: jsonb('days_of_week').$type<number[]>().notNull(),
+  /**
+   * Explicit dates to offer, each optionally overriding the daily window.
+   * When present this supersedes daysOfWeek: only these dates get slots.
+   */
+  dates: jsonb('dates').$type<Array<{ date: string, windowStart?: string, windowEnd?: string }>>(),
   /** Daily window in `timezone`, 24h "HH:MM" strings. */
   windowStart: text('window_start').notNull(),
   windowEnd: text('window_end').notNull(),

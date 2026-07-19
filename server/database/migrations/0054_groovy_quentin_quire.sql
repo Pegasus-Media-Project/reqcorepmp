@@ -1,0 +1,1 @@
+ALTER TABLE "job_interview_availability" ADD COLUMN "dates" jsonb;

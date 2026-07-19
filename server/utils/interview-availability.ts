@@ -6,6 +6,14 @@
  * as `interviewSlot` rows.
  */
 
+export interface AvailabilityDateEntry {
+  /** 'YYYY-MM-DD' in the config's timezone. */
+  date: string
+  /** Per-date window override; falls back to the config's default window. */
+  windowStart?: string
+  windowEnd?: string
+}
+
 export interface AvailabilityWindowConfig {
   /** Interview length in minutes; also the step between start times. */
   duration: number
@@ -14,9 +22,15 @@ export interface AvailabilityWindowConfig {
   /** First and last calendar day offered, inclusive, as 'YYYY-MM-DD' in `timezone`. */
   dateFrom: string
   dateTo: string
-  /** Days of week offered: 0 = Sunday … 6 = Saturday (in `timezone`). */
+  /** Days of week offered: 0 = Sunday … 6 = Saturday (legacy weekday mode). */
   daysOfWeek: number[]
-  /** Daily window, 24h 'HH:MM' strings in `timezone`. */
+  /**
+   * Explicit dates to offer — when non-empty this supersedes the
+   * dateFrom/dateTo × daysOfWeek sweep: ONLY these dates get slots, each
+   * optionally with its own window.
+   */
+  dates?: AvailabilityDateEntry[] | null
+  /** Default daily window, 24h 'HH:MM' strings in `timezone`. */
   windowStart: string
   windowEnd: string
   /** Optional daily break (e.g. lunch) — no slot may overlap it. */
@@ -86,13 +100,13 @@ function nextDay(dateStr: string): string {
 }
 
 /**
- * The bookable segments of one day, in minutes-since-midnight. Without a break
- * this is the whole window; with one, the window is split around it so slots
- * resume exactly at break end.
+ * The bookable segments of one day, in minutes-since-midnight, for the given
+ * window. Without a break this is the whole window; with one, the window is
+ * split around it so slots resume exactly at break end.
  */
-function daySegments(cfg: AvailabilityWindowConfig): Array<[number, number]> {
-  const startMin = toMinutes(cfg.windowStart)
-  const endMin = toMinutes(cfg.windowEnd)
+function daySegments(cfg: AvailabilityWindowConfig, windowStart: string, windowEnd: string): Array<[number, number]> {
+  const startMin = toMinutes(windowStart)
+  const endMin = toMinutes(windowEnd)
   if (!cfg.breakStart || !cfg.breakEnd) return [[startMin, endMin]]
   const bStart = Math.max(startMin, toMinutes(cfg.breakStart))
   const bEnd = Math.min(endMin, toMinutes(cfg.breakEnd))
@@ -105,22 +119,43 @@ function daySegments(cfg: AvailabilityWindowConfig): Array<[number, number]> {
  * capped at MAX_GENERATED_SLOTS. Within each bookable segment of a day, start
  * times step by `duration + buffer`; a slot is included only if the interview
  * fits inside the segment and starts after `now`.
+ *
+ * Days come from `dates` (explicit per-date mode, each date optionally with
+ * its own window) when non-empty, otherwise from the dateFrom/dateTo ×
+ * daysOfWeek sweep.
  */
 export function generateSlotStartTimes(cfg: AvailabilityWindowConfig, now: Date = new Date()): Date[] {
   const out: Date[] = []
   if (cfg.duration <= 0) return out
   const step = cfg.duration + Math.max(0, cfg.buffer ?? 0)
-  const segments = daySegments(cfg).filter(([s, e]) => e - s >= cfg.duration)
-  if (!segments.length) return out
 
-  const days = new Set(cfg.daysOfWeek)
-  for (let day = cfg.dateFrom; day <= cfg.dateTo; day = nextDay(day)) {
-    if (!days.has(dayOfWeek(day))) continue
+  // Resolve the day list: explicit dates, or the legacy weekday sweep.
+  let days: Array<{ date: string, windowStart: string, windowEnd: string }>
+  if (cfg.dates?.length) {
+    days = [...cfg.dates]
+      .sort((a, b) => a.date < b.date ? -1 : 1)
+      .map(d => ({
+        date: d.date,
+        windowStart: d.windowStart ?? cfg.windowStart,
+        windowEnd: d.windowEnd ?? cfg.windowEnd,
+      }))
+  }
+  else {
+    const wanted = new Set(cfg.daysOfWeek)
+    days = []
+    for (let day = cfg.dateFrom; day <= cfg.dateTo; day = nextDay(day)) {
+      if (!wanted.has(dayOfWeek(day))) continue
+      days.push({ date: day, windowStart: cfg.windowStart, windowEnd: cfg.windowEnd })
+    }
+  }
+
+  for (const day of days) {
+    const segments = daySegments(cfg, day.windowStart, day.windowEnd).filter(([s, e]) => e - s >= cfg.duration)
     for (const [segStart, segEnd] of segments) {
       for (let m = segStart; m + cfg.duration <= segEnd; m += step) {
         const hh = String(Math.floor(m / 60)).padStart(2, '0')
         const mm = String(m % 60).padStart(2, '0')
-        const startsAt = zonedTimeToUtc(day, `${hh}:${mm}`, cfg.timezone)
+        const startsAt = zonedTimeToUtc(day.date, `${hh}:${mm}`, cfg.timezone)
         if (startsAt <= now) continue
         out.push(startsAt)
         if (out.length >= MAX_GENERATED_SLOTS) return out

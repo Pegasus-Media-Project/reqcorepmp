@@ -71,7 +71,17 @@ export const jobAvailabilitySchema = z.object({
   capacity: z.number().int().min(1).max(100).default(1),
   dateFrom: z.string().regex(YMD, 'Use YYYY-MM-DD'),
   dateTo: z.string().regex(YMD, 'Use YYYY-MM-DD'),
-  daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1, 'Pick at least one day').max(7),
+  /** Legacy weekday mode; ignored when `dates` is provided. */
+  daysOfWeek: z.array(z.number().int().min(0).max(6)).max(7).default([]),
+  /**
+   * Explicit dates to offer — only these get slots. Each may override the
+   * default daily window.
+   */
+  dates: z.array(z.object({
+    date: z.string().regex(YMD, 'Use YYYY-MM-DD'),
+    windowStart: z.string().regex(HHMM, 'Use 24h HH:MM').optional(),
+    windowEnd: z.string().regex(HHMM, 'Use 24h HH:MM').optional(),
+  })).max(92, 'Select at most 92 dates').optional(),
   windowStart: z.string().regex(HHMM, 'Use 24h HH:MM'),
   windowEnd: z.string().regex(HHMM, 'Use 24h HH:MM'),
   breakStart: z.string().regex(HHMM, 'Use 24h HH:MM').nullish(),
@@ -100,6 +110,20 @@ export const jobAvailabilitySchema = z.object({
   }, { message: 'The daily window must fit at least one interview', path: ['windowEnd'] })
   .refine(d => !!d.breakStart === !!d.breakEnd, { message: 'Set both break times or neither', path: ['breakEnd'] })
   .refine(d => !d.breakStart || !d.breakEnd || d.breakStart < d.breakEnd, { message: 'Break end must be after its start', path: ['breakEnd'] })
+  .refine(d => (d.dates?.length ?? 0) > 0 || d.daysOfWeek.length > 0, { message: 'Select at least one date', path: ['dates'] })
+  .superRefine((d, ctx) => {
+    const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5))
+    for (const entry of d.dates ?? []) {
+      const start = entry.windowStart ?? d.windowStart
+      const end = entry.windowEnd ?? d.windowEnd
+      if (start >= end) {
+        ctx.addIssue({ code: 'custom', message: `${entry.date}: the window end must be after its start`, path: ['dates'] })
+      }
+      else if (toMin(end) - toMin(start) < d.duration) {
+        ctx.addIssue({ code: 'custom', message: `${entry.date}: the window is shorter than one interview`, path: ['dates'] })
+      }
+    }
+  })
 
 /**
  * Recruiter: reschedule an interview onto an open block, or onto a one-off

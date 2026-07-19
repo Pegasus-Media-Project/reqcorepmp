@@ -51,19 +51,10 @@ const interviewTypes = [
   { value: 'take_home', label: 'Take-Home' },
 ]
 
-// ── Job-level availability (length + windows → generated slots) ──────────────
-
-const DAY_OPTIONS = [
-  { value: 1, label: 'Mon' },
-  { value: 2, label: 'Tue' },
-  { value: 3, label: 'Wed' },
-  { value: 4, label: 'Thu' },
-  { value: 5, label: 'Fri' },
-  { value: 6, label: 'Sat' },
-  { value: 0, label: 'Sun' },
-]
+// ── Job-level availability (length + per-date windows → generated slots) ─────
 
 const DURATION_OPTIONS = [15, 20, 30, 45, 60, 90, 120]
+const MAX_DATE_ROWS = 92
 
 const BUFFER_OPTIONS = [0, 5, 10, 15, 20, 30]
 
@@ -75,7 +66,6 @@ const avail = reactive({
   location: '',
   dateFrom: '',
   dateTo: '',
-  daysOfWeek: [1, 2, 3, 4, 5] as number[],
   windowStart: '09:00',
   windowEnd: '17:00',
   breakStart: '',
@@ -83,6 +73,89 @@ const avail = reactive({
   buffer: 0,
   invitationTemplateId: '',
 })
+
+// Per-date rows: only checked dates get slots; each date can override the
+// default daily window.
+interface DateRow {
+  date: string
+  label: string
+  isWeekend: boolean
+  enabled: boolean
+  windowStart: string
+  windowEnd: string
+}
+const dateRows = ref<DateRow[]>([])
+const dateRangeTooLong = ref(false)
+
+function formatDateRowLabel(date: string): { label: string, isWeekend: boolean } {
+  const [y, m, d] = date.split('-').map(Number)
+  const dt = new Date(Date.UTC(y!, m! - 1, d!))
+  return {
+    label: dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }),
+    isWeekend: dt.getUTCDay() === 0 || dt.getUTCDay() === 6,
+  }
+}
+
+function nextDateStr(date: string): string {
+  const [y, m, d] = date.split('-').map(Number)
+  return new Date(Date.UTC(y!, m! - 1, d! + 1)).toISOString().slice(0, 10)
+}
+
+/**
+ * Rebuild the per-date rows for the current range, preserving what the user
+ * already toggled/customized. `presetDates` (from a saved availability)
+ * overrides the defaults for matching dates.
+ */
+function rebuildDateRows(presetDates?: Array<{ date: string, windowStart?: string | null, windowEnd?: string | null }>) {
+  if (!avail.dateFrom || !avail.dateTo || avail.dateFrom > avail.dateTo) {
+    dateRows.value = []
+    dateRangeTooLong.value = false
+    return
+  }
+  const existing = new Map(dateRows.value.map(r => [r.date, r]))
+  const preset = new Map((presetDates ?? []).map(p => [p.date, p]))
+  const rows: DateRow[] = []
+  dateRangeTooLong.value = false
+  for (let day = avail.dateFrom; day <= avail.dateTo; day = nextDateStr(day)) {
+    if (rows.length >= MAX_DATE_ROWS) {
+      dateRangeTooLong.value = true
+      break
+    }
+    const { label, isWeekend } = formatDateRowLabel(day)
+    const prev = existing.get(day)
+    const pre = preset.get(day)
+    rows.push({
+      date: day,
+      label,
+      isWeekend,
+      enabled: pre ? true : prev ? prev.enabled : (presetDates ? false : !isWeekend),
+      windowStart: pre?.windowStart ?? prev?.windowStart ?? avail.windowStart,
+      windowEnd: pre?.windowEnd ?? prev?.windowEnd ?? avail.windowEnd,
+    })
+  }
+  dateRows.value = rows
+}
+
+// From/To constraints: To can never precede From; range changes rebuild rows.
+watch(() => avail.dateFrom, (from) => {
+  if (from && avail.dateTo && avail.dateTo < from) avail.dateTo = from
+  rebuildDateRows()
+})
+watch(() => avail.dateTo, () => rebuildDateRows())
+
+const enabledDateRows = computed(() => dateRows.value.filter(r => r.enabled))
+
+/** Push the default daily window onto every date row. */
+function applyWindowToAllDates() {
+  for (const r of dateRows.value) {
+    r.windowStart = avail.windowStart
+    r.windowEnd = avail.windowEnd
+  }
+}
+
+function toggleAllDates(enabled: boolean) {
+  for (const r of dateRows.value) r.enabled = enabled
+}
 
 // Invitation template choices: the built-in default + this org's custom
 // self-schedule templates (other types use variables that don't exist here).
@@ -95,12 +168,6 @@ const invitationTemplateOptions = computed(() => [
 ])
 const hasAvailability = ref(false)
 const savingAvailability = ref(false)
-
-function toggleDay(day: number) {
-  avail.daysOfWeek = avail.daysOfWeek.includes(day)
-    ? avail.daysOfWeek.filter(d => d !== day)
-    : [...avail.daysOfWeek, day]
-}
 
 async function loadAvailability() {
   try {
@@ -116,13 +183,14 @@ async function loadAvailability() {
       avail.location = res.availability.location ?? ''
       avail.dateFrom = res.availability.dateFrom
       avail.dateTo = res.availability.dateTo
-      avail.daysOfWeek = res.availability.daysOfWeek
       avail.windowStart = res.availability.windowStart
       avail.windowEnd = res.availability.windowEnd
       avail.breakStart = (res.availability as any).breakStart ?? ''
       avail.breakEnd = (res.availability as any).breakEnd ?? ''
       avail.buffer = (res.availability as any).buffer ?? 0
       avail.invitationTemplateId = (res.availability as any).invitationTemplateId ?? ''
+      const savedDates = (res.availability as any).dates as Array<{ date: string, windowStart?: string, windowEnd?: string }> | null
+      rebuildDateRows(savedDates?.length ? savedDates : undefined)
     }
   }
   catch {
@@ -131,7 +199,9 @@ async function loadAvailability() {
 }
 
 const canSaveAvailability = computed(() =>
-  !!avail.dateFrom && !!avail.dateTo && avail.daysOfWeek.length > 0
+  !!avail.dateFrom && !!avail.dateTo && avail.dateFrom <= avail.dateTo
+  && enabledDateRows.value.length > 0
+  && enabledDateRows.value.every(r => r.windowStart < r.windowEnd)
   && !!avail.windowStart && !!avail.windowEnd && !!avail.title.trim()
   && !!avail.breakStart === !!avail.breakEnd,
 )
@@ -155,7 +225,11 @@ async function saveAvailability(opts: { priorMode: 'replace-all' | 'replace-auto
           timezone: localTz,
           dateFrom: avail.dateFrom,
           dateTo: avail.dateTo,
-          daysOfWeek: avail.daysOfWeek,
+          dates: enabledDateRows.value.map(r => ({
+            date: r.date,
+            windowStart: r.windowStart,
+            windowEnd: r.windowEnd,
+          })),
           windowStart: avail.windowStart,
           windowEnd: avail.windowEnd,
           breakStart: avail.breakStart || null,
@@ -178,7 +252,12 @@ async function saveAvailability(opts: { priorMode: 'replace-all' | 'replace-auto
   }
   catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    toast.error('Failed to save availability', { message: err?.data?.statusMessage, statusCode: err?.data?.statusCode })
+    // Surface the actual failing rule from a zod validation error when present.
+    const issue = err?.data?.data?.issues?.[0]?.message ?? err?.data?.data?.[0]?.message
+    toast.error('Failed to save availability', {
+      message: issue ?? err?.data?.statusMessage,
+      statusCode: err?.data?.statusCode,
+    })
   }
   finally {
     savingAvailability.value = false
@@ -429,14 +508,14 @@ function formatSlot(s: Slot) {
             </label>
             <label class="col-span-1 flex flex-col gap-1 text-[11px] text-surface-500">
               To
-              <input v-model="avail.dateTo" type="date" class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-2 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              <input v-model="avail.dateTo" type="date" :min="avail.dateFrom || undefined" class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-2 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
             </label>
             <label class="col-span-1 flex flex-col gap-1 text-[11px] text-surface-500">
-              Daily from
+              Default hours from
               <input v-model="avail.windowStart" type="time" class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-2 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
             </label>
             <label class="col-span-1 flex flex-col gap-1 text-[11px] text-surface-500">
-              Daily until
+              Default hours until
               <input v-model="avail.windowEnd" type="time" class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-2 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
             </label>
             <label class="col-span-1 flex flex-col gap-1 text-[11px] text-surface-500">
@@ -457,20 +536,62 @@ function formatSlot(s: Slot) {
           <p class="mt-1.5 text-[11px] text-surface-400 dark:text-surface-500">
             Leave the break fields empty for no break. Nothing can be booked during the break, and the gap is kept free between interviews.
           </p>
-          <div class="mt-2 flex flex-wrap items-center gap-1.5">
-            <button
-              v-for="d in DAY_OPTIONS"
-              :key="d.value"
-              type="button"
-              class="rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors"
-              :class="avail.daysOfWeek.includes(d.value)
-                ? 'bg-brand-600 text-white'
-                : 'bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 text-surface-500 dark:text-surface-400 hover:border-brand-400'"
-              @click="toggleDay(d.value)"
-            >
-              {{ d.label }}
-            </button>
-            <label class="ml-auto flex items-center gap-1.5 text-sm text-surface-600 dark:text-surface-300">
+          <!-- Per-date selection: only checked dates get slots; each can have
+               its own window. -->
+          <div v-if="dateRows.length" class="mt-2 rounded-lg border border-surface-200 dark:border-surface-800 bg-white/60 dark:bg-surface-900/40">
+            <div class="flex items-center gap-2 px-2.5 py-1.5 border-b border-surface-100 dark:border-surface-800">
+              <span class="text-[11px] font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400">
+                Dates ({{ enabledDateRows.length }}/{{ dateRows.length }} selected)
+              </span>
+              <button type="button" class="ml-auto text-[11px] text-brand-600 dark:text-brand-400 underline underline-offset-2" @click="toggleAllDates(true)">All</button>
+              <button type="button" class="text-[11px] text-brand-600 dark:text-brand-400 underline underline-offset-2" @click="toggleAllDates(false)">None</button>
+              <button type="button" class="text-[11px] text-brand-600 dark:text-brand-400 underline underline-offset-2" @click="applyWindowToAllDates">Apply default hours to all</button>
+            </div>
+            <div class="max-h-44 overflow-y-auto divide-y divide-surface-100 dark:divide-surface-800">
+              <div
+                v-for="r in dateRows"
+                :key="r.date"
+                class="flex items-center gap-2 px-2.5 py-1.5"
+                :class="r.enabled ? '' : 'opacity-50'"
+              >
+                <button
+                  type="button"
+                  class="size-4 shrink-0 rounded border flex items-center justify-center transition-colors"
+                  :class="r.enabled ? 'bg-brand-600 border-brand-600 text-white' : 'border-surface-300 dark:border-surface-600'"
+                  :aria-label="r.enabled ? `Exclude ${r.label}` : `Include ${r.label}`"
+                  @click="r.enabled = !r.enabled"
+                >
+                  <Check v-if="r.enabled" class="size-3" />
+                </button>
+                <span class="w-24 shrink-0 text-xs font-medium" :class="r.isWeekend ? 'text-surface-400 dark:text-surface-500' : 'text-surface-700 dark:text-surface-300'">
+                  {{ r.label }}
+                </span>
+                <input
+                  v-model="r.windowStart"
+                  type="time"
+                  :disabled="!r.enabled"
+                  class="rounded-md border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 px-1.5 py-1 text-xs text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-50"
+                />
+                <span class="text-[11px] text-surface-400">–</span>
+                <input
+                  v-model="r.windowEnd"
+                  type="time"
+                  :disabled="!r.enabled"
+                  class="rounded-md border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 px-1.5 py-1 text-xs text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-50"
+                />
+                <span v-if="r.enabled && r.windowStart >= r.windowEnd" class="text-[11px] text-danger-600 dark:text-danger-400">end before start</span>
+              </div>
+            </div>
+            <p v-if="dateRangeTooLong" class="px-2.5 py-1.5 text-[11px] text-amber-600 dark:text-amber-400 border-t border-surface-100 dark:border-surface-800">
+              Showing the first {{ dateRows.length }} days — shorten the range to manage the rest.
+            </p>
+          </div>
+          <p v-else class="mt-2 text-[11px] text-surface-400 dark:text-surface-500">
+            Pick a From and To date above, then choose which dates get interview slots.
+          </p>
+
+          <div class="mt-2 flex items-center justify-end">
+            <label class="flex items-center gap-1.5 text-sm text-surface-600 dark:text-surface-300">
               <span class="text-[11px] text-surface-500">Candidates per time</span>
               <input v-model.number="avail.capacity" type="number" min="1" max="100" class="w-14 rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
             </label>
