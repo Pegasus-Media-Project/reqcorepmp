@@ -361,6 +361,35 @@ async function handleMoveToInterview() {
 }
 
 // ─── Let the candidate self-schedule (send booking invite) ────────
+
+/** Who picks the interview time: the recruiter, or the candidate via a link. */
+const scheduleMode = ref<'fixed' | 'self'>('fixed')
+
+// jobId comes from the application (shared useFetch key — usually already
+// cached by the surrounding drawer/page).
+const { application: scheduleApplication } = useApplication(() => props.applicationId)
+const jobId = computed(() => scheduleApplication.value?.jobId ?? null)
+const localePath = useLocalePath()
+
+/** Open, future, not-full slot count for the job — null while unknown. */
+const openSlotCount = ref<number | null>(null)
+watch([jobId, scheduleMode], async ([jid, mode]) => {
+  if (!jid || mode !== 'self') return
+  openSlotCount.value = null
+  try {
+    const res = await $fetch<{ data: Array<{ status: string, available: number, startsAt: string }> }>(
+      '/api/interview-slots',
+      { query: { jobId: jid } },
+    )
+    openSlotCount.value = res.data
+      .filter(s => s.status === 'open' && s.available > 0 && new Date(s.startsAt) > new Date())
+      .length
+  }
+  catch {
+    openSlotCount.value = null
+  }
+}, { immediate: true })
+
 const isSendingInvite = ref(false)
 async function handleSendSlotInvite() {
   isSendingInvite.value = true
@@ -557,6 +586,31 @@ async function handleSendSlotInvite() {
               {{ errors.submit }}
             </div>
 
+            <!-- Who picks the time -->
+            <div class="grid grid-cols-2 gap-1 rounded-xl bg-surface-100 dark:bg-surface-800 p-1">
+              <button
+                type="button"
+                class="rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer"
+                :class="scheduleMode === 'fixed'
+                  ? 'bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 shadow-sm'
+                  : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200'"
+                @click="scheduleMode = 'fixed'"
+              >
+                Pick a time
+              </button>
+              <button
+                type="button"
+                class="rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer"
+                :class="scheduleMode === 'self'
+                  ? 'bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 shadow-sm'
+                  : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200'"
+                @click="scheduleMode = 'self'"
+              >
+                Candidate picks a time
+              </button>
+            </div>
+
+            <template v-if="scheduleMode === 'fixed'">
             <!-- Candidate notification -->
             <div>
               <label class="block text-[13px] font-medium text-surface-700 dark:text-surface-300 mb-2.5">
@@ -965,13 +1019,50 @@ async function handleSendSlotInvite() {
                 class="w-full rounded-xl border border-surface-200 dark:border-surface-700/80 bg-surface-50/50 dark:bg-surface-800/50 px-4 py-2.5 text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 focus:bg-white dark:focus:bg-surface-800 transition-all resize-none"
               />
             </div>
+            </template>
+
+            <!-- Self-schedule mode -->
+            <template v-else>
+              <div class="rounded-xl border border-surface-200 dark:border-surface-700/80 bg-surface-50/50 dark:bg-surface-800/40 p-4">
+                <div class="flex items-center gap-2 mb-1.5">
+                  <Send class="size-4 text-brand-500 dark:text-brand-400" />
+                  <span class="text-sm font-semibold text-surface-900 dark:text-surface-100">Candidate picks the time</span>
+                </div>
+                <p class="text-[13px] text-surface-500 dark:text-surface-400">
+                  {{ candidateName }} gets an email with a private scheduling link and chooses one of this
+                  job's open interview times. Booking a time creates the interview automatically.
+                </p>
+                <div class="mt-3 text-[13px]">
+                  <span v-if="openSlotCount === null" class="text-surface-400 dark:text-surface-500">Checking open times…</span>
+                  <span v-else-if="openSlotCount === 0" class="flex items-start gap-2 text-amber-700 dark:text-amber-400">
+                    <AlertCircle class="size-4 shrink-0 mt-0.5" />
+                    <span>
+                      No open interview times for this job yet.
+                      <NuxtLink
+                        v-if="jobId"
+                        :to="localePath(`/dashboard/jobs/${jobId}?slots=1`)"
+                        class="font-medium underline underline-offset-2"
+                        @click="emit('close')"
+                      >
+                        Set availability
+                      </NuxtLink>
+                      first — the link would show an empty calendar.
+                    </span>
+                  </span>
+                  <span v-else class="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+                    <CheckCircle2 class="size-4" />
+                    {{ openSlotCount }} open time{{ openSlotCount === 1 ? '' : 's' }} available to book
+                  </span>
+                </div>
+              </div>
+            </template>
 
           </div>
 
           <!-- Footer with preview + submit -->
           <div class="shrink-0 border-t border-surface-200/60 dark:border-surface-800/40 bg-white/80 dark:bg-surface-900/80 backdrop-blur-sm px-6 py-4">
             <!-- Preview -->
-            <div v-if="form.date && form.time" class="mb-3 flex items-center gap-2 min-w-0">
+            <div v-if="scheduleMode === 'fixed' && form.date && form.time" class="mb-3 flex items-center gap-2 min-w-0">
               <Calendar class="size-3.5 shrink-0 text-brand-500 dark:text-brand-400" />
               <span class="text-[12px] font-semibold text-surface-800 dark:text-surface-200 truncate">{{ formattedDateTime }}</span>
               <span class="text-[12px] text-surface-400 dark:text-surface-500 shrink-0">· {{ form.duration }}m</span>
@@ -1000,7 +1091,7 @@ async function handleSendSlotInvite() {
                 Cancel
               </button>
               <button
-                v-if="canScheduleInterviews"
+                v-if="canScheduleInterviews && scheduleMode === 'fixed'"
                 type="button"
                 :disabled="isSubmitting || isMoving"
                 class="flex-[1.5] rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-sm shadow-brand-600/20 dark:shadow-brand-500/10"
@@ -1008,18 +1099,15 @@ async function handleSendSlotInvite() {
               >
                 {{ isSubmitting ? 'Scheduling…' : 'Schedule Interview' }}
               </button>
-            </div>
-            <div
-              v-if="canScheduleInterviews"
-              class="mt-2.5 text-center"
-            >
               <button
+                v-else-if="canScheduleInterviews"
                 type="button"
-                :disabled="isSubmitting || isMoving || isSendingInvite"
-                class="text-[12px] font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 underline underline-offset-2 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                :disabled="isSendingInvite || isMoving || openSlotCount === 0"
+                class="flex-[1.5] inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-sm shadow-brand-600/20 dark:shadow-brand-500/10"
                 @click="handleSendSlotInvite"
               >
-                {{ isSendingInvite ? 'Sending…' : 'Let the candidate pick a time (send scheduling link)' }}
+                <Send class="size-4" />
+                {{ isSendingInvite ? 'Sending…' : 'Send scheduling link' }}
               </button>
             </div>
             <div class="mt-2.5 text-center">

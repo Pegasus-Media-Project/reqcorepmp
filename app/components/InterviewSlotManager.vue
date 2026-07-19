@@ -23,6 +23,7 @@ interface Slot {
   bookedCount: number
   available: number
   status: 'open' | 'closed' | 'cancelled'
+  generated?: boolean
 }
 
 const slots = ref<Slot[]>([])
@@ -50,6 +51,111 @@ const interviewTypes = [
   { value: 'take_home', label: 'Take-Home' },
 ]
 
+// ── Job-level availability (length + windows → generated slots) ──────────────
+
+const DAY_OPTIONS = [
+  { value: 1, label: 'Mon' },
+  { value: 2, label: 'Tue' },
+  { value: 3, label: 'Wed' },
+  { value: 4, label: 'Thu' },
+  { value: 5, label: 'Fri' },
+  { value: 6, label: 'Sat' },
+  { value: 0, label: 'Sun' },
+]
+
+const DURATION_OPTIONS = [15, 20, 30, 45, 60, 90, 120]
+
+const avail = reactive({
+  title: 'Interview',
+  type: 'video',
+  duration: 60,
+  capacity: 1,
+  location: '',
+  dateFrom: '',
+  dateTo: '',
+  daysOfWeek: [1, 2, 3, 4, 5] as number[],
+  windowStart: '09:00',
+  windowEnd: '17:00',
+})
+const hasAvailability = ref(false)
+const savingAvailability = ref(false)
+
+function toggleDay(day: number) {
+  avail.daysOfWeek = avail.daysOfWeek.includes(day)
+    ? avail.daysOfWeek.filter(d => d !== day)
+    : [...avail.daysOfWeek, day]
+}
+
+async function loadAvailability() {
+  try {
+    const res = await $fetch<{ availability: (typeof avail & { id: string }) | null }>(
+      `/api/jobs/${props.jobId}/interview-availability`,
+    )
+    if (res.availability) {
+      hasAvailability.value = true
+      avail.title = res.availability.title
+      avail.type = res.availability.type
+      avail.duration = res.availability.duration
+      avail.capacity = res.availability.capacity
+      avail.location = res.availability.location ?? ''
+      avail.dateFrom = res.availability.dateFrom
+      avail.dateTo = res.availability.dateTo
+      avail.daysOfWeek = res.availability.daysOfWeek
+      avail.windowStart = res.availability.windowStart
+      avail.windowEnd = res.availability.windowEnd
+    }
+  }
+  catch {
+    // Non-fatal — the manual slot list still works.
+  }
+}
+
+const canSaveAvailability = computed(() =>
+  !!avail.dateFrom && !!avail.dateTo && avail.daysOfWeek.length > 0
+  && !!avail.windowStart && !!avail.windowEnd && !!avail.title.trim(),
+)
+
+async function saveAvailability() {
+  if (!canSaveAvailability.value || savingAvailability.value) return
+  savingAvailability.value = true
+  try {
+    const res = await $fetch<{ created: number, removed: number, truncated: boolean }>(
+      `/api/jobs/${props.jobId}/interview-availability`,
+      {
+        method: 'PUT',
+        body: {
+          title: avail.title.trim(),
+          type: avail.type,
+          duration: avail.duration,
+          capacity: avail.capacity,
+          location: avail.location.trim() || null,
+          timezone: localTz,
+          dateFrom: avail.dateFrom,
+          dateTo: avail.dateTo,
+          daysOfWeek: avail.daysOfWeek,
+          windowStart: avail.windowStart,
+          windowEnd: avail.windowEnd,
+        },
+      },
+    )
+    hasAvailability.value = true
+    toast.success(
+      'Availability saved',
+      `${res.created} time${res.created === 1 ? '' : 's'} generated`
+      + (res.removed ? `, ${res.removed} replaced` : '')
+      + (res.truncated ? ' (capped — narrow the date range for more control)' : ''),
+    )
+    await loadSlots()
+  }
+  catch (err: any) {
+    if (handlePreviewReadOnlyError(err)) return
+    toast.error('Failed to save availability', { message: err?.data?.statusMessage, statusCode: err?.data?.statusCode })
+  }
+  finally {
+    savingAvailability.value = false
+  }
+}
+
 async function loadSlots() {
   loading.value = true
   try {
@@ -73,6 +179,7 @@ watch(() => props.open, (open) => {
     form.capacity = 1
     form.location = ''
     loadSlots()
+    loadAvailability()
   }
 })
 
@@ -156,11 +263,80 @@ function formatSlot(s: Slot) {
           </button>
         </div>
         <p class="text-xs text-surface-500 dark:text-surface-400 mb-4 shrink-0">
-          Define bookable times. Invited candidates pick an open slot first-come. Times are in your local timezone ({{ localTz }}).
+          Set availability for the whole job — invited candidates pick an open time first-come. Times are in your local timezone ({{ localTz }}).
         </p>
 
-        <!-- Create form -->
-        <div class="rounded-xl border border-surface-200 dark:border-surface-800 p-3 mb-4 shrink-0">
+        <div class="flex-1 overflow-y-auto -mx-1 px-1">
+        <!-- Job availability -->
+        <div class="rounded-xl border border-brand-200 dark:border-brand-800/60 bg-brand-50/40 dark:bg-brand-950/20 p-3 mb-4">
+          <div class="text-xs font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-300 mb-2">
+            Availability
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <input v-model="avail.title" type="text" placeholder="Interview title" class="col-span-2 rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            <select v-model="avail.type" class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option v-for="t in interviewTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
+            </select>
+            <select v-model.number="avail.duration" class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option v-for="d in DURATION_OPTIONS" :key="d" :value="d">{{ d }} min</option>
+            </select>
+            <label class="col-span-1 flex flex-col gap-1 text-[11px] text-surface-500">
+              From
+              <input v-model="avail.dateFrom" type="date" class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-2 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </label>
+            <label class="col-span-1 flex flex-col gap-1 text-[11px] text-surface-500">
+              To
+              <input v-model="avail.dateTo" type="date" class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-2 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </label>
+            <label class="col-span-1 flex flex-col gap-1 text-[11px] text-surface-500">
+              Daily from
+              <input v-model="avail.windowStart" type="time" class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-2 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </label>
+            <label class="col-span-1 flex flex-col gap-1 text-[11px] text-surface-500">
+              Daily until
+              <input v-model="avail.windowEnd" type="time" class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-2 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </label>
+          </div>
+          <div class="mt-2 flex flex-wrap items-center gap-1.5">
+            <button
+              v-for="d in DAY_OPTIONS"
+              :key="d.value"
+              type="button"
+              class="rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors"
+              :class="avail.daysOfWeek.includes(d.value)
+                ? 'bg-brand-600 text-white'
+                : 'bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 text-surface-500 dark:text-surface-400 hover:border-brand-400'"
+              @click="toggleDay(d.value)"
+            >
+              {{ d.label }}
+            </button>
+            <label class="ml-auto flex items-center gap-1.5 text-sm text-surface-600 dark:text-surface-300">
+              <span class="text-[11px] text-surface-500">Candidates per time</span>
+              <input v-model.number="avail.capacity" type="number" min="1" max="100" class="w-14 rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </label>
+          </div>
+          <input v-model="avail.location" type="text" placeholder="Location / link (optional)" class="mt-2 w-full rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          <div class="flex items-center justify-between mt-2.5">
+            <span class="text-[11px] text-surface-500 dark:text-surface-400">
+              Saving replaces future auto-generated times nobody has booked. Manual and booked times are kept.
+            </span>
+            <button
+              :disabled="!canSaveAvailability || savingAvailability"
+              class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              @click="saveAvailability"
+            >
+              <Loader2 v-if="savingAvailability" class="size-4 animate-spin" />
+              <CalendarClock v-else class="size-4" />
+              {{ hasAvailability ? 'Update availability' : 'Save availability' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- One-off slot form -->
+        <div class="rounded-xl border border-surface-200 dark:border-surface-800 p-3 mb-4">
+          <div class="text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">
+            Add a one-off time
+          </div>
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
             <input v-model="form.title" type="text" placeholder="Title (e.g. Phone screen)" class="col-span-2 sm:col-span-3 rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
             <input v-model="form.date" type="date" class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
@@ -192,12 +368,12 @@ function formatSlot(s: Slot) {
         </div>
 
         <!-- Slot list -->
-        <div class="flex-1 overflow-y-auto -mx-1 px-1">
+        <div>
           <div v-if="loading" class="flex items-center justify-center py-8 text-surface-400">
             <Loader2 class="size-5 animate-spin" />
           </div>
           <div v-else-if="!slots.length" class="py-8 text-center text-sm text-surface-500 dark:text-surface-400">
-            No slots yet. Add one above.
+            No bookable times yet. Save availability above (or add a one-off time).
           </div>
           <div v-else class="space-y-1.5">
             <div
@@ -207,7 +383,10 @@ function formatSlot(s: Slot) {
               :class="s.status === 'cancelled' ? 'opacity-50' : ''"
             >
               <div class="min-w-0 flex-1">
-                <div class="text-sm font-medium text-surface-800 dark:text-surface-200 truncate">{{ s.title }}</div>
+                <div class="text-sm font-medium text-surface-800 dark:text-surface-200 truncate">
+                  {{ s.title }}
+                  <span v-if="s.generated" class="ml-1 rounded bg-surface-100 dark:bg-surface-800 px-1 py-0.5 text-[10px] font-normal text-surface-500 dark:text-surface-400 align-middle">auto</span>
+                </div>
                 <div class="text-xs text-surface-500">{{ formatSlot(s) }} · {{ s.duration }}m</div>
               </div>
               <span
@@ -234,6 +413,7 @@ function formatSlot(s: Slot) {
               </button>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>

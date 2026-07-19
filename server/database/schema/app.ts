@@ -759,6 +759,12 @@ export const interviewSlot = pgTable('interview_slot', {
   /** Current number of confirmed bookings — the race-safe availability counter. */
   bookedCount: integer('booked_count').notNull().default(0),
   status: interviewSlotStatusEnum('status').notNull().default('open'),
+  /**
+   * True when this slot was produced by the job's availability settings
+   * (jobInterviewAvailability). Regenerating availability replaces future
+   * unbooked generated slots but never touches manual ones.
+   */
+  generated: boolean('generated').notNull().default(false),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (t) => ([
@@ -767,6 +773,42 @@ export const interviewSlot = pgTable('interview_slot', {
   index('interview_slot_job_id_idx').on(t.jobId),
   index('interview_slot_starts_at_idx').on(t.startsAt),
   index('interview_slot_status_idx').on(t.status),
+]))
+
+/**
+ * Job-level interview availability: the interview length and the recurring
+ * time windows in which candidates may self-schedule. Saving this generates
+ * the concrete `interviewSlot` rows candidates book against (marked
+ * `generated: true`); the slot pool remains the single booking substrate.
+ * One row per job.
+ */
+export const jobInterviewAvailability = pgTable('job_interview_availability', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  jobId: text('job_id').notNull().references(() => job.id, { onDelete: 'cascade' }),
+  /** Title copied onto generated slots (and thus onto booked interviews). */
+  title: text('title').notNull().default('Interview'),
+  type: interviewTypeEnum('type').notNull().default('video'),
+  /** Interview length in minutes; also the step between generated start times. */
+  duration: integer('duration').notNull().default(60),
+  /** IANA timezone the windows are expressed in. */
+  timezone: text('timezone').notNull().default('UTC'),
+  location: text('location'),
+  /** Candidates per generated slot. */
+  capacity: integer('capacity').notNull().default(1),
+  /** First and last calendar day (inclusive, in `timezone`) to offer times. */
+  dateFrom: text('date_from').notNull(),
+  dateTo: text('date_to').notNull(),
+  /** Days of week offered: 0 = Sunday … 6 = Saturday. */
+  daysOfWeek: jsonb('days_of_week').$type<number[]>().notNull(),
+  /** Daily window in `timezone`, 24h "HH:MM" strings. */
+  windowStart: text('window_start').notNull(),
+  windowEnd: text('window_end').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (t) => ([
+  uniqueIndex('job_interview_availability_job_id_idx').on(t.jobId),
+  index('job_interview_availability_organization_id_idx').on(t.organizationId),
 ]))
 
 /**

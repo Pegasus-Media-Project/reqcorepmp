@@ -58,6 +58,30 @@ export const sendSlotInvitationSchema = z.object({
   customBody: z.string().max(20000).optional(),
 })
 
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
+const YMD = /^\d{4}-\d{2}-\d{2}$/
+
+/** Recruiter: job-level availability (length + windows) for self-scheduling. */
+export const jobAvailabilitySchema = z.object({
+  title: z.string().trim().min(1, 'Title is required').max(200).default('Interview'),
+  type: z.enum(interviewTypes).default('video'),
+  duration: z.number().int().min(5).max(480).default(60),
+  timezone: z.string().min(1).max(100),
+  location: z.string().max(500).nullish(),
+  capacity: z.number().int().min(1).max(100).default(1),
+  dateFrom: z.string().regex(YMD, 'Use YYYY-MM-DD'),
+  dateTo: z.string().regex(YMD, 'Use YYYY-MM-DD'),
+  daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1, 'Pick at least one day').max(7),
+  windowStart: z.string().regex(HHMM, 'Use 24h HH:MM'),
+  windowEnd: z.string().regex(HHMM, 'Use 24h HH:MM'),
+}).refine(d => d.dateFrom <= d.dateTo, { message: 'End date must be on or after the start date', path: ['dateTo'] })
+  .refine(d => d.windowStart < d.windowEnd, { message: 'Window end must be after its start', path: ['windowEnd'] })
+  .refine((d) => {
+    const [sh, sm] = d.windowStart.split(':').map(Number)
+    const [eh, em] = d.windowEnd.split(':').map(Number)
+    return (eh! * 60 + em!) - (sh! * 60 + sm!) >= d.duration
+  }, { message: 'The daily window must fit at least one interview', path: ['windowEnd'] })
+
 /** Public: token identifies the invited application. */
 export const publicSlotsQuerySchema = z.object({
   token: z.string().min(1, 'Token is required'),

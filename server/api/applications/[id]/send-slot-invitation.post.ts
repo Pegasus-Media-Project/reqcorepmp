@@ -1,5 +1,5 @@
-import { and, eq } from 'drizzle-orm'
-import { application, candidate, job, organization, careerPage } from '../../../database/schema'
+import { and, eq, gt, lt, sql } from 'drizzle-orm'
+import { application, candidate, job, organization, careerPage, interviewSlot } from '../../../database/schema'
 import { applicationIdParamSchema } from '../../../utils/schemas/application'
 import { sendSlotInvitationSchema } from '../../../utils/schemas/interviewSlot'
 import { buildBookingUrl } from '../../../utils/interview-token'
@@ -49,6 +49,24 @@ export default defineEventHandler(async (event) => {
   }
   if (!app.candidate.email) {
     throw createError({ statusCode: 422, statusMessage: 'Candidate has no email address on file.' })
+  }
+
+  // Don't send a scheduling link that leads to an empty calendar.
+  const [bookable] = await db.select({ id: interviewSlot.id })
+    .from(interviewSlot)
+    .where(and(
+      eq(interviewSlot.jobId, app.jobId),
+      eq(interviewSlot.organizationId, orgId),
+      eq(interviewSlot.status, 'open'),
+      gt(interviewSlot.startsAt, new Date()),
+      lt(interviewSlot.bookedCount, sql`${interviewSlot.capacity}`),
+    ))
+    .limit(1)
+  if (!bookable) {
+    throw createError({
+      statusCode: 422,
+      statusMessage: 'This job has no open interview times. Set availability (or add slots) on the job page first.',
+    })
   }
 
   // Resolve org name + logo (same logic as the application-confirmation email).
