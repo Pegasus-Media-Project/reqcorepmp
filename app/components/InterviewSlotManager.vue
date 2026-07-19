@@ -234,7 +234,9 @@ async function saveAvailability(opts: { priorMode: 'replace-all' | 'replace-auto
           windowEnd: avail.windowEnd,
           breakStart: avail.breakStart || null,
           breakEnd: avail.breakEnd || null,
-          buffer: avail.buffer,
+          // NOT `buffer:` — a truthy top-level `buffer` makes ofetch treat the
+          // body as binary and send "[object Object]" instead of JSON.
+          bufferMinutes: avail.buffer,
           invitationTemplateId: avail.invitationTemplateId || null,
         },
       },
@@ -278,6 +280,8 @@ async function loadSlots() {
   }
 }
 
+// `immediate` — the modal can mount already open (?slots=1 deep link), in
+// which case a lazy watcher would never fire and nothing would load.
 watch(() => props.open, (open) => {
   if (open) {
     form.title = ''
@@ -289,7 +293,7 @@ watch(() => props.open, (open) => {
     loadSlots()
     loadAvailability()
   }
-})
+}, { immediate: true })
 
 async function createSlot() {
   if (!form.title.trim() || !form.date || !form.time || creating.value) return

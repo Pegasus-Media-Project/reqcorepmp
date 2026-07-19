@@ -20,6 +20,7 @@ export default defineEventHandler(async (event) => {
 
   const { id } = await getValidatedRouterParams(event, idParamSchema.parse)
   const body = await readValidatedBody(event, jobAvailabilitySchema.parse)
+  const bufferMinutes = body.bufferMinutes ?? body.buffer ?? 0
 
   const jobRow = await db.query.job.findFirst({
     where: and(eq(job.id, id), eq(job.organizationId, orgId)),
@@ -41,7 +42,7 @@ export default defineEventHandler(async (event) => {
     windowEnd: body.windowEnd,
     breakStart: body.breakStart,
     breakEnd: body.breakEnd,
-    buffer: body.buffer,
+    buffer: bufferMinutes,
   })
 
   const result = await db.transaction(async (tx) => {
@@ -65,7 +66,7 @@ export default defineEventHandler(async (event) => {
       windowEnd: body.windowEnd,
       breakStart: body.breakStart ?? null,
       breakEnd: body.breakEnd ?? null,
-      buffer: body.buffer,
+      buffer: bufferMinutes,
       invitationTemplateId: body.invitationTemplateId ?? null,
       updatedAt: new Date(),
     }

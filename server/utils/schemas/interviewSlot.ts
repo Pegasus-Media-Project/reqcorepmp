@@ -86,7 +86,14 @@ export const jobAvailabilitySchema = z.object({
   windowEnd: z.string().regex(HHMM, 'Use 24h HH:MM'),
   breakStart: z.string().regex(HHMM, 'Use 24h HH:MM').nullish(),
   breakEnd: z.string().regex(HHMM, 'Use 24h HH:MM').nullish(),
-  buffer: z.number().int().min(0).max(120).default(0),
+  /**
+   * Gap between interviews in minutes. Named `bufferMinutes` on the wire
+   * because ofetch refuses to JSON-serialize any body with a truthy `buffer`
+   * property (its TypedArray heuristic) — a top-level `buffer: 10` made the
+   * whole payload arrive as "[object Object]". `buffer` kept as a legacy alias.
+   */
+  bufferMinutes: z.number().int().min(0).max(120).optional(),
+  buffer: z.number().int().min(0).max(120).optional(),
   /** System template id or custom emailTemplate id; null = built-in default. */
   invitationTemplateId: z.string().max(100).nullish(),
   /**
