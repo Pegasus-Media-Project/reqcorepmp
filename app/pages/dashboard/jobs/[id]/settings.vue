@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {
-  Save, Trash2, ArrowLeft, ExternalLink, Link2, ClipboardCopy,
+  Save, Trash2, ArrowLeft, ExternalLink, Link2, ClipboardCopy, CalendarClock,
 } from 'lucide-vue-next'
 import { z } from 'zod'
 
@@ -18,6 +18,9 @@ const { handlePreviewReadOnlyError } = usePreviewReadOnly()
 const { track } = useTrack()
 
 const { job, status: fetchStatus, error: fetchError, updateJob, deleteJob } = useJob(jobId)
+
+// Interview slot / availability manager (same modal as on the pipeline page).
+const showSlotManager = ref(route.query.slots === '1')
 const { programs } = usePrograms()
 const { employmentTypes } = useEmploymentTypes()
 // Assigning users to a job is an admin/owner action (program:update).
@@ -742,6 +745,25 @@ function onSalaryMaxChange(e: Event) {
         </section>
 
         <!-- ═══════════════════════════════════════ -->
+        <!-- SECTION: Interview Scheduling            -->
+        <!-- ═══════════════════════════════════════ -->
+        <section class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-6">
+          <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100 mb-1">Interview Scheduling</h2>
+          <p class="text-xs text-surface-400 dark:text-surface-500 mb-5">
+            Set the interview length and the times candidates can self-schedule, including breaks and gaps
+            between interviews. Candidates you invite pick an open time first-come.
+          </p>
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 rounded-lg border border-surface-300 dark:border-surface-700 px-4 py-2 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+            @click="showSlotManager = true"
+          >
+            <CalendarClock class="size-4" />
+            Manage availability &amp; interview slots
+          </button>
+        </section>
+
+        <!-- ═══════════════════════════════════════ -->
         <!-- SECTION: Application Link                -->
         <!-- ═══════════════════════════════════════ -->
         <section v-if="job.status === 'open'" class="rounded-xl border border-brand-200 dark:border-brand-800 bg-brand-50/50 dark:bg-brand-950/30 p-6">
@@ -849,5 +871,12 @@ function onSalaryMaxChange(e: Event) {
         </div>
       </section>
     </template>
+
+    <!-- Interview slot / availability manager -->
+    <InterviewSlotManager
+      :open="showSlotManager"
+      :job-id="jobId"
+      @close="showSlotManager = false"
+    />
   </div>
 </template>

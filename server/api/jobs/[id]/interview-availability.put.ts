@@ -37,6 +37,9 @@ export default defineEventHandler(async (event) => {
     daysOfWeek: body.daysOfWeek,
     windowStart: body.windowStart,
     windowEnd: body.windowEnd,
+    breakStart: body.breakStart,
+    breakEnd: body.breakEnd,
+    buffer: body.buffer,
   })
 
   const result = await db.transaction(async (tx) => {
@@ -57,6 +60,9 @@ export default defineEventHandler(async (event) => {
       daysOfWeek: body.daysOfWeek,
       windowStart: body.windowStart,
       windowEnd: body.windowEnd,
+      breakStart: body.breakStart ?? null,
+      breakEnd: body.breakEnd ?? null,
+      buffer: body.buffer,
       updatedAt: new Date(),
     }
     const [availability] = existing

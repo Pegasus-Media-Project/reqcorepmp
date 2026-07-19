@@ -804,6 +804,11 @@ export const jobInterviewAvailability = pgTable('job_interview_availability', {
   /** Daily window in `timezone`, 24h "HH:MM" strings. */
   windowStart: text('window_start').notNull(),
   windowEnd: text('window_end').notNull(),
+  /** Optional daily break (e.g. lunch) during which nothing can be booked. */
+  breakStart: text('break_start'),
+  breakEnd: text('break_end'),
+  /** Gap in minutes between consecutive interviews (0 = back-to-back). */
+  buffer: integer('buffer').notNull().default(0),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (t) => ([

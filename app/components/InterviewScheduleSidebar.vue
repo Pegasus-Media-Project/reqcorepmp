@@ -1040,7 +1040,7 @@ async function handleSendSlotInvite() {
                       No open interview times for this job yet.
                       <NuxtLink
                         v-if="jobId"
-                        :to="localePath(`/dashboard/jobs/${jobId}?slots=1`)"
+                        :to="localePath({ path: `/dashboard/jobs/${jobId}`, query: { slots: '1' } })"
                         class="font-medium underline underline-offset-2"
                         @click="emit('close')"
                       >

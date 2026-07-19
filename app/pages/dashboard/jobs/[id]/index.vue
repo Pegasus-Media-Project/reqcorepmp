@@ -24,8 +24,13 @@ const localePath = useLocalePath()
 const jobId = route.params.id as string
 
 // Interview slot self-scheduling manager (modal). `?slots=1` deep-links here
-// (e.g. from the schedule sidebar's "set availability" hint).
+// (e.g. from the schedule sidebar's "set availability" hint). Watched, not just
+// read at setup — the link may be clicked while already on this page, which
+// only changes the query.
 const showSlotManager = ref(route.query.slots === '1')
+watch(() => route.query.slots, (slots) => {
+  if (slots === '1') showSlotManager.value = true
+})
 const { handlePreviewReadOnlyError } = usePreviewReadOnly()
 const { track } = useTrack()
 const toast = useToast()

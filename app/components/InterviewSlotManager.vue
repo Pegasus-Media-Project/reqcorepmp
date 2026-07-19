@@ -65,6 +65,8 @@ const DAY_OPTIONS = [
 
 const DURATION_OPTIONS = [15, 20, 30, 45, 60, 90, 120]
 
+const BUFFER_OPTIONS = [0, 5, 10, 15, 20, 30]
+
 const avail = reactive({
   title: 'Interview',
   type: 'video',
@@ -76,6 +78,9 @@ const avail = reactive({
   daysOfWeek: [1, 2, 3, 4, 5] as number[],
   windowStart: '09:00',
   windowEnd: '17:00',
+  breakStart: '',
+  breakEnd: '',
+  buffer: 0,
 })
 const hasAvailability = ref(false)
 const savingAvailability = ref(false)
@@ -103,6 +108,9 @@ async function loadAvailability() {
       avail.daysOfWeek = res.availability.daysOfWeek
       avail.windowStart = res.availability.windowStart
       avail.windowEnd = res.availability.windowEnd
+      avail.breakStart = (res.availability as any).breakStart ?? ''
+      avail.breakEnd = (res.availability as any).breakEnd ?? ''
+      avail.buffer = (res.availability as any).buffer ?? 0
     }
   }
   catch {
@@ -112,7 +120,8 @@ async function loadAvailability() {
 
 const canSaveAvailability = computed(() =>
   !!avail.dateFrom && !!avail.dateTo && avail.daysOfWeek.length > 0
-  && !!avail.windowStart && !!avail.windowEnd && !!avail.title.trim(),
+  && !!avail.windowStart && !!avail.windowEnd && !!avail.title.trim()
+  && !!avail.breakStart === !!avail.breakEnd,
 )
 
 async function saveAvailability() {
@@ -135,6 +144,9 @@ async function saveAvailability() {
           daysOfWeek: avail.daysOfWeek,
           windowStart: avail.windowStart,
           windowEnd: avail.windowEnd,
+          breakStart: avail.breakStart || null,
+          breakEnd: avail.breakEnd || null,
+          buffer: avail.buffer,
         },
       },
     )
@@ -296,7 +308,24 @@ function formatSlot(s: Slot) {
               Daily until
               <input v-model="avail.windowEnd" type="time" class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-2 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
             </label>
+            <label class="col-span-1 flex flex-col gap-1 text-[11px] text-surface-500">
+              Break from <span class="sr-only">(optional)</span>
+              <input v-model="avail.breakStart" type="time" class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-2 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </label>
+            <label class="col-span-1 flex flex-col gap-1 text-[11px] text-surface-500">
+              Break until
+              <input v-model="avail.breakEnd" type="time" class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-2 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </label>
+            <label class="col-span-2 flex flex-col gap-1 text-[11px] text-surface-500">
+              Gap between interviews
+              <select v-model.number="avail.buffer" class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-2 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <option v-for="b in BUFFER_OPTIONS" :key="b" :value="b">{{ b === 0 ? 'None (back-to-back)' : `${b} minutes` }}</option>
+              </select>
+            </label>
           </div>
+          <p class="mt-1.5 text-[11px] text-surface-400 dark:text-surface-500">
+            Leave the break fields empty for no break. Nothing can be booked during the break, and the gap is kept free between interviews.
+          </p>
           <div class="mt-2 flex flex-wrap items-center gap-1.5">
             <button
               v-for="d in DAY_OPTIONS"
@@ -316,13 +345,13 @@ function formatSlot(s: Slot) {
             </label>
           </div>
           <input v-model="avail.location" type="text" placeholder="Location / link (optional)" class="mt-2 w-full rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-          <div class="flex items-center justify-between mt-2.5">
-            <span class="text-[11px] text-surface-500 dark:text-surface-400">
+          <div class="flex items-center justify-between gap-4 mt-2.5">
+            <span class="min-w-0 text-[11px] text-surface-500 dark:text-surface-400">
               Saving replaces future auto-generated times nobody has booked. Manual and booked times are kept.
             </span>
             <button
               :disabled="!canSaveAvailability || savingAvailability"
-              class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              class="shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed"
               @click="saveAvailability"
             >
               <Loader2 v-if="savingAvailability" class="size-4 animate-spin" />

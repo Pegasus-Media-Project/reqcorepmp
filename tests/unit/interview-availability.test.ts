@@ -86,6 +86,43 @@ describe('generateSlotStartTimes', () => {
     expect(times).toHaveLength(MAX_GENERATED_SLOTS)
   })
 
+  it('skips slots that would overlap the daily break and resumes at break end', () => {
+    // 09:00–14:00, 60-min interviews, lunch 12:00–12:30.
+    const times = generateSlotStartTimes(
+      cfg({ dateTo: '2026-07-20', windowEnd: '14:00', breakStart: '12:00', breakEnd: '12:30' }),
+      PAST,
+    ).map(t => t.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: false, timeZone: 'America/New_York' }))
+    // Morning segment 09:00–12:00 → 09,10,11; afternoon resumes at 12:30 → 12:30, 13:00 would overrun? 12:30+60=13:30 ≤ 14:00 ✓; next 13:30+60 > 14:00.
+    expect(times).toEqual(['09:00', '10:00', '11:00', '12:30'])
+  })
+
+  it('adds the buffer between consecutive interviews', () => {
+    // 09:00–11:00, 30-min interviews with a 10-min buffer → 09:00, 09:40, 10:20.
+    const times = generateSlotStartTimes(
+      cfg({ dateTo: '2026-07-20', windowEnd: '11:00', duration: 30, buffer: 10 }),
+      PAST,
+    ).map(t => t.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: false, timeZone: 'America/New_York' }))
+    expect(times).toEqual(['09:00', '09:40', '10:20'])
+  })
+
+  it('combines break and buffer', () => {
+    // 09:00–13:00, 45-min + 15 buffer, break 10:30–11:00 → 09:00; 10:00 won't fit before break (ends 10:45) → afternoon 11:00, 12:00.
+    const times = generateSlotStartTimes(
+      cfg({ dateTo: '2026-07-20', windowEnd: '13:00', duration: 45, buffer: 15, breakStart: '10:30', breakEnd: '11:00' }),
+      PAST,
+    ).map(t => t.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: false, timeZone: 'America/New_York' }))
+    expect(times).toEqual(['09:00', '11:00', '12:00'])
+  })
+
+  it('ignores a break outside the window', () => {
+    const withBreak = generateSlotStartTimes(
+      cfg({ dateTo: '2026-07-20', breakStart: '18:00', breakEnd: '19:00' }),
+      PAST,
+    )
+    const without = generateSlotStartTimes(cfg({ dateTo: '2026-07-20' }), PAST)
+    expect(withBreak).toEqual(without)
+  })
+
   it('keeps wall-clock times stable across a DST transition', () => {
     // Fri 2026-03-06 (EST, UTC-5) and Mon 2026-03-09 (EDT, UTC-4) both offer 09:00 local.
     const times = generateSlotStartTimes(

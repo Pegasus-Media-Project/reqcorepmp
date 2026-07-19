@@ -74,6 +74,9 @@ export const jobAvailabilitySchema = z.object({
   daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1, 'Pick at least one day').max(7),
   windowStart: z.string().regex(HHMM, 'Use 24h HH:MM'),
   windowEnd: z.string().regex(HHMM, 'Use 24h HH:MM'),
+  breakStart: z.string().regex(HHMM, 'Use 24h HH:MM').nullish(),
+  breakEnd: z.string().regex(HHMM, 'Use 24h HH:MM').nullish(),
+  buffer: z.number().int().min(0).max(120).default(0),
 }).refine(d => d.dateFrom <= d.dateTo, { message: 'End date must be on or after the start date', path: ['dateTo'] })
   .refine(d => d.windowStart < d.windowEnd, { message: 'Window end must be after its start', path: ['windowEnd'] })
   .refine((d) => {
@@ -81,6 +84,8 @@ export const jobAvailabilitySchema = z.object({
     const [eh, em] = d.windowEnd.split(':').map(Number)
     return (eh! * 60 + em!) - (sh! * 60 + sm!) >= d.duration
   }, { message: 'The daily window must fit at least one interview', path: ['windowEnd'] })
+  .refine(d => !!d.breakStart === !!d.breakEnd, { message: 'Set both break times or neither', path: ['breakEnd'] })
+  .refine(d => !d.breakStart || !d.breakEnd || d.breakStart < d.breakEnd, { message: 'Break end must be after its start', path: ['breakEnd'] })
 
 /** Public: token identifies the invited application. */
 export const publicSlotsQuerySchema = z.object({
