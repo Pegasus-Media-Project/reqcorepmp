@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { X, Plus, Trash2, Loader2, CalendarClock } from 'lucide-vue-next'
+import { X, Plus, Trash2, Loader2, CalendarClock, Check, AlertTriangle, ExternalLink } from 'lucide-vue-next'
 
 const props = defineProps<{
   open: boolean
@@ -136,15 +136,17 @@ const canSaveAvailability = computed(() =>
   && !!avail.breakStart === !!avail.breakEnd,
 )
 
-async function saveAvailability() {
+async function saveAvailability(opts: { priorMode: 'replace-all' | 'replace-auto' | 'keep', bookedAction: 'keep' | 'rebook' }) {
   if (!canSaveAvailability.value || savingAvailability.value) return
   savingAvailability.value = true
   try {
-    const res = await $fetch<{ created: number, removed: number, truncated: boolean }>(
+    const res = await $fetch<{ created: number, removed: number, rebooked: number, truncated: boolean }>(
       `/api/jobs/${props.jobId}/interview-availability`,
       {
         method: 'PUT',
         body: {
+          priorMode: opts.priorMode,
+          bookedAction: opts.bookedAction,
           title: avail.title.trim(),
           type: avail.type,
           duration: avail.duration,
@@ -164,10 +166,12 @@ async function saveAvailability() {
       },
     )
     hasAvailability.value = true
+    showSaveConfirm.value = false
     toast.success(
       'Availability saved',
       `${res.created} time${res.created === 1 ? '' : 's'} generated`
       + (res.removed ? `, ${res.removed} replaced` : '')
+      + (res.rebooked ? `, ${res.rebooked} candidate${res.rebooked === 1 ? '' : 's'} sent a new time picker` : '')
       + (res.truncated ? ' (capped — narrow the date range for more control)' : ''),
     )
     await loadSlots()
@@ -243,6 +247,111 @@ async function createSlot() {
   }
 }
 
+// ── Multi-select + bulk removal ──────────────────────────────────────────────
+
+const selectedSlotIds = ref<Set<string>>(new Set())
+
+function toggleSlotSelect(id: string) {
+  const next = new Set(selectedSlotIds.value)
+  next.has(id) ? next.delete(id) : next.add(id)
+  selectedSlotIds.value = next
+}
+
+function clearSlotSelection() {
+  selectedSlotIds.value = new Set()
+}
+
+const selectedBookedCount = computed(() =>
+  slots.value.filter(s => selectedSlotIds.value.has(s.id) && s.bookedCount > 0).length,
+)
+
+const showBulkRemoveConfirm = ref(false)
+const bulkBookedMode = ref<'skip' | 'cancel-interviews'>('skip')
+const bulkRemoving = ref(false)
+
+async function bulkRemoveSelected() {
+  if (bulkRemoving.value || !selectedSlotIds.value.size) return
+  bulkRemoving.value = true
+  try {
+    const res = await $fetch<{ deleted: number, cancelled: number, skippedBooked: number, cancelledInterviews: number }>(
+      '/api/interview-slots/bulk-delete',
+      { method: 'POST', body: { slotIds: [...selectedSlotIds.value], bookedMode: bulkBookedMode.value } },
+    )
+    const parts = [
+      `${res.deleted + res.cancelled} removed`,
+      res.cancelledInterviews ? `${res.cancelledInterviews} interview${res.cancelledInterviews === 1 ? '' : 's'} cancelled` : '',
+      res.skippedBooked ? `${res.skippedBooked} with assignees kept` : '',
+    ].filter(Boolean)
+    toast.success('Slots removed', parts.join(', '))
+    showBulkRemoveConfirm.value = false
+    clearSlotSelection()
+    await loadSlots()
+  }
+  catch (err: any) {
+    if (handlePreviewReadOnlyError(err)) return
+    toast.error('Failed to remove slots', { message: err?.data?.statusMessage, statusCode: err?.data?.statusCode })
+  }
+  finally {
+    bulkRemoving.value = false
+  }
+}
+
+// ── Save-availability confirmation (regeneration) ────────────────────────────
+
+const showSaveConfirm = ref(false)
+const savePriorMode = ref<'replace-all' | 'keep'>('replace-all')
+const saveBookedAction = ref<'keep' | 'rebook'>('keep')
+
+const futureOpenCount = computed(() =>
+  slots.value.filter(s => s.status !== 'cancelled' && s.bookedCount === 0 && new Date(s.startsAt) > new Date()).length,
+)
+const futureBookedCount = computed(() =>
+  slots.value.filter(s => s.bookedCount > 0 && new Date(s.startsAt) > new Date()).length,
+)
+
+/** Entry point for the Save button: prompt when prior slots exist. */
+function requestSaveAvailability() {
+  if (!canSaveAvailability.value || savingAvailability.value) return
+  if (futureOpenCount.value > 0 || futureBookedCount.value > 0) {
+    savePriorMode.value = 'replace-all'
+    saveBookedAction.value = 'keep'
+    showSaveConfirm.value = true
+    return
+  }
+  saveAvailability({ priorMode: 'replace-all', bookedAction: 'keep' })
+}
+
+// ── Single delete with assignees ─────────────────────────────────────────────
+
+interface SlotBookingInfo {
+  interviewId: string | null
+  applicationId: string
+  candidateName: string
+}
+const deleteBlocked = ref<{ slot: Slot, bookings: SlotBookingInfo[] } | null>(null)
+const deletingWithCancel = ref(false)
+
+async function confirmDeleteWithCancel() {
+  if (!deleteBlocked.value || deletingWithCancel.value) return
+  deletingWithCancel.value = true
+  try {
+    const res = await $fetch<{ cancelledInterviews: number }>(
+      `/api/interview-slots/${deleteBlocked.value.slot.id}`,
+      { method: 'DELETE', query: { mode: 'cancel-interviews' } },
+    )
+    toast.success('Slot removed', `${res.cancelledInterviews} interview${res.cancelledInterviews === 1 ? '' : 's'} cancelled and the candidates notified`)
+    deleteBlocked.value = null
+    await loadSlots()
+  }
+  catch (err: any) {
+    if (handlePreviewReadOnlyError(err)) return
+    toast.error('Failed to remove slot', { message: err?.data?.statusMessage })
+  }
+  finally {
+    deletingWithCancel.value = false
+  }
+}
+
 async function toggleStatus(slot: Slot) {
   const next = slot.status === 'open' ? 'closed' : 'open'
   try {
@@ -262,6 +371,15 @@ async function deleteSlot(slot: Slot) {
   }
   catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
+    // 409 = the slot has assignees; ask whether to cancel their interviews or
+    // move them via reschedule instead.
+    if (err?.status === 409 || err?.statusCode === 409 || err?.data?.statusCode === 409) {
+      deleteBlocked.value = {
+        slot,
+        bookings: err?.data?.data?.bookings ?? [],
+      }
+      return
+    }
     toast.error('Failed to remove slot', { message: err?.data?.statusMessage })
   }
 }
@@ -371,7 +489,7 @@ function formatSlot(s: Slot) {
             <button
               :disabled="!canSaveAvailability || savingAvailability"
               class="shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed"
-              @click="saveAvailability"
+              @click="requestSaveAvailability"
             >
               <Loader2 v-if="savingAvailability" class="size-4 animate-spin" />
               <CalendarClock v-else class="size-4" />
@@ -423,13 +541,42 @@ function formatSlot(s: Slot) {
           <div v-else-if="!slots.length" class="py-8 text-center text-sm text-surface-500 dark:text-surface-400">
             No bookable times yet. Save availability above (or add a one-off time).
           </div>
-          <div v-else class="space-y-1.5">
+          <template v-else>
+          <!-- Bulk actions -->
+          <div v-if="selectedSlotIds.size" class="flex items-center gap-2 mb-2 rounded-lg border border-brand-200 dark:border-brand-800/60 bg-brand-50 dark:bg-brand-950/40 px-3 py-1.5">
+            <span class="text-xs font-medium text-brand-800 dark:text-brand-200">{{ selectedSlotIds.size }} selected</span>
+            <button
+              type="button"
+              class="inline-flex items-center gap-1 rounded-md bg-danger-600 px-2 py-1 text-xs font-semibold text-white hover:bg-danger-700"
+              @click="bulkBookedMode = 'skip'; showBulkRemoveConfirm = true"
+            >
+              <Trash2 class="size-3" />
+              Remove selected
+            </button>
+            <button
+              type="button"
+              class="ml-auto text-[11px] text-brand-700 dark:text-brand-300 underline underline-offset-2"
+              @click="clearSlotSelection"
+            >
+              Clear
+            </button>
+          </div>
+          <div class="space-y-1.5">
             <div
               v-for="s in slots"
               :key="s.id"
               class="flex items-center gap-3 rounded-lg border border-surface-200 dark:border-surface-800 px-3 py-2"
               :class="s.status === 'cancelled' ? 'opacity-50' : ''"
             >
+              <button
+                type="button"
+                class="size-4 shrink-0 rounded border flex items-center justify-center transition-colors"
+                :class="selectedSlotIds.has(s.id) ? 'bg-brand-600 border-brand-600 text-white' : 'border-surface-300 dark:border-surface-600'"
+                :aria-label="selectedSlotIds.has(s.id) ? 'Deselect' : 'Select'"
+                @click="toggleSlotSelect(s.id)"
+              >
+                <Check v-if="selectedSlotIds.has(s.id)" class="size-3" />
+              </button>
               <div class="min-w-0 flex-1">
                 <div class="text-sm font-medium text-surface-800 dark:text-surface-200 truncate">
                   {{ s.title }}
@@ -461,7 +608,156 @@ function formatSlot(s: Slot) {
               </button>
             </div>
           </div>
+          </template>
         </div>
+        </div>
+
+        <!-- Confirm: save availability over existing times -->
+        <div v-if="showSaveConfirm" class="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-black/30 backdrop-blur-[2px]">
+          <div class="w-full max-w-md mx-6 rounded-xl bg-white dark:bg-surface-900 shadow-xl ring-1 ring-surface-200 dark:ring-surface-700 p-4">
+            <h4 class="text-sm font-semibold text-surface-900 dark:text-surface-100 mb-1">Replace the existing schedule?</h4>
+            <p class="text-xs text-surface-500 dark:text-surface-400 mb-3">
+              This job already has {{ futureOpenCount }} open time{{ futureOpenCount === 1 ? '' : 's' }}<span v-if="futureBookedCount"> and {{ futureBookedCount }} booked</span>.
+            </p>
+
+            <div class="space-y-1.5 mb-3">
+              <label class="flex items-start gap-2 text-sm text-surface-700 dark:text-surface-300">
+                <input v-model="savePriorMode" type="radio" value="replace-all" class="mt-0.5 accent-brand-600" />
+                <span>Remove all prior open times and use the new schedule</span>
+              </label>
+              <label class="flex items-start gap-2 text-sm text-surface-700 dark:text-surface-300">
+                <input v-model="savePriorMode" type="radio" value="keep" class="mt-0.5 accent-brand-600" />
+                <span>Keep the existing open times and add the new ones alongside</span>
+              </label>
+            </div>
+
+            <template v-if="futureBookedCount">
+              <div class="text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-1.5">
+                {{ futureBookedCount }} time{{ futureBookedCount === 1 ? ' has' : 's have' }} candidates assigned
+              </div>
+              <div class="space-y-1.5 mb-3">
+                <label class="flex items-start gap-2 text-sm text-surface-700 dark:text-surface-300">
+                  <input v-model="saveBookedAction" type="radio" value="keep" class="mt-0.5 accent-brand-600" />
+                  <span>Keep their booked times — move them manually later if needed</span>
+                </label>
+                <label class="flex items-start gap-2 text-sm text-surface-700 dark:text-surface-300">
+                  <input v-model="saveBookedAction" type="radio" value="rebook" class="mt-0.5 accent-brand-600" />
+                  <span>Cancel their interviews and email each candidate a new time picker</span>
+                </label>
+              </div>
+            </template>
+
+            <div class="flex justify-end gap-2">
+              <button
+                type="button"
+                class="rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-1.5 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800"
+                @click="showSaveConfirm = false"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                :disabled="savingAvailability"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-40"
+                @click="saveAvailability({ priorMode: savePriorMode, bookedAction: saveBookedAction })"
+              >
+                <Loader2 v-if="savingAvailability" class="size-4 animate-spin" />
+                Save schedule
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Confirm: bulk remove -->
+        <div v-if="showBulkRemoveConfirm" class="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-black/30 backdrop-blur-[2px]">
+          <div class="w-full max-w-md mx-6 rounded-xl bg-white dark:bg-surface-900 shadow-xl ring-1 ring-surface-200 dark:ring-surface-700 p-4">
+            <h4 class="text-sm font-semibold text-surface-900 dark:text-surface-100 mb-1">
+              Remove {{ selectedSlotIds.size }} slot{{ selectedSlotIds.size === 1 ? '' : 's' }}?
+            </h4>
+            <template v-if="selectedBookedCount">
+              <p class="text-xs text-surface-500 dark:text-surface-400 mb-2">
+                {{ selectedBookedCount }} of them {{ selectedBookedCount === 1 ? 'has' : 'have' }} candidates assigned.
+              </p>
+              <div class="space-y-1.5 mb-3">
+                <label class="flex items-start gap-2 text-sm text-surface-700 dark:text-surface-300">
+                  <input v-model="bulkBookedMode" type="radio" value="skip" class="mt-0.5 accent-brand-600" />
+                  <span>Keep the booked ones — remove only the empty slots</span>
+                </label>
+                <label class="flex items-start gap-2 text-sm text-surface-700 dark:text-surface-300">
+                  <input v-model="bulkBookedMode" type="radio" value="cancel-interviews" class="mt-0.5 accent-brand-600" />
+                  <span>Also cancel the booked interviews and notify the candidates</span>
+                </label>
+              </div>
+            </template>
+            <p v-else class="text-xs text-surface-500 dark:text-surface-400 mb-3">None of the selected slots have candidates assigned.</p>
+            <div class="flex justify-end gap-2">
+              <button
+                type="button"
+                class="rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-1.5 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800"
+                @click="showBulkRemoveConfirm = false"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                :disabled="bulkRemoving"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-danger-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-danger-700 disabled:opacity-40"
+                @click="bulkRemoveSelected"
+              >
+                <Loader2 v-if="bulkRemoving" class="size-4 animate-spin" />
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Confirm: delete a slot with assignees -->
+        <div v-if="deleteBlocked" class="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-black/30 backdrop-blur-[2px]">
+          <div class="w-full max-w-md mx-6 rounded-xl bg-white dark:bg-surface-900 shadow-xl ring-1 ring-surface-200 dark:ring-surface-700 p-4">
+            <h4 class="flex items-center gap-1.5 text-sm font-semibold text-surface-900 dark:text-surface-100 mb-1">
+              <AlertTriangle class="size-4 text-amber-500" />
+              This time has candidates assigned
+            </h4>
+            <p class="text-xs text-surface-500 dark:text-surface-400 mb-2">
+              {{ formatSlot(deleteBlocked.slot) }} — cancel their interview{{ deleteBlocked.bookings.length === 1 ? '' : 's' }} entirely, or move them to another time first?
+            </p>
+            <ul class="mb-3 space-y-1">
+              <li
+                v-for="b in deleteBlocked.bookings"
+                :key="b.applicationId"
+                class="flex items-center justify-between gap-2 text-sm text-surface-700 dark:text-surface-300"
+              >
+                <span class="truncate">{{ b.candidateName }}</span>
+                <NuxtLink
+                  v-if="b.interviewId"
+                  :to="$localePath(`/dashboard/interviews/${b.interviewId}`)"
+                  target="_blank"
+                  class="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 underline underline-offset-2"
+                >
+                  Move (reschedule)
+                  <ExternalLink class="size-3" />
+                </NuxtLink>
+              </li>
+            </ul>
+            <div class="flex justify-end gap-2">
+              <button
+                type="button"
+                class="rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-1.5 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800"
+                @click="deleteBlocked = null"
+              >
+                Keep slot
+              </button>
+              <button
+                type="button"
+                :disabled="deletingWithCancel"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-danger-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-danger-700 disabled:opacity-40"
+                @click="confirmDeleteWithCancel"
+              >
+                <Loader2 v-if="deletingWithCancel" class="size-4 animate-spin" />
+                Cancel interview{{ deleteBlocked.bookings.length === 1 ? '' : 's' }} &amp; remove
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

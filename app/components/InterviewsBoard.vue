@@ -217,6 +217,57 @@ const editForm = reactive({
 const editErrors = ref<Record<string, string>>({})
 const isSaving = ref(false)
 
+// When the interview's job uses interview slots, time changes in this modal go
+// through the slot-aware reschedule endpoint (open blocks or a one-off that
+// materializes a block) instead of a free-form PATCH.
+interface EditSlot {
+  id: string
+  startsAt: string
+  duration: number
+  status: string
+  available: number
+}
+const editJobSlots = ref<EditSlot[]>([])
+const editJobUsesSlots = ref(false)
+const editSelectedSlotId = ref('')
+const editSlotsLoading = ref(false)
+
+async function loadEditJobSlots(jobId: string) {
+  editSlotsLoading.value = true
+  try {
+    const res = await $fetch<{ data: EditSlot[] }>('/api/interview-slots', { query: { jobId } })
+    editJobUsesSlots.value = res.data.length > 0
+    editJobSlots.value = res.data
+      .filter(s => s.status === 'open' && s.available > 0 && new Date(s.startsAt) > new Date())
+      .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
+  }
+  catch {
+    editJobUsesSlots.value = false
+    editJobSlots.value = []
+  }
+  finally {
+    editSlotsLoading.value = false
+  }
+}
+
+function selectEditSlot(slotId: string) {
+  editSelectedSlotId.value = editSelectedSlotId.value === slotId ? '' : slotId
+  if (editSelectedSlotId.value) {
+    editForm.date = ''
+    editForm.time = ''
+  }
+}
+
+function clearEditSlotSelection() {
+  editSelectedSlotId.value = ''
+}
+
+function formatEditSlot(s: EditSlot) {
+  return new Date(s.startsAt).toLocaleString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true,
+  })
+}
+
 function openEdit(interviewItem: typeof interviews.value[number]) {
   editingInterview.value = interviewItem
   const d = new Date(interviewItem.scheduledAt)
@@ -230,7 +281,16 @@ function openEdit(interviewItem: typeof interviews.value[number]) {
   editForm.notes = interviewItem.notes ?? ''
   editForm.interviewers = interviewItem.interviewers?.length ? [...interviewItem.interviewers] : ['']
   editErrors.value = {}
+  editSelectedSlotId.value = ''
+  editJobUsesSlots.value = false
   showEditModal.value = true
+  loadEditJobSlots(interviewItem.jobId).then(() => {
+    // Slot-governed jobs treat empty time fields as "keep the current time".
+    if (editJobUsesSlots.value) {
+      editForm.date = ''
+      editForm.time = ''
+    }
+  })
 }
 
 function cancelEdit() {
@@ -243,11 +303,15 @@ async function handleSaveEdit() {
   editErrors.value = {}
 
   if (!editForm.title.trim()) editErrors.value.title = 'Title is required'
-  if (!editForm.date) editErrors.value.date = 'Date is required'
-  if (!editForm.time) editErrors.value.time = 'Time is required'
+  if (!editJobUsesSlots.value) {
+    if (!editForm.date) editErrors.value.date = 'Date is required'
+    if (!editForm.time) editErrors.value.time = 'Time is required'
+  }
+  else if ((editForm.date && !editForm.time) || (!editForm.date && editForm.time)) {
+    editErrors.value.date = 'Enter both date and time for a one-off change'
+  }
   if (Object.keys(editErrors.value).length > 0) return
 
-  const scheduledAt = new Date(`${editForm.date}T${editForm.time}`).toISOString()
   const filteredInterviewers = editForm.interviewers.filter(i => i.trim())
 
   isSaving.value = true
@@ -256,17 +320,40 @@ async function handleSaveEdit() {
       title: editForm.title.trim(),
       type: editForm.type as any,
       status: editForm.status as any,
-      scheduledAt,
-      duration: editForm.duration,
+      // Free-form time editing only when the job doesn't use slots.
+      ...(editJobUsesSlots.value
+        ? {}
+        : {
+            scheduledAt: new Date(`${editForm.date}T${editForm.time}`).toISOString(),
+            duration: editForm.duration,
+          }),
       location: editForm.location.trim() || null,
       notes: editForm.notes.trim() || null,
       interviewers: filteredInterviewers.length > 0 ? filteredInterviewers : null,
     })
+
+    // Slot-governed time change: move onto the picked block or a one-off block.
+    if (editJobUsesSlots.value && (editSelectedSlotId.value || (editForm.date && editForm.time))) {
+      const body = editSelectedSlotId.value
+        ? { slotId: editSelectedSlotId.value }
+        : {
+            startsAt: new Date(`${editForm.date}T${editForm.time}`).toISOString(),
+            duration: editForm.duration,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          }
+      await $fetch(`/api/interviews/${editingInterview.value!.id}/reschedule`, { method: 'POST', body })
+      await refresh()
+    }
+
     showEditModal.value = false
     editingInterview.value = null
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
     editErrors.value.submit = err?.data?.statusMessage ?? 'Failed to update interview'
+    if (err?.status === 409 || err?.statusCode === 409) {
+      editSelectedSlotId.value = ''
+      if (editingInterview.value) loadEditJobSlots(editingInterview.value.jobId)
+    }
   } finally {
     isSaving.value = false
   }
@@ -855,6 +942,60 @@ const statusCounts = computed(() => {
               </div>
             </div>
 
+            <!-- Time: slot-governed jobs pick a block; others edit freely -->
+            <div v-if="editJobUsesSlots" class="rounded-lg border border-surface-200 dark:border-surface-700 p-3">
+              <div class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
+                Time
+                <span class="font-normal text-surface-400"> — currently {{ editingInterview ? formatDateTime(editingInterview.scheduledAt) : '' }}</span>
+              </div>
+              <p class="text-[11px] text-surface-400 dark:text-surface-500 mb-2">
+                This job uses interview slots. Leave everything below untouched to keep the current time.
+              </p>
+              <div v-if="editSlotsLoading" class="text-xs text-surface-400">Loading open blocks…</div>
+              <div v-else-if="!editJobSlots.length" class="text-xs text-surface-400 dark:text-surface-500 mb-2">
+                No open blocks — a one-off time below adds a matching block.
+              </div>
+              <div v-else class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto mb-2">
+                <button
+                  v-for="s in editJobSlots"
+                  :key="s.id"
+                  type="button"
+                  class="rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors"
+                  :class="editSelectedSlotId === s.id
+                    ? 'border-brand-600 bg-brand-600 text-white'
+                    : 'border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-700 dark:text-surface-300 hover:border-brand-400'"
+                  @click="selectEditSlot(s.id)"
+                >
+                  {{ formatEditSlot(s) }} · {{ s.duration }}m
+                </button>
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                <input
+                  v-model="editForm.date"
+                  type="date"
+                  aria-label="One-off date"
+                  class="rounded-lg border border-surface-300 dark:border-surface-700 px-2.5 py-1.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
+                  @input="clearEditSlotSelection"
+                />
+                <input
+                  v-model="editForm.time"
+                  type="time"
+                  aria-label="One-off time"
+                  class="rounded-lg border border-surface-300 dark:border-surface-700 px-2.5 py-1.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
+                  @input="clearEditSlotSelection"
+                />
+                <input
+                  v-model.number="editForm.duration"
+                  type="number"
+                  min="5"
+                  max="480"
+                  aria-label="Duration (minutes)"
+                  class="rounded-lg border border-surface-300 dark:border-surface-700 px-2.5 py-1.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            <template v-else>
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label for="edit-interview-date" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Date</label>
@@ -887,6 +1028,7 @@ const statusCounts = computed(() => {
                 class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
               />
             </div>
+            </template>
 
             <div>
               <label for="edit-interview-location" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Location / Link</label>

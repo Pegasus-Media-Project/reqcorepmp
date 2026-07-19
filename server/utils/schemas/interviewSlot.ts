@@ -79,6 +79,18 @@ export const jobAvailabilitySchema = z.object({
   buffer: z.number().int().min(0).max(120).default(0),
   /** System template id or custom emailTemplate id; null = built-in default. */
   invitationTemplateId: z.string().max(100).nullish(),
+  /**
+   * What happens to existing FUTURE, UNBOOKED slots:
+   * replace-auto (default) = replace auto-generated ones, keep manual;
+   * replace-all = remove all prior open times; keep = only add new times.
+   */
+  priorMode: z.enum(['replace-auto', 'replace-all', 'keep']).default('replace-auto'),
+  /**
+   * What happens to future slots someone already booked:
+   * keep (default) = leave them untouched; rebook = cancel those interviews
+   * and email each candidate a new time-picker link.
+   */
+  bookedAction: z.enum(['keep', 'rebook']).default('keep'),
 }).refine(d => d.dateFrom <= d.dateTo, { message: 'End date must be on or after the start date', path: ['dateTo'] })
   .refine(d => d.windowStart < d.windowEnd, { message: 'Window end must be after its start', path: ['windowEnd'] })
   .refine((d) => {

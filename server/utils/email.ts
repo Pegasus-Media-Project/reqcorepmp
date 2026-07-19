@@ -829,6 +829,48 @@ export const DEFAULT_SLOT_INVITATION_BODY = [
   '{{organizationName}}',
 ].join('\n')
 
+/**
+ * Notify a candidate their interview was cancelled. Plain email (no .ics —
+ * synced Google Calendar events are cancelled through the Calendar API).
+ */
+export async function sendInterviewCancellationEmail(params: {
+  to: string
+  candidateFirstName: string
+  jobTitle: string
+  organizationName: string
+  interviewTitle: string
+  interviewDate: string
+  interviewTime: string
+  /** Extra sentence after the cancellation notice (e.g. "You'll receive a new scheduling link shortly."). */
+  followUpNote?: string
+}): Promise<void> {
+  const subject = `Interview cancelled: ${params.jobTitle} at ${params.organizationName}`
+  const bodyLines = [
+    `Hi ${params.candidateFirstName},`,
+    '',
+    `Your interview for ${params.jobTitle} at ${params.organizationName}, previously scheduled for ${params.interviewDate} at ${params.interviewTime}, has been cancelled.`,
+    ...(params.followUpNote ? ['', params.followUpNote] : []),
+    '',
+    params.organizationName,
+  ]
+  const text = bodyLines.join('\n')
+  const html = `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;margin:0 auto;color:#09090b;">
+      ${bodyLines.filter(l => l !== '').map(l => `<p style="font-size:14px;">${escapeHtml(l)}</p>`).join('')}
+    </div>
+  `.trim()
+
+  await sendEmail({
+    to: params.to,
+    subject,
+    html,
+    text,
+    resendTags: [{ name: 'category', value: 'interview-cancellation' }],
+    logFallback: `Interview cancellation → ${params.to} | ${params.interviewTitle} | was ${params.interviewDate} at ${params.interviewTime}`,
+    errorCategory: 'email.interview_cancellation_send_failed',
+  })
+}
+
 /** Built-in template for a reschedule notification (uses interview vars). */
 export const DEFAULT_RESCHEDULE_SUBJECT = 'Interview rescheduled: {{jobTitle}} at {{organizationName}}'
 export const DEFAULT_RESCHEDULE_BODY = [

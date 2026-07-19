@@ -1,15 +1,8 @@
 import { and, eq, gt, lt, sql } from 'drizzle-orm'
-import { application, candidate, job, organization, careerPage, interviewSlot, jobInterviewAvailability, emailTemplate } from '../../../database/schema'
-import { SYSTEM_TEMPLATES } from '~~/shared/system-templates'
+import { application, interviewSlot } from '../../../database/schema'
 import { applicationIdParamSchema } from '../../../utils/schemas/application'
 import { sendSlotInvitationSchema } from '../../../utils/schemas/interviewSlot'
-import { buildBookingUrl } from '../../../utils/interview-token'
-import {
-  sendSlotInvitationEmail,
-  renderTemplateGeneric,
-  DEFAULT_SLOT_INVITATION_SUBJECT,
-  DEFAULT_SLOT_INVITATION_BODY,
-} from '../../../utils/email'
+import { sendSlotInvitationForApplication } from '../../../utils/slot-scheduling'
 
 /**
  * Best-effort per-application resend cooldown (2 minutes). In-memory, so it is
@@ -22,7 +15,8 @@ const COOLDOWN_MS = 2 * 60 * 1000
 /**
  * POST /api/applications/:id/send-slot-invitation
  * Email the candidate a link to self-schedule their interview by booking one of
- * the job's open slots. Solo+ (`interviews`) feature.
+ * the job's open slots. Solo+ (`interviews`) feature. The email template comes
+ * from the job's availability settings (or the built-in default).
  */
 export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { interview: ['update'] })
@@ -40,16 +34,10 @@ export default defineEventHandler(async (event) => {
 
   const app = await db.query.application.findFirst({
     where: and(eq(application.id, id), eq(application.organizationId, orgId)),
-    with: {
-      candidate: { columns: { firstName: true, lastName: true, email: true } },
-      job: { columns: { title: true } },
-    },
+    columns: { id: true, jobId: true },
   })
-  if (!app || !app.candidate) {
-    throw createError({ statusCode: 404, statusMessage: 'Application or candidate not found' })
-  }
-  if (!app.candidate.email) {
-    throw createError({ statusCode: 422, statusMessage: 'Candidate has no email address on file.' })
+  if (!app) {
+    throw createError({ statusCode: 404, statusMessage: 'Application not found' })
   }
 
   // Don't send a scheduling link that leads to an empty calendar.
@@ -70,89 +58,12 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Resolve org name + logo (same logic as the application-confirmation email).
-  const origin = getRequestURL(event).origin
-  const org = await db.query.organization.findFirst({
-    where: eq(organization.id, orgId),
-    columns: { name: true, logo: true, slug: true },
-  })
-  const cp = await db.query.careerPage.findFirst({
-    where: eq(careerPage.organizationId, orgId),
-    columns: { slug: true, logoStorageKey: true, updatedAt: true, enabled: true },
-  })
-  const orgName = org?.name?.trim() || 'Pegasus Media Project'
-  let logoUrl: string | undefined
-  const cpSlug = cp?.slug ?? org?.slug ?? null
-  if (cp?.logoStorageKey && cpSlug && (cp.enabled ?? true)) {
-    logoUrl = `${origin}/api/public/career-page/${cpSlug}/asset?kind=logo&v=${new Date(cp.updatedAt).getTime()}`
-  } else if (org?.logo && /^https?:\/\//i.test(org.logo)) {
-    logoUrl = org.logo
-  }
-
-  // Base URL for the public booking link (mirrors send-invitation derivation).
-  const baseUrl = env.BETTER_AUTH_URL
-    || (env.RAILWAY_PUBLIC_DOMAIN ? `https://${env.RAILWAY_PUBLIC_DOMAIN}` : '')
-    || origin
-    || 'https://reqcore.com'
-
-  const bookingUrl = buildBookingUrl(baseUrl, id, env.BETTER_AUTH_SECRET)
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', {
-    year: 'numeric', month: 'long', day: 'numeric',
-  })
-
-  const candidateName = `${app.candidate.firstName} ${app.candidate.lastName}`.trim()
-  const vars: Record<string, string> = {
-    candidateName,
-    candidateFirstName: app.candidate.firstName,
-    candidateLastName: app.candidate.lastName,
-    jobTitle: app.job?.title ?? '',
-    organizationName: orgName,
-    bookingUrl,
-    expiresAt,
-  }
-
-  // Template resolution: explicit custom text → the job's configured template
-  // (system id or custom emailTemplate row) → the built-in default.
-  let subjectTemplate = DEFAULT_SLOT_INVITATION_SUBJECT
-  let bodyTemplate = DEFAULT_SLOT_INVITATION_BODY
-  if (body.customSubject && body.customBody) {
-    subjectTemplate = body.customSubject
-    bodyTemplate = body.customBody
-  }
-  else {
-    const availability = await db.query.jobInterviewAvailability.findFirst({
-      where: and(
-        eq(jobInterviewAvailability.jobId, app.jobId),
-        eq(jobInterviewAvailability.organizationId, orgId),
-      ),
-      columns: { invitationTemplateId: true },
-    })
-    const templateId = availability?.invitationTemplateId
-    if (templateId) {
-      const system = SYSTEM_TEMPLATES.find(t => t.id === templateId)
-      if (system) {
-        subjectTemplate = system.subject
-        bodyTemplate = system.body
-      }
-      else {
-        const custom = await db.query.emailTemplate.findFirst({
-          where: and(eq(emailTemplate.id, templateId), eq(emailTemplate.organizationId, orgId)),
-          columns: { subject: true, body: true },
-        })
-        if (custom) {
-          subjectTemplate = custom.subject
-          bodyTemplate = custom.body
-        }
-      }
-    }
-  }
-
-  await sendSlotInvitationEmail({
-    to: app.candidate.email,
-    subject: renderTemplateGeneric(subjectTemplate, vars),
-    body: renderTemplateGeneric(bodyTemplate, vars),
-    organizationName: orgName,
-    logoUrl,
+  const { candidateEmail } = await sendSlotInvitationForApplication({
+    orgId,
+    applicationId: id,
+    origin: getRequestURL(event).origin,
+    customSubject: body.customSubject,
+    customBody: body.customBody,
   })
 
   lastSentAt.set(id, Date.now())
@@ -163,8 +74,8 @@ export default defineEventHandler(async (event) => {
     action: 'updated',
     resourceType: 'application',
     resourceId: id,
-    metadata: { action: 'slot_invitation_sent', candidateEmail: app.candidate.email },
+    metadata: { action: 'slot_invitation_sent', candidateEmail },
   })
 
-  return { success: true, sentAt: new Date(), candidateEmail: app.candidate.email }
+  return { success: true, sentAt: new Date(), candidateEmail }
 })

@@ -3,6 +3,7 @@ import { interviewSlot, job, jobInterviewAvailability } from '../../../database/
 import { idParamSchema } from '../../../utils/schemas/job'
 import { jobAvailabilitySchema } from '../../../utils/schemas/interviewSlot'
 import { generateSlotStartTimes, MAX_GENERATED_SLOTS } from '../../../utils/interview-availability'
+import { cancelSlotBookings, sendSlotInvitationForApplication } from '../../../utils/slot-scheduling'
 
 /**
  * PUT /api/jobs/:id/interview-availability
@@ -75,29 +76,46 @@ export default defineEventHandler(async (event) => {
           .values({ ...values, organizationId: orgId, jobId: id })
           .returning()
 
-    // Replace future generated slots that nobody has booked.
-    const removable = await tx.select({ id: interviewSlot.id })
+    // Future slots with assignees — the rebook flow (post-commit) cancels
+    // these and re-invites the candidates.
+    const bookedFuture = await tx.select({ id: interviewSlot.id })
       .from(interviewSlot)
       .where(and(
         eq(interviewSlot.jobId, id),
         eq(interviewSlot.organizationId, orgId),
-        eq(interviewSlot.generated, true),
-        eq(interviewSlot.bookedCount, 0),
+        gt(interviewSlot.bookedCount, 0),
         gt(interviewSlot.startsAt, new Date()),
       ))
-    if (removable.length) {
-      await tx.delete(interviewSlot).where(inArray(interviewSlot.id, removable.map(r => r.id)))
+
+    // Remove prior future UNBOOKED slots per the chosen mode.
+    let removed = 0
+    if (body.priorMode !== 'keep') {
+      const removable = await tx.select({ id: interviewSlot.id })
+        .from(interviewSlot)
+        .where(and(
+          eq(interviewSlot.jobId, id),
+          eq(interviewSlot.organizationId, orgId),
+          ...(body.priorMode === 'replace-auto' ? [eq(interviewSlot.generated, true)] : []),
+          eq(interviewSlot.bookedCount, 0),
+          gt(interviewSlot.startsAt, new Date()),
+        ))
+      if (removable.length) {
+        await tx.delete(interviewSlot).where(inArray(interviewSlot.id, removable.map(r => r.id)))
+      }
+      removed = removable.length
     }
 
-    // Skip new times that collide with a kept slot (manual or booked).
-    const kept = await tx.select({ startsAt: interviewSlot.startsAt })
+    // Skip new times that collide with a kept slot. Slots that the rebook flow
+    // will cancel don't block their time in the new grid.
+    const kept = await tx.select({ id: interviewSlot.id, startsAt: interviewSlot.startsAt })
       .from(interviewSlot)
       .where(and(
         eq(interviewSlot.jobId, id),
         eq(interviewSlot.organizationId, orgId),
         gt(interviewSlot.startsAt, new Date()),
       ))
-    const taken = new Set(kept.map(k => new Date(k.startsAt).getTime()))
+    const rebooking = body.bookedAction === 'rebook' ? new Set(bookedFuture.map(b => b.id)) : new Set<string>()
+    const taken = new Set(kept.filter(k => !rebooking.has(k.id)).map(k => new Date(k.startsAt).getTime()))
     const fresh = startTimes.filter(t => !taken.has(t.getTime()))
 
     if (fresh.length) {
@@ -116,8 +134,47 @@ export default defineEventHandler(async (event) => {
       })))
     }
 
-    return { availability, created: fresh.length, removed: removable.length }
+    return { availability, created: fresh.length, removed, bookedFutureIds: bookedFuture.map(b => b.id) }
   })
+
+  // Rebook: cancel the booked interviews (with a heads-up email) and send each
+  // affected candidate a fresh time-picker link into the new schedule.
+  let rebooked = 0
+  if (body.bookedAction === 'rebook' && result.bookedFutureIds.length) {
+    const origin = getRequestURL(event).origin
+    const affectedApplications = new Set<string>()
+    for (const slotId of result.bookedFutureIds) {
+      try {
+        const { applicationIds } = await cancelSlotBookings({
+          orgId,
+          slotId,
+          followUpNote: 'The interview schedule has changed — you will receive a new scheduling link shortly to pick a time that works for you.',
+        })
+        for (const appId of applicationIds) affectedApplications.add(appId)
+        await db.update(interviewSlot)
+          .set({ status: 'cancelled', updatedAt: new Date() })
+          .where(and(eq(interviewSlot.id, slotId), eq(interviewSlot.organizationId, orgId)))
+      }
+      catch (err) {
+        logError('slots.rebook_cancel_failed', {
+          slot_id: slotId,
+          error_message: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+    for (const applicationId of affectedApplications) {
+      try {
+        await sendSlotInvitationForApplication({ orgId, applicationId, origin })
+        rebooked++
+      }
+      catch (err) {
+        logError('slots.rebook_invite_failed', {
+          application_id: applicationId,
+          error_message: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+  }
 
   recordActivity({
     organizationId: orgId,
@@ -125,11 +182,21 @@ export default defineEventHandler(async (event) => {
     action: 'updated',
     resourceType: 'job',
     resourceId: id,
-    metadata: { action: 'interview_availability_saved', created: result.created, removed: result.removed },
+    metadata: {
+      action: 'interview_availability_saved',
+      created: result.created,
+      removed: result.removed,
+      priorMode: body.priorMode,
+      bookedAction: body.bookedAction,
+      rebooked,
+    },
   })
 
   return {
-    ...result,
+    availability: result.availability,
+    created: result.created,
+    removed: result.removed,
+    rebooked,
     truncated: startTimes.length >= MAX_GENERATED_SLOTS,
   }
 })
