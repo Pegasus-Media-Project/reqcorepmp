@@ -356,6 +356,7 @@ function clearError(key: string) {
       <form
         class="space-y-5"
         :class="isPreview ? 'select-none' : ''"
+        :novalidate="!isLive"
         @submit.prevent="onSubmit"
       >
         <!-- Honeypot (hidden from humans) -->
