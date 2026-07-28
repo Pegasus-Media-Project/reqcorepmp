@@ -1,6 +1,7 @@
 import { eq, and, asc, sql } from 'drizzle-orm'
 import { fileTypeFromBuffer } from 'file-type'
 import { job, candidate, application, jobQuestion, questionResponse, document, organization, applicationSource, trackingLink, careerPage } from '../../../../database/schema'
+import { visibleQuestionIds } from '../../../../../shared/questionVisibility'
 import { publicApplicationSchema, publicJobSlugSchema } from '../../../../utils/schemas/publicApplication'
 import { createPreviewReadOnlyError } from '../../../../utils/previewReadOnly'
 import { autoScoreApplication } from '../../../../utils/ai/autoScore'
@@ -258,6 +259,12 @@ export default defineEventHandler(async (event) => {
   const fileQuestions = questions.filter((q) => q.type === 'file_upload')
   const fileQuestionIds = new Set(fileQuestions.map((q) => q.id))
 
+  // Branching: a question hidden by an unmet condition is neither required nor
+  // storable, so resolve visibility from the submitted answers first.
+  const answersById: Record<string, typeof responseArray[number]['value']> = {}
+  for (const r of responseArray) answersById[r.questionId] = r.value
+  const visibleIds = visibleQuestionIds(questions, answersById)
+
   // A required rating grid only counts as answered once every row has a score.
   const responseByQuestionId = new Map(responseArray.map((r) => [r.questionId, r.value]))
   const isRatingComplete = (questionId: string, rows: string[] | null) => {
@@ -267,6 +274,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const unanswered = requiredQuestionIds.filter((id) => {
+    if (!visibleIds.has(id)) return false
     if (fileQuestionIds.has(id)) {
       return !uploadedFiles.has(id)
     }
@@ -288,9 +296,12 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Filter out responses for questions that don't belong to this job
+  // Filter out responses for questions that don't belong to this job, or that
+  // the applicant never saw because a branch kept them hidden.
   const validQuestionIds = new Set(questions.map((q) => q.id))
-  const validResponses = responseArray.filter((r) => validQuestionIds.has(r.questionId))
+  const validResponses = responseArray.filter(
+    (r) => validQuestionIds.has(r.questionId) && visibleIds.has(r.questionId),
+  )
 
   // ─────────────────────────────────────────────
   // 4. Validate uploaded files (MIME via magic bytes, size)

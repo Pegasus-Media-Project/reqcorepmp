@@ -9,6 +9,13 @@ type Question = {
   content?: string | null
   required: boolean
   options?: string[] | null
+  /** Rating scale and branch condition; passed through to the form body. */
+  config?: {
+    ratingMax?: number
+    ratingMinLabel?: string | null
+    ratingMaxLabel?: string | null
+    visibleWhen?: { questionId: string, values: string[] } | null
+  } | null
   sectionId?: string | null
 }
 

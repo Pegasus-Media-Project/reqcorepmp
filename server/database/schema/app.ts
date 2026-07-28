@@ -344,14 +344,17 @@ export const jobQuestion = pgTable('job_question', {
   required: boolean('required').notNull().default(false),
   options: jsonb('options').$type<string[]>(),
   /**
-   * Type-specific settings. Only `rating` uses it today: the rows come from
-   * `options`, and this carries the scale (`ratingMax`) plus the optional
-   * endpoint captions shown above the first and last columns.
+   * Type-specific settings.
+   *
+   * `rating` takes its rows from `options` and its scale (`ratingMax`) plus the
+   * optional endpoint captions from here. `visibleWhen` is type-agnostic: it
+   * branches the question off another question's answer.
    */
   config: jsonb('config').$type<{
     ratingMax?: number
     ratingMinLabel?: string | null
     ratingMaxLabel?: string | null
+    visibleWhen?: { questionId: string, values: string[] } | null
   } | null>(),
   displayOrder: integer('display_order').notNull().default(0),
   createdAt: timestamp('created_at').notNull().defaultNow(),

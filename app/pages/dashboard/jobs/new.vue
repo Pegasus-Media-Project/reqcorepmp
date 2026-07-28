@@ -78,6 +78,7 @@ type QuestionConfig = {
   ratingMax?: number
   ratingMinLabel?: string | null
   ratingMaxLabel?: string | null
+  visibleWhen?: { questionId: string, values: string[] } | null
 }
 
 type DraftQuestion = {
@@ -346,6 +347,10 @@ const draftQuestionSchema = z.object({
     ratingMax: z.number().int().min(2).max(10).optional(),
     ratingMinLabel: z.string().trim().max(100).nullish(),
     ratingMaxLabel: z.string().trim().max(100).nullish(),
+    visibleWhen: z.object({
+      questionId: z.string().min(1),
+      values: z.array(z.string().max(200)).min(1).max(50),
+    }).nullish(),
   }).nullish(),
   sectionId: z.string().min(1).nullish(),
 })
@@ -774,6 +779,8 @@ async function handleSubmit(mode: 'publish' | 'draft' = publishChoice.value) {
           description: section.description || undefined,
         })),
       questions: applicationForm.value.questions.map((question, index) => ({
+        // Draft id, so the server can resolve branch conditions to real ids.
+        ref: question.id,
         label: question.label,
         type: question.type,
         description: question.description || undefined,

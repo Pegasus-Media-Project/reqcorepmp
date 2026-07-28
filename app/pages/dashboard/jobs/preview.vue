@@ -24,6 +24,7 @@ type DraftQuestion = {
     ratingMax?: number
     ratingMinLabel?: string | null
     ratingMaxLabel?: string | null
+    visibleWhen?: { questionId: string, values: string[] } | null
   } | null
 }
 
@@ -169,6 +170,7 @@ onMounted(loadDraft)
         v-model:resume="resumeFile"
         v-model:cover-letter="coverLetterText"
         :job="previewJob"
+        mode="review"
         :submit-error="submitError"
         @clear-error="submitError = null"
         @submit="handlePreviewSubmit"

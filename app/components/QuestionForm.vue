@@ -1,10 +1,21 @@
 <script setup lang="ts">
 import { X, Plus, Trash2 } from 'lucide-vue-next'
 
+import type { VisibilityCondition } from '~~/shared/questionVisibility'
+
 type QuestionConfig = {
   ratingMax?: number
   ratingMinLabel?: string | null
   ratingMaxLabel?: string | null
+  visibleWhen?: VisibilityCondition | null
+}
+
+/** A question this one can branch off — always one that comes before it. */
+type ConditionSource = {
+  id: string
+  label: string
+  type: string
+  options?: string[] | null
 }
 
 const props = defineProps<{
@@ -21,6 +32,8 @@ const props = defineProps<{
   }
   /** Preselects the field type when adding a new item (e.g. 'info'). */
   initialType?: string
+  /** Earlier questions with discrete answers, offered as branch conditions. */
+  conditionSources?: ConditionSource[]
 }>()
 
 const emit = defineEmits<{
@@ -63,6 +76,9 @@ const form = ref({
   ratingMax: props.question?.config?.ratingMax ?? DEFAULT_RATING_MAX,
   ratingMinLabel: props.question?.config?.ratingMinLabel ?? '',
   ratingMaxLabel: props.question?.config?.ratingMaxLabel ?? '',
+  conditionEnabled: !!props.question?.config?.visibleWhen,
+  conditionQuestionId: props.question?.config?.visibleWhen?.questionId ?? '',
+  conditionValues: [...(props.question?.config?.visibleWhen?.values ?? [])],
 })
 
 const errors = ref<Record<string, string>>({})
@@ -78,6 +94,34 @@ const isRating = computed(() => form.value.type === 'rating')
 const hasOptionList = computed(() => isSelectType.value || isRating.value)
 
 const ratingScaleChoices = [2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+// ─────────────────────────────────────────────
+// Branching: show this item only for certain answers to an earlier question
+// ─────────────────────────────────────────────
+
+const conditionSources = computed<ConditionSource[]>(() => props.conditionSources ?? [])
+
+const conditionSource = computed(() =>
+  conditionSources.value.find(q => q.id === form.value.conditionQuestionId) ?? null)
+
+/** Answers of the controlling question, as pickable trigger values. */
+const conditionChoices = computed<{ value: string, label: string }[]>(() => {
+  const source = conditionSource.value
+  if (!source) return []
+  if (source.type === 'checkbox') {
+    return [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }]
+  }
+  return (source.options ?? []).map(option => ({ value: option, label: option }))
+})
+
+function toggleConditionValue(value: string) {
+  const index = form.value.conditionValues.indexOf(value)
+  if (index >= 0) form.value.conditionValues.splice(index, 1)
+  else form.value.conditionValues.push(value)
+}
+
+// Switching the controlling question invalidates whichever answers were picked.
+watch(() => form.value.conditionQuestionId, () => { form.value.conditionValues = [] })
 
 /** Preview of the columns a candidate will see. */
 const ratingColumns = computed(() =>
@@ -106,6 +150,14 @@ function removeOption(index: number) {
 function validate(): boolean {
   errors.value = {}
 
+  if (form.value.conditionEnabled) {
+    if (!form.value.conditionQuestionId) {
+      errors.value.condition = 'Choose the question this one depends on'
+    } else if (form.value.conditionValues.length === 0) {
+      errors.value.condition = 'Choose at least one answer that reveals this question'
+    }
+  }
+
   if (isInfo.value) {
     // Info blocks: heading optional, rich content required.
     if (!hasRichContent(form.value.content)) {
@@ -116,6 +168,7 @@ function validate(): boolean {
     }
     return Object.keys(errors.value).length === 0
   }
+
 
   if (!form.value.label.trim()) {
     errors.value.label = 'Question label is required'
@@ -144,6 +197,29 @@ function validate(): boolean {
   return Object.keys(errors.value).length === 0
 }
 
+/**
+ * Assemble the type-specific config. Settings for a type the question no
+ * longer is are dropped, so a stale rating scale can't linger.
+ */
+function buildConfig(): QuestionConfig | null {
+  const config: QuestionConfig = {}
+
+  if (isRating.value) {
+    config.ratingMax = form.value.ratingMax
+    config.ratingMinLabel = form.value.ratingMinLabel.trim() || null
+    config.ratingMaxLabel = form.value.ratingMaxLabel.trim() || null
+  }
+
+  if (form.value.conditionEnabled && form.value.conditionQuestionId && form.value.conditionValues.length) {
+    config.visibleWhen = {
+      questionId: form.value.conditionQuestionId,
+      values: [...form.value.conditionValues],
+    }
+  }
+
+  return Object.keys(config).length ? config : null
+}
+
 function handleSubmit() {
   if (!validate()) return
 
@@ -162,6 +238,8 @@ function handleSubmit() {
     required: isInfo.value ? false : form.value.required,
   }
 
+  data.config = buildConfig()
+
   if (isInfo.value) {
     data.content = form.value.content
     emit('save', data)
@@ -177,16 +255,6 @@ function handleSubmit() {
       .map((o) => o.trim())
       .filter((o) => o.length > 0)
   }
-
-  // Clear the config when the type is switched away from a rating grid so a
-  // stale scale can't linger on the question.
-  data.config = isRating.value
-    ? {
-        ratingMax: form.value.ratingMax,
-        ratingMinLabel: form.value.ratingMinLabel.trim() || null,
-        ratingMaxLabel: form.value.ratingMaxLabel.trim() || null,
-      }
-    : null
 
   emit('save', data)
 }
@@ -357,6 +425,64 @@ const isEditing = computed(() => !!props.question)
           {{ isRating ? 'Add item' : 'Add option' }}
         </button>
         <p v-if="errors.options" class="mt-1 text-xs text-danger-600 dark:text-danger-400">{{ errors.options }}</p>
+      </div>
+
+      <!-- Branching: only show this item for certain earlier answers -->
+      <div v-if="conditionSources.length" class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-800/50 p-3">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input
+            v-model="form.conditionEnabled"
+            type="checkbox"
+            class="size-4 rounded border-surface-300 dark:border-surface-700 text-brand-600 focus:ring-brand-500"
+          />
+          <span class="text-sm font-medium text-surface-700 dark:text-surface-300">
+            Only show this {{ isInfo ? 'block' : 'question' }} for certain answers
+          </span>
+        </label>
+
+        <div v-if="form.conditionEnabled" class="mt-3 space-y-3">
+          <div>
+            <label for="q-condition-source" class="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1">
+              Depends on
+            </label>
+            <select
+              id="q-condition-source"
+              v-model="form.conditionQuestionId"
+              class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors bg-white dark:bg-surface-800"
+            >
+              <option value="" disabled>Choose an earlier question…</option>
+              <option v-for="source in conditionSources" :key="source.id" :value="source.id">
+                {{ source.label }}
+              </option>
+            </select>
+          </div>
+
+          <div v-if="conditionChoices.length">
+            <p class="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1">
+              Show when the answer is
+            </p>
+            <div class="space-y-1.5">
+              <label
+                v-for="choice in conditionChoices"
+                :key="choice.value"
+                class="flex items-center gap-2 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  :checked="form.conditionValues.includes(choice.value)"
+                  class="size-4 rounded border-surface-300 dark:border-surface-700 text-brand-600 focus:ring-brand-500"
+                  @change="toggleConditionValue(choice.value)"
+                />
+                <span class="text-sm text-surface-700 dark:text-surface-300">{{ choice.label }}</span>
+              </label>
+            </div>
+          </div>
+
+          <p v-if="errors.condition" class="text-xs text-danger-600 dark:text-danger-400">{{ errors.condition }}</p>
+          <p v-else class="text-xs text-surface-400 dark:text-surface-500">
+            Applicants who answer differently never see it, and it's left out of their application.
+          </p>
+        </div>
       </div>
 
       <!-- Required -->

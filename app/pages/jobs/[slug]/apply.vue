@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Briefcase, CreditCard } from 'lucide-vue-next'
+import { visibleQuestionIds } from '~~/shared/questionVisibility'
 
 definePageMeta({
   layout: 'public',
@@ -69,6 +70,9 @@ const form = ref({
 // Dynamic question responses: questionId → value
 const responses = ref<Record<string, string | string[] | number | boolean | Record<string, number>>>({})
 
+/** Questions currently revealed by the applicant's answers (branching). */
+const visibleIds = computed(() => visibleQuestionIds(job.value?.questions ?? [], responses.value))
+
 // File uploads: questionId → File object
 const fileUploads = ref<Record<string, File>>({})
 
@@ -131,9 +135,11 @@ function validate(): boolean {
     errors.value.resume = t('jobs.apply.validation.fileTooLarge')
   }
 
-  // Validate required custom questions
+  // Validate required custom questions. Questions hidden by an unmet branch
+  // condition are neither required nor submitted.
   if (job.value?.questions) {
     for (const q of job.value.questions) {
+      if (!visibleIds.value.has(q.id)) continue
       if (q.required) {
         if (q.type === 'file_upload') {
           // For file uploads, check if a File was selected
@@ -173,6 +179,7 @@ async function handleSubmit() {
     const responseArray = Object.entries(responses.value)
       .filter(([questionId, value]) => {
         if (fileQuestionIds.has(questionId)) return false
+        if (!visibleIds.value.has(questionId)) return false
         return hasAnswerValue(value)
       })
       .map(([questionId, value]) => ({ questionId, value }))

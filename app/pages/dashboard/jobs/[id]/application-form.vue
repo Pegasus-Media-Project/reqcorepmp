@@ -127,6 +127,7 @@ type QuestionConfig = {
   ratingMax?: number
   ratingMinLabel?: string | null
   ratingMaxLabel?: string | null
+  visibleWhen?: { questionId: string, values: string[] } | null
 }
 
 type BuilderQuestion = {

@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import {
   Lock, Upload, FileText, GripVertical, Plus, Pencil, Trash2,
-  ChevronUp, ChevronDown, Check,
+  ChevronUp, ChevronDown, Check, GitBranch,
 } from 'lucide-vue-next'
+import {
+  BRANCHABLE_QUESTION_TYPES,
+  describeVisibilityCondition,
+  type VisibilityCondition,
+} from '~~/shared/questionVisibility'
 
 /**
  * Live application builder: recruiter controls on the left, a real candidate
@@ -17,11 +22,12 @@ type QuestionType =
   | 'short_text' | 'long_text' | 'single_select' | 'multi_select'
   | 'number' | 'date' | 'url' | 'checkbox' | 'file_upload' | 'info' | 'rating'
 
-/** Type-specific settings; only rating grids use it today. */
+/** Type-specific settings: rating scale, plus any branch condition. */
 type QuestionConfig = {
   ratingMax?: number
   ratingMinLabel?: string | null
   ratingMaxLabel?: string | null
+  visibleWhen?: VisibilityCondition | null
 }
 
 type DraftQuestion = {
@@ -210,16 +216,42 @@ async function handleUpdateQuestion(data: QuestionInput) {
   questionActionError.value = null
 }
 
+/** Questions whose branch condition points at `questionId`. */
+function dependentsOf(questionId: string) {
+  return model.value.questions.filter(q => q.config?.visibleWhen?.questionId === questionId)
+}
+
+/** Strip a question's branch condition, keeping the rest of its config. */
+function configWithoutCondition(question: DraftQuestion): QuestionConfig | null {
+  const { visibleWhen: _dropped, ...rest } = question.config ?? {}
+  return Object.keys(rest).length ? rest : null
+}
+
 async function handleDeleteQuestion(questionId: string) {
+  // Anything branching off this question loses its condition rather than
+  // being stranded behind an answer that can no longer be given.
+  const orphaned = dependentsOf(questionId)
+
   if (props.operations) {
-    if (await runOp(() => props.operations!.deleteQuestion(questionId)) && editingQuestion.value?.id === questionId) {
-      editingQuestion.value = null
+    if (await runOp(() => props.operations!.deleteQuestion(questionId))) {
+      if (editingQuestion.value?.id === questionId) editingQuestion.value = null
+      for (const dependent of orphaned) {
+        await runOp(() => props.operations!.updateQuestion(dependent.id, {
+          label: dependent.label,
+          type: dependent.type,
+          required: dependent.required,
+          config: configWithoutCondition(dependent),
+        }))
+      }
     }
     return
   }
   const index = model.value.questions.findIndex((q) => q.id === questionId)
   if (index === -1) return
   model.value.questions.splice(index, 1)
+  for (const dependent of orphaned) {
+    dependent.config = configWithoutCondition(dependent)
+  }
   if (editingQuestion.value?.id === questionId) editingQuestion.value = null
   questionActionError.value = null
 }
@@ -368,6 +400,33 @@ const questionGroups = computed<QuestionGroup[]>(() => {
 
 /** Whether to show page headers (only once real pages exist). */
 const showGroupHeaders = computed(() => sectionsEnabled.value && sections.value.length > 0)
+
+// ─────────────────────────────────────────────
+// Branching
+// ─────────────────────────────────────────────
+
+/** Questions with a discrete answer that a later item can branch off. */
+function branchSourcesBefore(index: number) {
+  return model.value.questions
+    .slice(0, index === -1 ? model.value.questions.length : index)
+    .filter(q => (BRANCHABLE_QUESTION_TYPES as readonly string[]).includes(q.type))
+    .map(q => ({ id: q.id, label: q.label || 'Untitled', type: q.type, options: q.options ?? null }))
+}
+
+/** Sources offered to the add form — a new item lands at the end of the list. */
+const addFormConditionSources = computed(() => branchSourcesBefore(-1))
+
+/** Sources offered when editing: only questions that come before it. */
+const editFormConditionSources = computed(() => {
+  const editing = editingQuestion.value
+  if (!editing) return []
+  return branchSourcesBefore(model.value.questions.findIndex(q => q.id === editing.id))
+})
+
+/** Plain-language summary of a question's branch, for the row badge. */
+function conditionSummary(question: DraftQuestion): string | null {
+  return describeVisibilityCondition(question.config?.visibleWhen, model.value.questions)
+}
 
 /** Page the add form renders in; falls back to the default page if the target
  *  page was deleted while the form was open. */
@@ -738,6 +797,13 @@ function handleEditField(field: string) {
                       >
                         &middot; {{ q.options.length }} {{ q.options.length === 1 ? 'item' : 'items' }}, 1&ndash;{{ q.config?.ratingMax ?? 5 }}
                       </span>
+                      <span
+                        v-if="conditionSummary(q)"
+                        class="inline-flex items-center gap-1 rounded-md bg-surface-100 dark:bg-surface-800 px-2 py-0.5 text-[10px] font-medium text-surface-500 dark:text-surface-400 ring-1 ring-inset ring-surface-200 dark:ring-surface-700"
+                        :title="conditionSummary(q) ?? ''"
+                      >
+                        <GitBranch class="size-3" /> {{ conditionSummary(q) }}
+                      </span>
                     </div>
                   </div>
                   <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
@@ -784,6 +850,7 @@ function handleEditField(field: string) {
                   :key="`edit-${q.id}`"
                   data-question-form
                   :question="editingQuestion"
+                  :condition-sources="editFormConditionSources"
                   class="mb-3"
                   @save="handleUpdateQuestion"
                   @cancel="editingQuestion = null"
@@ -801,6 +868,7 @@ function handleEditField(field: string) {
               data-question-form
               class="mt-3"
               :initial-type="addInitialType"
+              :condition-sources="addFormConditionSources"
               @save="handleAddQuestion"
               @cancel="showAddForm = false"
             />

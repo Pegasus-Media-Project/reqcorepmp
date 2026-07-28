@@ -87,6 +87,7 @@ function handleSubmit() {
         v-model:resume="resumeFile"
         v-model:cover-letter="coverLetterText"
         :job="job"
+        mode="review"
         :sections="job.sections ?? []"
         :errors="errors"
         @clear-error="(key: string) => delete errors[key]"

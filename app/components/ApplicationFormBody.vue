@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { visibleQuestionIds, describeVisibilityCondition } from '~~/shared/questionVisibility'
+
 /**
  * Presentational application form — the single source of truth for how the
  * candidate-facing application renders. Used in two modes:
@@ -10,6 +12,13 @@
  *                application builder. Fields are inert; clicking a field group
  *                emits `edit-field` so the builder can open the matching editor.
  *                Preview always renders the whole form on one page.
+ *  - `review`  : the shared read-only review link. Interactive like `live` so a
+ *                reviewer can page through the form, but nothing is required
+ *                and nothing is submitted.
+ *
+ * `live` hides questions whose branch condition isn't met; the other two modes
+ * show every branch, each labelled with the answer that reveals it, so a
+ * reviewer sees the whole form.
  *
  * Keeping both modes in one component is deliberate: the recruiter preview can
  * never drift from what candidates actually see, because there is only one
@@ -29,6 +38,7 @@ type Question = {
     ratingMax?: number
     ratingMinLabel?: string | null
     ratingMaxLabel?: string | null
+    visibleWhen?: { questionId: string, values: string[] } | null
   } | null
   sectionId?: string | null
 }
@@ -48,7 +58,7 @@ const props = withDefaults(defineProps<{
     questions?: Question[]
   }
   sections?: Section[]
-  mode?: 'live' | 'preview'
+  mode?: 'live' | 'preview' | 'review'
   errors?: Record<string, string>
   submitError?: string | null
   isSubmitting?: boolean
@@ -83,6 +93,10 @@ const { t } = useI18n()
 
 const isPreview = computed(() => props.mode === 'preview')
 
+/** Only the real form enforces required answers and hides unmet branches. */
+const isLive = computed(() => props.mode === 'live')
+
+
 /** In preview mode, clicking a field group edits it instead of focusing the input. */
 function onFieldClick(field: string) {
   if (isPreview.value) emit('edit-field', field)
@@ -98,18 +112,52 @@ const sortedSections = computed(() =>
 const allQuestions = computed(() => props.job.questions ?? [])
 const sectionIds = computed(() => new Set(sortedSections.value.map(s => s.id)))
 
+// ─────────────────────────────────────────────
+// Branching
+// ─────────────────────────────────────────────
+/** Ids of the questions the applicant can currently see. */
+const branchVisibleIds = computed(() => visibleQuestionIds(allQuestions.value, responses.value))
+
+/** Live hides unmet branches; preview and review show every one of them. */
+function passesBranch(question: Question): boolean {
+  return !isLive.value || branchVisibleIds.value.has(question.id)
+}
+
+/** Caption for a branched question, shown wherever all branches are on display. */
+function branchLabel(question: Question): string | null {
+  if (isLive.value) return null
+  return describeVisibilityCondition(question.config?.visibleWhen, allQuestions.value)
+}
+
+// An answer given before a branch closed must not linger: it would submit an
+// answer the applicant can no longer see, and keep any question branching off
+// it alive. Only the live form prunes — the others never submit.
+watch(branchVisibleIds, (visible) => {
+  if (!isLive.value) return
+  for (const question of allQuestions.value) {
+    if (!visible.has(question.id) && responses.value[question.id] !== undefined) {
+      delete responses.value[question.id]
+    }
+  }
+})
+
 /** Questions not tied to a (still-existing) section — the implicit default page. */
 const unsectionedQuestions = computed(() =>
-  allQuestions.value.filter(q => !q.sectionId || !sectionIds.value.has(q.sectionId)))
+  allQuestions.value.filter(q =>
+    (!q.sectionId || !sectionIds.value.has(q.sectionId)) && passesBranch(q)))
 
 function questionsForSection(sectionId: string) {
-  return allQuestions.value.filter(q => q.sectionId === sectionId)
+  return allQuestions.value.filter(q => q.sectionId === sectionId && passesBranch(q))
 }
 
 const hasDocuments = computed(() => !!props.job.requireResume || !!props.job.requireCoverLetter)
 
-/** Wizard is only active on the live form when the job defines sections. */
-const isWizard = computed(() => props.mode === 'live' && sortedSections.value.length > 0)
+/**
+ * The wizard runs wherever the form is interactive and the job defines
+ * sections — the review link included, so a reviewer sees the same paging an
+ * applicant will. Only the builder's inert preview flattens to one page.
+ */
+const isWizard = computed(() => props.mode !== 'preview' && sortedSections.value.length > 0)
 
 type Step =
   | { key: 'personal' }
@@ -119,7 +167,11 @@ type Step =
 
 const steps = computed<Step[]>(() => {
   const arr: Step[] = [{ key: 'personal' }]
-  for (const s of sortedSections.value) arr.push({ key: 'section', section: s })
+  // A page whose questions are all branched away is skipped rather than shown
+  // empty.
+  for (const s of sortedSections.value) {
+    if (questionsForSection(s.id).length) arr.push({ key: 'section', section: s })
+  }
   if (unsectionedQuestions.value.length) arr.push({ key: 'default' })
   if (hasDocuments.value) arr.push({ key: 'documents' })
   return arr
@@ -137,7 +189,7 @@ const showDocuments = computed(() => hasDocuments.value && (!isWizard.value || a
 
 /** Questions visible on the current view. Non-wizard shows all; wizard shows the step's. */
 const visibleQuestions = computed<Question[]>(() => {
-  if (!isWizard.value) return allQuestions.value
+  if (!isWizard.value) return allQuestions.value.filter(passesBranch)
   const step = activeStep.value
   if (step?.key === 'section') return questionsForSection(step.section.id)
   if (step?.key === 'default') return unsectionedQuestions.value
@@ -171,6 +223,13 @@ const displayErrors = computed<Record<string, string>>(() => ({ ...props.errors,
 
 /** Validate only the fields on the current step before advancing. */
 function validateCurrentStep(): boolean {
+  // Only the real form gates navigation — a reviewer following a share link
+  // shouldn't have to invent answers just to reach the next page.
+  if (!isLive.value) {
+    stepErrors.value = {}
+    return true
+  }
+
   const errs: Record<string, string> = {}
   const step = activeStep.value
   if (step?.key === 'personal') {
@@ -435,6 +494,12 @@ function clearError(key: string) {
             <p v-else class="text-sm font-medium text-surface-700 dark:text-surface-300">{{ t('jobs.form.additionalQuestions') }}</p>
             <div class="space-y-5">
               <div v-for="q in visibleQuestions" :key="q.id">
+                <p
+                  v-if="branchLabel(q)"
+                  class="mb-1.5 inline-flex items-center gap-1 rounded-md bg-surface-100 dark:bg-surface-800 px-2 py-0.5 text-[11px] font-medium text-surface-500 dark:text-surface-400"
+                >
+                  {{ branchLabel(q) }}
+                </p>
                 <FormInfoBlock v-if="q.type === 'info'" :block="q" />
                 <DynamicField
                   v-else
@@ -463,6 +528,12 @@ function clearError(key: string) {
                   @click="onFieldClick(`question:${q.id}`)"
                 >
                   <div :class="isPreview ? 'pointer-events-none' : ''">
+                    <p
+                      v-if="branchLabel(q)"
+                      class="mb-1.5 inline-flex items-center gap-1 rounded-md bg-surface-100 dark:bg-surface-800 px-2 py-0.5 text-[11px] font-medium text-surface-500 dark:text-surface-400"
+                    >
+                      {{ branchLabel(q) }}
+                    </p>
                     <FormInfoBlock v-if="q.type === 'info'" :block="q" />
                     <DynamicField
                       v-else

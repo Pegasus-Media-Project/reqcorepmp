@@ -21,6 +21,15 @@ export const questionConfigSchema = z.object({
   ratingMax: z.number().int().min(RATING_MIN_SCALE).max(RATING_MAX_SCALE).optional(),
   ratingMinLabel: z.string().trim().max(100).nullish(),
   ratingMaxLabel: z.string().trim().max(100).nullish(),
+  /**
+   * Branching: show this question only when another question's answer matches.
+   * `questionId` holds a real question id, or — from the create-job wizard,
+   * where ids don't exist yet — the controlling question's `ref`.
+   */
+  visibleWhen: z.object({
+    questionId: z.string().min(1).max(100),
+    values: z.array(z.string().max(200)).min(1).max(50),
+  }).nullish(),
 })
 
 /** `rating` reuses `options` for its rows, so both need the same option checks. */
@@ -80,6 +89,8 @@ export const createQuestionSchema = z.object({
   required: z.boolean().default(false),
   options: z.array(z.string().trim().min(1).max(200)).min(1).max(50).optional(),
   config: questionConfigSchema.nullish(),
+  /** Client-side id used by the create-job wizard to wire up branch conditions. */
+  ref: z.string().min(1).max(100).optional(),
   displayOrder: z.number().int().min(0).default(0),
   /** Optional wizard section/page this question belongs to. Null = default page. */
   sectionId: z.string().min(1).nullish(),

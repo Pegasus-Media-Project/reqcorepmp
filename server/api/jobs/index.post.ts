@@ -107,7 +107,7 @@ export default defineEventHandler(async (event) => {
     }
 
     if (body.questions.length) {
-      await tx.insert(jobQuestion).values(body.questions.map((question, index) => ({
+      const insertedQuestions = await tx.insert(jobQuestion).values(body.questions.map((question, index) => ({
         organizationId: orgId,
         jobId,
         // `sectionId` from the wizard holds a section ref; map it to the real id.
@@ -120,7 +120,30 @@ export default defineEventHandler(async (event) => {
         options: question.options,
         config: question.config ?? null,
         displayOrder: index,
-      })))
+      }))).returning({ id: jobQuestion.id })
+
+      // Branch conditions arrive holding the controlling question's wizard
+      // `ref`; rewrite them to real ids now that those exist. A condition
+      // naming a ref that wasn't submitted is dropped rather than left dangling.
+      const questionRefToId = new Map<string, string>()
+      body.questions.forEach((question, index) => {
+        const created = insertedQuestions[index]
+        if (question.ref && created) questionRefToId.set(question.ref, created.id)
+      })
+
+      for (const [index, question] of body.questions.entries()) {
+        const condition = question.config?.visibleWhen
+        const created = insertedQuestions[index]
+        if (!condition || !created) continue
+        const controllerId = questionRefToId.get(condition.questionId)
+        const { visibleWhen: _dropped, ...rest } = question.config ?? {}
+        const config = controllerId
+          ? { ...rest, visibleWhen: { ...condition, questionId: controllerId } }
+          : rest
+        await tx.update(jobQuestion)
+          .set({ config })
+          .where(eq(jobQuestion.id, created.id))
+      }
     }
 
     if (body.criteria.length) {
