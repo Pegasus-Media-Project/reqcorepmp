@@ -216,11 +216,13 @@
         "emailRequired": "Email is required",
         "emailInvalid": "Invalid email address",
         "phoneRequired": "Phone number is required",
+        "phoneInvalid": "Enter a valid phone number",
         "resumeRequired": "Resume/CV is required",
         "coverLetterRequired": "Cover letter is required",
         "coverLetterTooLong": "Cover letter must be 10,000 characters or fewer.",
         "fileTooLarge": "File too large. Maximum 10 MB.",
-        "fieldRequired": "This field is required"
+        "fieldRequired": "This field is required",
+        "numberInvalid": "Enter a number"
       }
     },
     "confirmation": {

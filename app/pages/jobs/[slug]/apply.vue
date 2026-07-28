@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Briefcase, CreditCard } from 'lucide-vue-next'
 import { visibleQuestionIds } from '~~/shared/questionVisibility'
+import { isValidEmail, isValidPhone, isNumericAnswer } from '~~/shared/fieldFormats'
 
 definePageMeta({
   layout: 'public',
@@ -111,11 +112,15 @@ function validate(): boolean {
   if (!form.value.lastName.trim()) errors.value.lastName = t('jobs.apply.validation.lastNameRequired')
   if (!form.value.email.trim()) {
     errors.value.email = t('jobs.apply.validation.emailRequired')
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.value.email)) {
+  } else if (!isValidEmail(form.value.email)) {
     errors.value.email = t('jobs.apply.validation.emailInvalid')
   }
-  if (job.value?.phoneRequirement === 'required' && !form.value.phone.trim()) {
-    errors.value.phone = t('jobs.apply.validation.phoneRequired')
+  if (!form.value.phone.trim()) {
+    if (job.value?.phoneRequirement === 'required') {
+      errors.value.phone = t('jobs.apply.validation.phoneRequired')
+    }
+  } else if (!isValidPhone(form.value.phone)) {
+    errors.value.phone = t('jobs.apply.validation.phoneInvalid')
   }
 
   // Validate required resume
@@ -140,6 +145,11 @@ function validate(): boolean {
   if (job.value?.questions) {
     for (const q of job.value.questions) {
       if (!visibleIds.value.has(q.id)) continue
+      const answer = responses.value[q.id]
+      if (q.type === 'number' && answer !== undefined && answer !== '' && !isNumericAnswer(answer)) {
+        errors.value[`q-${q.id}`] = t('jobs.apply.validation.numberInvalid')
+        continue
+      }
       if (q.required) {
         if (q.type === 'file_upload') {
           // For file uploads, check if a File was selected

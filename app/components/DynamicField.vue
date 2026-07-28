@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Upload, X } from 'lucide-vue-next'
+import { sanitizeNumberInput, isNumericText } from '~~/shared/fieldFormats'
 
 /**
  * Renders a custom question as the appropriate form field based on its type.
@@ -39,9 +40,33 @@ const stringModel = computed({
   set: (v: string) => { model.value = v },
 })
 
-const numberModel = computed({
-  get: () => (model.value as number) ?? undefined,
-  set: (v: number) => { model.value = v },
+/**
+ * `number` questions render as a text input with a numeric keypad rather than
+ * `type="number"`: browsers disagree on what a number input accepts (Firefox
+ * takes letters, Chrome allows `e` and `+`), and only a text input can be
+ * sanitized on the way in. `numberText` holds what's on screen — including
+ * part-typed values like `-` or `12.` — while the model holds the parsed number.
+ */
+const numberText = ref(typeof model.value === 'number' ? String(model.value) : '')
+
+function onNumberInput(event: Event) {
+  const el = event.target as HTMLInputElement
+  const cleaned = sanitizeNumberInput(el.value)
+  // Write straight back so a rejected character never shows, even briefly.
+  if (el.value !== cleaned) el.value = cleaned
+  numberText.value = cleaned
+  model.value = isNumericText(cleaned) ? Number(cleaned) : undefined
+}
+
+// Keep the field in step when the parent resets the answer (e.g. a branch
+// closing), without disturbing a value the applicant is mid-way through typing.
+watch(() => model.value, (value) => {
+  if (props.question.type !== 'number') return
+  if (typeof value === 'number') {
+    if (Number(numberText.value) !== value) numberText.value = String(value)
+  } else if (isNumericText(numberText.value)) {
+    numberText.value = ''
+  }
 })
 
 const booleanModel = computed({
@@ -254,14 +279,16 @@ const normalBorderClass = 'border-surface-300 dark:border-surface-700'
       </table>
     </div>
 
-    <!-- Number -->
+    <!-- Number (text input so non-numeric characters can be refused outright) -->
     <input
       v-else-if="question.type === 'number'"
       :id="`q-${question.id}`"
-      v-model="numberModel"
-      type="number"
+      :value="numberText"
+      type="text"
+      inputmode="decimal"
       :required="question.required"
       :class="[inputClasses, error ? errorBorderClass : normalBorderClass]"
+      @input="onNumberInput"
     />
 
     <!-- Date -->

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { visibleQuestionIds, describeVisibilityCondition } from '~~/shared/questionVisibility'
+import { sanitizePhoneInput, isValidPhone, isValidEmail, isNumericAnswer } from '~~/shared/fieldFormats'
 
 /**
  * Presentational application form — the single source of truth for how the
@@ -219,7 +220,89 @@ const currentSectionMeta = computed(() => {
 // ─────────────────────────────────────────────
 
 const stepErrors = ref<Record<string, string>>({})
-const displayErrors = computed<Record<string, string>>(() => ({ ...props.errors, ...stepErrors.value }))
+
+/**
+ * Fields the applicant has already finished with — left, or tried to move past.
+ * Only these show an inline error, so nobody is told they're wrong one
+ * character into their first attempt.
+ */
+const touched = ref<Record<string, boolean>>({})
+
+function markTouched(key: string) {
+  if (isLive.value) touched.value[key] = true
+}
+
+/**
+ * The current problem with one field, or null. Every check runs through here,
+ * so the message shown while typing is the same one the page gate produces.
+ */
+function fieldError(key: string): string | null {
+  if (key === 'firstName') {
+    return form.value.firstName.trim() ? null : t('jobs.apply.validation.firstNameRequired')
+  }
+  if (key === 'lastName') {
+    return form.value.lastName.trim() ? null : t('jobs.apply.validation.lastNameRequired')
+  }
+  if (key === 'email') {
+    const value = form.value.email.trim()
+    if (!value) return t('jobs.apply.validation.emailRequired')
+    return isValidEmail(value) ? null : t('jobs.apply.validation.emailInvalid')
+  }
+  if (key === 'phone') {
+    const value = form.value.phone.trim()
+    if (!value) {
+      return props.job.phoneRequirement === 'required'
+        ? t('jobs.apply.validation.phoneRequired')
+        : null
+    }
+    return isValidPhone(value) ? null : t('jobs.apply.validation.phoneInvalid')
+  }
+  if (key.startsWith('q-')) {
+    const question = allQuestions.value.find(q => `q-${q.id}` === key)
+    // A question hidden by a branch is nobody's problem.
+    if (!question || !branchVisibleIds.value.has(question.id)) return null
+    const answer = responses.value[question.id]
+    if (question.type === 'number' && answer !== undefined && answer !== '' && !isNumericAnswer(answer)) {
+      return t('jobs.apply.validation.numberInvalid')
+    }
+    if (question.required && question.type !== 'file_upload' && isAnswerMissing(question, answer)) {
+      return t('jobs.apply.validation.fieldRequired')
+    }
+  }
+  return null
+}
+
+/** Fields belonging to a step, in the order they're rendered. */
+function fieldKeysForStep(step: Step | undefined): string[] {
+  if (step?.key === 'personal') {
+    const keys = ['firstName', 'lastName', 'email']
+    if (props.job.phoneRequirement !== 'hidden') keys.push('phone')
+    return keys
+  }
+  if (step?.key === 'section' || step?.key === 'default') {
+    return visibleQuestions.value.map(q => `q-${q.id}`)
+  }
+  return []
+}
+
+/** Live problems with the fields the applicant has already been through. */
+const liveErrors = computed<Record<string, string>>(() => {
+  if (!isLive.value) return {}
+  const errs: Record<string, string> = {}
+  for (const key of Object.keys(touched.value)) {
+    const message = fieldError(key)
+    if (message) errs[key] = message
+  }
+  return errs
+})
+
+// Live checks win: they reflect what's in the field right now, where a step or
+// server error may already be stale.
+const displayErrors = computed<Record<string, string>>(() => ({
+  ...props.errors,
+  ...stepErrors.value,
+  ...liveErrors.value,
+}))
 
 /** Validate only the fields on the current step before advancing. */
 function validateCurrentStep(): boolean {
@@ -232,27 +315,32 @@ function validateCurrentStep(): boolean {
 
   const errs: Record<string, string> = {}
   const step = activeStep.value
-  if (step?.key === 'personal') {
-    if (!form.value.firstName.trim()) errs.firstName = t('jobs.apply.validation.firstNameRequired')
-    if (!form.value.lastName.trim()) errs.lastName = t('jobs.apply.validation.lastNameRequired')
-    if (!form.value.email.trim()) errs.email = t('jobs.apply.validation.emailRequired')
-    if (props.job.phoneRequirement === 'required' && !form.value.phone.trim()) {
-      errs.phone = t('jobs.apply.validation.phoneRequired')
-    }
+
+  for (const key of fieldKeysForStep(step)) {
+    // Anything the applicant skipped past counts as visited now, so its error
+    // stays on screen while they fix it.
+    touched.value[key] = true
+    const message = fieldError(key)
+    if (message) errs[key] = message
   }
-  else if (step?.key === 'section' || step?.key === 'default') {
-    for (const q of visibleQuestions.value) {
-      if (q.required && q.type !== 'file_upload' && isAnswerMissing(q, responses.value[q.id])) {
-        errs[`q-${q.id}`] = t('jobs.apply.validation.fieldRequired')
-      }
-    }
-  }
-  else if (step?.key === 'documents') {
+
+  if (step?.key === 'documents') {
     if (props.job.requireResume && !resume.value) errs.resume = t('jobs.apply.validation.resumeRequired')
     if (props.job.requireCoverLetter && !coverLetter.value.trim()) errs.coverLetter = t('jobs.apply.validation.coverLetterRequired')
   }
+
   stepErrors.value = errs
   return Object.keys(errs).length === 0
+}
+
+/** Phone is restricted to digits and phone punctuation as it's typed. */
+function onPhoneInput(event: Event) {
+  const el = event.target as HTMLInputElement
+  const cleaned = sanitizePhoneInput(el.value)
+  // Write straight back so a rejected character never shows, even briefly.
+  if (el.value !== cleaned) el.value = cleaned
+  form.value.phone = cleaned
+  clearError('phone')
 }
 
 function goNext() {
@@ -386,6 +474,7 @@ function clearError(key: string) {
                 autocomplete="given-name"
                 :tabindex="isPreview ? -1 : undefined"
                 @input="clearError('firstName')"
+                @blur="markTouched('firstName')"
                 :class="[
                   'w-full rounded-xl border px-3.5 py-2.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors',
                   displayErrors.firstName ? 'border-danger-300 dark:border-danger-700 focus:ring-danger-500 focus:border-danger-500' : 'border-surface-300 dark:border-surface-700',
@@ -411,6 +500,7 @@ function clearError(key: string) {
                 autocomplete="family-name"
                 :tabindex="isPreview ? -1 : undefined"
                 @input="clearError('lastName')"
+                @blur="markTouched('lastName')"
                 :class="[
                   'w-full rounded-xl border px-3.5 py-2.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors',
                   displayErrors.lastName ? 'border-danger-300 dark:border-danger-700 focus:ring-danger-500 focus:border-danger-500' : 'border-surface-300 dark:border-surface-700',
@@ -440,6 +530,7 @@ function clearError(key: string) {
               autocomplete="email"
               :tabindex="isPreview ? -1 : undefined"
               @input="clearError('email')"
+              @blur="markTouched('email')"
               :class="[
                 'w-full rounded-xl border px-3.5 py-2.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors',
                 displayErrors.email ? 'border-danger-300 dark:border-danger-700 focus:ring-danger-500 focus:border-danger-500' : 'border-surface-300 dark:border-surface-700',
@@ -465,12 +556,14 @@ function clearError(key: string) {
             </label>
             <input
               id="phone"
-              v-model="form.phone"
+              :value="form.phone"
               type="tel"
+              inputmode="tel"
               :placeholder="t('jobs.form.phonePlaceholder')"
               autocomplete="tel"
               :tabindex="isPreview ? -1 : undefined"
-              @input="clearError('phone')"
+              @input="onPhoneInput"
+              @blur="markTouched('phone')"
               :class="[
                 'w-full rounded-xl border px-3.5 py-2.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors',
                 displayErrors.phone ? 'border-danger-300 dark:border-danger-700 focus:ring-danger-500 focus:border-danger-500' : 'border-surface-300 dark:border-surface-700',
@@ -494,7 +587,12 @@ function clearError(key: string) {
             </div>
             <p v-else class="text-sm font-medium text-surface-700 dark:text-surface-300">{{ t('jobs.form.additionalQuestions') }}</p>
             <div class="space-y-5">
-              <div v-for="q in visibleQuestions" :key="q.id">
+              <div
+                v-for="q in visibleQuestions"
+                :key="q.id"
+                @input="clearError(`q-${q.id}`)"
+                @focusout="markTouched(`q-${q.id}`)"
+              >
                 <p
                   v-if="branchLabel(q)"
                   class="mb-1.5 inline-flex items-center gap-1 rounded-md bg-surface-100 dark:bg-surface-800 px-2 py-0.5 text-[11px] font-medium text-surface-500 dark:text-surface-400"
@@ -527,6 +625,8 @@ function clearError(key: string) {
                   :key="q.id"
                   :class="isPreview ? 'cursor-pointer rounded-xl ring-offset-2 ring-offset-white dark:ring-offset-surface-900 hover:ring-2 hover:ring-brand-300 dark:hover:ring-brand-700 transition-shadow' : ''"
                   @click="onFieldClick(`question:${q.id}`)"
+                  @input="clearError(`q-${q.id}`)"
+                  @focusout="markTouched(`q-${q.id}`)"
                 >
                   <div :class="isPreview ? 'pointer-events-none' : ''">
                     <p

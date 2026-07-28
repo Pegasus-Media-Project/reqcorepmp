@@ -2,6 +2,7 @@ import { eq, and, asc, sql } from 'drizzle-orm'
 import { fileTypeFromBuffer } from 'file-type'
 import { job, candidate, application, jobQuestion, questionResponse, document, organization, applicationSource, trackingLink, careerPage } from '../../../../database/schema'
 import { visibleQuestionIds } from '../../../../../shared/questionVisibility'
+import { isNumericAnswer } from '../../../../../shared/fieldFormats'
 import { publicApplicationSchema, publicJobSlugSchema } from '../../../../utils/schemas/publicApplication'
 import { createPreviewReadOnlyError } from '../../../../utils/previewReadOnly'
 import { autoScoreApplication } from '../../../../utils/ai/autoScore'
@@ -284,6 +285,21 @@ export default defineEventHandler(async (event) => {
     }
     return !answeredIds.has(id)
   })
+
+  // `number` questions must actually hold a number, whatever the client sent.
+  const nonNumeric = questions.filter((q) =>
+    q.type === 'number'
+    && visibleIds.has(q.id)
+    && answeredIds.has(q.id)
+    && !isNumericAnswer(responseByQuestionId.get(q.id)),
+  )
+
+  if (nonNumeric.length > 0) {
+    throw createError({
+      statusCode: 422,
+      statusMessage: `These answers must be numbers: ${nonNumeric.map((q) => q.label).join(', ')}`,
+    })
+  }
 
   if (unanswered.length > 0) {
     const unansweredLabels = questions

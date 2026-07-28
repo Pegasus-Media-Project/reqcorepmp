@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isValidPhone } from '../../../shared/fieldFormats'
 
 // ─────────────────────────────────────────────
 // Public application submission schemas
@@ -22,7 +23,11 @@ export const publicApplicationSchema = z.object({
   firstName: z.string().min(1, 'First name is required').max(100),
   lastName: z.string().min(1, 'Last name is required').max(100),
   email: z.string().email('Invalid email address').max(254),
-  phone: z.string().max(50).optional(),
+  // Digits and phone punctuation only — the form refuses anything else as it
+  // is typed, and this is the matching check for anything hand-rolled.
+  phone: z.string().max(50)
+    .refine(value => !value.trim() || isValidPhone(value), 'Invalid phone number')
+    .optional(),
   responses: z.array(questionResponseSchema).default([]),
   /** Optional cover letter text submitted by the candidate */
   coverLetterText: z.string().max(10000).optional(),
