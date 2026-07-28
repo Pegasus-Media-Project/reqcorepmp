@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FileText, FileDown, Search, X, Briefcase, Mail, Clock, ArrowUp, ArrowDown, ArrowUpDown, SlidersHorizontal, Maximize2, Minimize2, Check, ChevronLeft, ChevronRight, Loader2 } from 'lucide-vue-next'
+import { FileText, Search, X, Briefcase, Mail, Clock, ArrowUp, ArrowDown, ArrowUpDown, SlidersHorizontal, Maximize2, Minimize2, Check, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 
 definePageMeta({
   layout: 'dashboard',
@@ -408,36 +408,24 @@ function clearSelection() {
 
 const selectedIdList = computed(() => [...selectedIds.value])
 
-const PDF_EXPORT_LIMIT = 200
-const exportingPdf = ref(false)
-const exportToast = useToast()
+// ── Export ────────────────────────────────────────────────────────────────────
+// "Selected" sends the ticked ids; "Everything" sends the active filters and
+// lets the server resolve them, so the export isn't limited to this page.
+const { busy: exporting, download } = useFileExport()
 
-async function exportSelectedPdf() {
-  if (exportingPdf.value) return
-  if (selectedIds.value.size > PDF_EXPORT_LIMIT) {
-    exportToast.error('Too many selected', { message: `PDF export is limited to ${PDF_EXPORT_LIMIT} applications at once.` })
-    return
-  }
-  exportingPdf.value = true
-  try {
-    const blob = await $fetch<Blob>('/api/applications/bulk/export.pdf', {
-      method: 'POST',
-      body: { applicationIds: selectedIdList.value },
-      responseType: 'blob',
-    })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'applications-export.pdf'
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-  catch (err: any) {
-    exportToast.error('PDF export failed', { message: err?.data?.statusMessage, statusCode: err?.data?.statusCode })
-  }
-  finally {
-    exportingPdf.value = false
-  }
+function onExport({ format, scope }: { format: 'xlsx' | 'pdf', scope: 'all' | 'selected' }) {
+  const body = scope === 'selected'
+    ? { format, applicationIds: selectedIdList.value }
+    : {
+        format,
+        filters: {
+          ...(activeStatus.value ? { status: activeStatus.value } : {}),
+          ...(activeJobId.value ? { jobId: activeJobId.value } : {}),
+          ...(debouncedSearch.value ? { search: debouncedSearch.value } : {}),
+          ...(propertyFilters.value.length ? { propertyFilters: JSON.stringify(propertyFilters.value) } : {}),
+        },
+      }
+  download('/api/applications/bulk/export', body, `applications-export.${format}`)
 }
 </script>
 
@@ -491,6 +479,13 @@ async function exportSelectedPdf() {
         <X class="size-3" />
         Clear
       </button>
+      <ExportMenu
+        :selected-count="selectedIds.size"
+        :total-count="total"
+        :busy="exporting"
+        compact
+        @export="onExport"
+      />
       <button
         type="button"
         class="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-2.5 py-2 text-surface-500 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800 hover:text-surface-700 dark:hover:text-surface-200 transition-colors"
@@ -518,16 +513,12 @@ async function exportSelectedPdf() {
         <Mail class="size-4" />
         Email selected
       </button>
-      <button
-        type="button"
-        :disabled="exportingPdf"
-        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-300 dark:border-brand-700 px-3 py-1.5 text-sm font-semibold text-brand-700 dark:text-brand-300 hover:bg-brand-100 dark:hover:bg-brand-900/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        @click="exportSelectedPdf"
-      >
-        <Loader2 v-if="exportingPdf" class="size-4 animate-spin" />
-        <FileDown v-else class="size-4" />
-        {{ exportingPdf ? 'Exporting…' : 'Export PDFs' }}
-      </button>
+      <ExportMenu
+        :selected-count="selectedIds.size"
+        :total-count="total"
+        :busy="exporting"
+        @export="onExport"
+      />
       <button
         type="button"
         class="ml-auto inline-flex items-center gap-1 text-xs text-brand-700 dark:text-brand-300 hover:text-brand-900 dark:hover:text-brand-100 transition-colors"

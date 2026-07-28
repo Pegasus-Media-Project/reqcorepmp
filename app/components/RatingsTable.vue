@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronRight, FileSpreadsheet, FileText, ChevronsDownUp, ChevronsUpDown, ArrowUpDown, PanelRight } from 'lucide-vue-next'
+import { ChevronRight, ChevronsDownUp, ChevronsUpDown, ArrowUpDown, PanelRight } from 'lucide-vue-next'
 
 interface ReviewerRow {
   reviewerId: string
@@ -37,9 +37,44 @@ interface ReviewerProgress {
 const props = defineProps<{
   applicants: Applicant[]
   reviewerProgress?: ReviewerProgress[]
-  /** When set, renders CSV/XLSX export links (e.g. `/api/jobs/:id/reviews/export`). */
+  /** When set, renders the export menu (e.g. `/api/jobs/:id/reviews/export`). */
   exportBase?: string
 }>()
+
+// ── Selection + export ──
+// Rows are ticked to export a subset; with none ticked, the export covers every
+// applicant on the job.
+const selectedIds = ref<Set<string>>(new Set())
+
+function toggleSelected(applicationId: string) {
+  const next = new Set(selectedIds.value)
+  if (next.has(applicationId)) next.delete(applicationId)
+  else next.add(applicationId)
+  selectedIds.value = next
+}
+
+const allSelected = computed(() =>
+  props.applicants.length > 0 && selectedIds.value.size === props.applicants.length)
+
+function toggleSelectAll() {
+  selectedIds.value = allSelected.value
+    ? new Set()
+    : new Set(props.applicants.map(a => a.applicationId))
+}
+
+// A different job's applicants are a different set — drop stale ticks.
+watch(() => props.applicants, () => { selectedIds.value = new Set() })
+
+const { busy: exporting, download } = useFileExport()
+
+function onExport({ format, scope }: { format: 'xlsx' | 'pdf', scope: 'all' | 'selected' }) {
+  if (!props.exportBase) return
+  download(
+    props.exportBase,
+    { format, ...(scope === 'selected' ? { applicationIds: [...selectedIds.value] } : {}) },
+    `ratings-export.${format}`,
+  )
+}
 
 function fmt(v: number | null): string {
   return v == null ? '—' : v.toFixed(1)
@@ -153,20 +188,14 @@ const drawerApplicationId = ref<string | null>(null)
         </div>
       </div>
 
-      <div v-if="exportBase" class="flex items-center gap-2">
-        <a
-          :href="`${exportBase}?format=csv`"
-          class="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 dark:border-surface-700/80 bg-white dark:bg-surface-900 px-3 py-2 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors shadow-sm"
-        >
-          <FileText class="size-4" /> CSV
-        </a>
-        <a
-          :href="`${exportBase}?format=xlsx`"
-          class="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 dark:border-surface-700/80 bg-white dark:bg-surface-900 px-3 py-2 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors shadow-sm"
-        >
-          <FileSpreadsheet class="size-4" /> Excel
-        </a>
-      </div>
+      <ExportMenu
+        v-if="exportBase"
+        :selected-count="selectedIds.size"
+        :total-count="applicants.length"
+        :busy="exporting"
+        :scope-labels="{ all: 'All applicants', selected: 'Selected applicants' }"
+        @export="onExport"
+      />
     </div>
 
     <div class="grid grid-cols-1 xl:grid-cols-[1fr_280px] gap-4 items-start">
@@ -184,6 +213,15 @@ const drawerApplicationId = ref<string | null>(null)
             <thead>
               <tr class="border-b border-surface-100 dark:border-surface-800">
                 <th class="w-8" />
+                <th class="w-10 px-2 py-3">
+                  <input
+                    type="checkbox"
+                    :checked="allSelected"
+                    aria-label="Select all applicants"
+                    class="size-4 rounded border-surface-300 dark:border-surface-700 text-brand-600 focus:ring-brand-500"
+                    @click.stop="toggleSelectAll"
+                  />
+                </th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wide">Applicant</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wide">Stage</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wide">Interview</th>
@@ -198,6 +236,15 @@ const drawerApplicationId = ref<string | null>(null)
                 <tr class="hover:bg-surface-50/60 dark:hover:bg-surface-900/40 cursor-pointer" @click="toggle(a.applicationId)">
                   <td class="pl-3 text-surface-400">
                     <ChevronRight class="size-4 transition-transform" :class="expanded.has(a.applicationId) ? 'rotate-90' : ''" />
+                  </td>
+                  <td class="px-2 py-3">
+                    <input
+                      type="checkbox"
+                      :checked="selectedIds.has(a.applicationId)"
+                      :aria-label="`Select ${a.candidateName}`"
+                      class="size-4 rounded border-surface-300 dark:border-surface-700 text-brand-600 focus:ring-brand-500"
+                      @click.stop="toggleSelected(a.applicationId)"
+                    />
                   </td>
                   <td class="px-4 py-3">
                     <span class="font-medium text-surface-900 dark:text-surface-100">{{ a.candidateName }}</span>
@@ -237,7 +284,7 @@ const drawerApplicationId = ref<string | null>(null)
                 </tr>
                 <!-- Per-reviewer breakdown -->
                 <tr v-if="expanded.has(a.applicationId)">
-                  <td colspan="8" class="bg-surface-50/50 dark:bg-surface-900/30 px-4 py-3">
+                  <td colspan="9" class="bg-surface-50/50 dark:bg-surface-900/30 px-4 py-3">
                     <div v-if="a.reviews.length === 0" class="text-xs text-surface-400 dark:text-surface-500 pl-8">No reviews yet.</div>
                     <div v-else class="space-y-2 pl-8">
                       <div v-for="r in a.reviews" :key="r.reviewerId + r.stage" class="flex items-start gap-3 text-sm">

@@ -36,6 +36,16 @@ const { track } = useTrack()
 const toast = useToast()
 const { formatPersonName } = useOrgSettings()
 
+// "Everything" means the stage currently in focus, matching what the list shows.
+const { busy: exportingApplications, download: downloadExport } = useFileExport()
+
+function onExportApplications({ format, scope }: { format: 'xlsx' | 'pdf', scope: 'all' | 'selected' }) {
+  const body = scope === 'selected'
+    ? { format, applicationIds: [...selectedAppIds.value] }
+    : { format, filters: { jobId, status: focusStatus.value } }
+  downloadExport('/api/applications/bulk/export', body, `applications-export.${format}`)
+}
+
 // ─────────────────────────────────────────────
 // Job data (with update/delete support)
 // ─────────────────────────────────────────────
@@ -188,6 +198,22 @@ const statusCounts = computed(() => {
 })
 
 const selectedApplicationId = ref<string | null>(null)
+
+// ── Export selection ──────────────────────────────────────────────────────
+// Distinct from `selectedApplicationId`, which is the candidate being reviewed:
+// these are the rows ticked for an export.
+const selectedAppIds = ref<Set<string>>(new Set())
+
+function toggleAppSelected(applicationId: string) {
+  const next = new Set(selectedAppIds.value)
+  if (next.has(applicationId)) next.delete(applicationId)
+  else next.add(applicationId)
+  selectedAppIds.value = next
+}
+
+function clearAppSelection() {
+  selectedAppIds.value = new Set()
+}
 // One-shot instruction for the next list arrival: paging backwards should land on
 // the last candidate of the previous page instead of the default first.
 const selectLastOnNextLoad = ref(false)
@@ -1595,16 +1621,17 @@ function closeDocPreview() {
             <span class="hidden sm:inline">Interview slots</span>
           </button>
 
-          <!-- Export the current stage's applications to PDF -->
-          <a
-            :href="`/api/jobs/${jobId}/applications/export.pdf?status=${focusStatus}`"
-            target="_blank"
-            class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-surface-500 hover:bg-surface-100 hover:text-surface-700 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:text-surface-200 transition-all duration-200 focus:outline-none"
-            :title="`Export ${focusStatus} applications to PDF`"
-          >
-            <Download class="size-4" />
-            <span class="hidden sm:inline">Export PDF</span>
-          </a>
+          <!-- Export: the focused stage, or just the candidates ticked in the list -->
+          <ExportMenu
+            :selected-count="selectedAppIds.size"
+            :busy="exportingApplications"
+            :scope-labels="{
+              all: `All in ${formatStatusLabel(focusStatus)}`,
+              selected: 'Selected candidates',
+            }"
+            compact
+            @export="onExportApplications"
+          />
 
           <!-- Fullscreen toggle -->
           <button
@@ -1808,6 +1835,21 @@ function closeDocPreview() {
             </div>
           </div>
 
+          <!-- Export selection summary -->
+          <div
+            v-if="selectedAppIds.size > 0"
+            class="flex items-center gap-2 border-t border-surface-100 bg-brand-50/60 px-3.5 py-2 text-xs dark:border-surface-800/60 dark:bg-brand-950/20"
+          >
+            <span class="font-medium text-brand-700 dark:text-brand-300">{{ selectedAppIds.size }} selected for export</span>
+            <button
+              type="button"
+              class="ml-auto cursor-pointer font-medium text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200"
+              @click="clearAppSelection"
+            >
+              Clear
+            </button>
+          </div>
+
           <!-- Scrollable list -->
           <div ref="sidebarList" class="flex-1 overflow-y-auto scrollbar-thin border-t border-surface-100 dark:border-surface-800/60">
             <div v-if="filteredApplications.length === 0" class="p-8 text-center">
@@ -1829,16 +1871,29 @@ function closeDocPreview() {
               </button>
             </div>
 
-            <button
+            <div
               v-for="(app, idx) in filteredApplications"
               :key="app.id"
               :data-candidate-idx="idx"
-              class="pipeline-candidate-card group flex w-full cursor-pointer items-start gap-3 px-3.5 py-3 text-left transition-all duration-150"
+              class="pipeline-candidate-card group flex w-full items-start transition-all duration-150"
               :class="currentIndex === idx
                 ? 'bg-brand-50/70 dark:bg-brand-950/20 border-l-[3px] border-l-brand-500 dark:border-l-brand-400'
                 : 'border-l-[3px] border-l-transparent hover:bg-surface-50/80 dark:hover:bg-surface-800/40'"
-              @click="selectCandidate(idx)"
             >
+              <label class="flex shrink-0 cursor-pointer items-center py-4 pl-3" @click.stop>
+                <input
+                  type="checkbox"
+                  :checked="selectedAppIds.has(app.id)"
+                  :aria-label="`Select ${formatPersonName(app.candidateFirstName, app.candidateLastName)} for export`"
+                  class="size-4 rounded border-surface-300 text-brand-600 focus:ring-brand-500 dark:border-surface-600 dark:bg-surface-800"
+                  @change="toggleAppSelected(app.id)"
+                />
+              </label>
+              <button
+                type="button"
+                class="flex min-w-0 flex-1 cursor-pointer items-start gap-3 py-3 pl-2.5 pr-3.5 text-left"
+                @click="selectCandidate(idx)"
+              >
               <div
                 class="flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-all duration-150"
                 :class="currentIndex === idx
@@ -1894,7 +1949,8 @@ function closeDocPreview() {
                   </span>
                 </div>
               </div>
-            </button>
+              </button>
+            </div>
           </div>
         </div>
 

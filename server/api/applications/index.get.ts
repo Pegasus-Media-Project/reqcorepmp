@@ -1,12 +1,8 @@
 import { asc, eq, and, desc, inArray, notInArray, or, ilike, gte, lt, isNull, isNotNull, count, sql } from 'drizzle-orm'
 import { application, applicationStatusEnum, candidate, interview, job, review } from '../../database/schema'
 import { applicationQuerySchema } from '../../utils/schemas/application'
-import { propertyFiltersArraySchema } from '../../utils/schemas/property'
-import {
-  entityIdsMatchingFilters,
-  loadPropertyEntriesForEntities,
-  type PropertyFilter,
-} from '../../utils/properties'
+import { buildApplicationFilterConditions } from '../../utils/applicationFilters'
+import { loadPropertyEntriesForEntities } from '../../utils/properties'
 
 type StatusCountRow = { status: (typeof applicationStatusEnum.enumValues)[number], count: number }
 
@@ -37,69 +33,10 @@ export default defineEventHandler(async (event) => {
   const conditions = [eq(application.organizationId, orgId)]
   if (scopeCondition) conditions.push(scopeCondition)
 
-  if (query.jobId) {
-    conditions.push(eq(application.jobId, query.jobId))
-  }
-  if (query.candidateId) {
-    conditions.push(eq(application.candidateId, query.candidateId))
-  }
-  if (query.status) {
-    conditions.push(eq(application.status, query.status))
-  }
-  if (query.search) {
-    // Escape LIKE meta-characters to keep this a literal substring search.
-    const escaped = query.search.replace(/[%_\\]/g, '\\$&')
-    const pattern = `%${escaped}%`
-    conditions.push(or(
-      ilike(candidate.firstName, pattern),
-      ilike(candidate.lastName, pattern),
-      ilike(sql`${candidate.firstName} || ' ' || ${candidate.lastName}`, pattern),
-      ilike(candidate.email, pattern),
-    )!)
-  }
-  if (query.score) {
-    switch (query.score) {
-      case 'high':
-        conditions.push(gte(application.score, 75))
-        break
-      case 'medium':
-        conditions.push(and(gte(application.score, 40), lt(application.score, 75))!)
-        break
-      case 'low':
-        conditions.push(lt(application.score, 40))
-        break
-      case 'none':
-        conditions.push(isNull(application.score))
-        break
-    }
-  }
-  if (query.interview) {
-    const interviewApplicationIds = db
-      .select({ applicationId: interview.applicationId })
-      .from(interview)
-      .where(eq(interview.organizationId, orgId))
-    conditions.push(
-      query.interview === 'has-interview'
-        ? inArray(application.id, interviewApplicationIds)
-        : notInArray(application.id, interviewApplicationIds),
-    )
-  }
-
-  // ── Custom property filters ──
-  let propertyFilters: PropertyFilter[] = []
-  if (query.propertyFilters) {
-    let raw: unknown
-    try {
-      raw = JSON.parse(query.propertyFilters)
-    } catch {
-      throw createError({ statusCode: 400, statusMessage: 'Invalid propertyFilters' })
-    }
-    const result = propertyFiltersArraySchema.safeParse(raw)
-    if (!result.success) {
-      throw createError({ statusCode: 400, statusMessage: 'Invalid propertyFilters' })
-    }
-    propertyFilters = result.data as PropertyFilter[]
-  }
+  // Filters are built by the shared helper so the export covers exactly the
+  // rows listed here.
+  const { conditions: filterConditions, noMatches } = await buildApplicationFilterConditions({ orgId, query })
+  conditions.push(...filterConditions)
 
   // Job-wide per-status totals for the pipeline tab badges. Intentionally ignores
   // every active filter so the badges stay put as the user narrows the list.
@@ -112,27 +49,16 @@ export default defineEventHandler(async (event) => {
         .groupBy(application.status)
     : Promise.resolve([])
 
-  if (propertyFilters.length > 0) {
-    // Awaited together so a failing filter query doesn't leave the counts
-    // promise rejecting unobserved.
-    const [matching, statusCountRows] = await Promise.all([
-      entityIdsMatchingFilters({
-        organizationId: orgId,
-        entityType: 'application',
-        filters: propertyFilters,
-      }),
-      statusCountsPromise,
-    ])
-    if (!matching || matching.size === 0) {
-      return {
-        data: [],
-        total: 0,
-        page: query.page,
-        limit: query.limit,
-        statusCounts: tallyStatusCounts(statusCountRows),
-      }
+  // A property filter that matched nothing: nothing to list, but the badges
+  // still report the job's real totals.
+  if (noMatches) {
+    return {
+      data: [],
+      total: 0,
+      page: query.page,
+      limit: query.limit,
+      statusCounts: tallyStatusCounts(await statusCountsPromise),
     }
-    conditions.push(inArray(application.id, [...matching]))
   }
 
   const where = and(...conditions)

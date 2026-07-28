@@ -93,6 +93,54 @@ function clearSelection() {
   selectedInterviewIds.value = new Set()
 }
 const selectedInterviewList = computed(() => [...selectedInterviewIds.value])
+
+// ── Day selection + export ────────────────────────────────────────────────
+// The export asks for whole days rather than individual slots, so a day header
+// ticks every interview on that day. Any mix of ticks still exports exactly
+// what's ticked.
+
+/** Interview ids on a given day, in the board's own grouping. */
+function dayInterviewIds(dateLabel: string): string[] {
+  return (groupedByDate.value.get(dateLabel) ?? []).map(i => i.id)
+}
+
+function isDaySelected(dateLabel: string): boolean {
+  const ids = dayInterviewIds(dateLabel)
+  return ids.length > 0 && ids.every(id => selectedInterviewIds.value.has(id))
+}
+
+function toggleDaySelect(dateLabel: string) {
+  const ids = dayInterviewIds(dateLabel)
+  const next = new Set(selectedInterviewIds.value)
+  if (isDaySelected(dateLabel)) for (const id of ids) next.delete(id)
+  else for (const id of ids) next.add(id)
+  selectedInterviewIds.value = next
+}
+
+/** How many distinct days the current selection covers. */
+const selectedDayCount = computed(() => {
+  let days = 0
+  for (const [dateLabel] of groupedByDate.value) {
+    if (dayInterviewIds(dateLabel).some(id => selectedInterviewIds.value.has(id))) days++
+  }
+  return days
+})
+
+const dayCount = computed(() => groupedByDate.value.size)
+
+const { busy: exporting, download } = useFileExport()
+
+function onExport({ format, scope }: { format: 'xlsx' | 'pdf', scope: 'all' | 'selected' }) {
+  download(
+    '/api/interviews/bulk/export',
+    {
+      format,
+      ...(scope === 'selected' ? { interviewIds: selectedInterviewList.value } : {}),
+      ...(props.jobId ? { jobId: props.jobId } : {}),
+    },
+    `interviews-export.${format}`,
+  )
+}
 const selectedJobIds = computed(() => {
   const ids = new Set<string>()
   for (const i of filteredInterviews.value) {
@@ -504,6 +552,18 @@ const statusCounts = computed(() => {
         </button>
       </div>
 
+      <ExportMenu
+        :selected-count="selectedInterviewIds.size"
+        :total-count="total"
+        :busy="exporting"
+        :scope-labels="{
+          all: dayCount ? `All ${dayCount} day${dayCount === 1 ? '' : 's'}` : 'All interviews',
+          selected: selectedDayCount ? `Selected ${selectedDayCount} day${selectedDayCount === 1 ? '' : 's'}` : 'Selected days',
+        }"
+        compact
+        @export="onExport"
+      />
+
       <NuxtLink
         v-if="canReadEmailTemplates"
         :to="$localePath('/dashboard/interviews/templates')"
@@ -792,6 +852,15 @@ const statusCounts = computed(() => {
             </div>
             <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">{{ dateLabel }}</h3>
             <span class="text-xs text-surface-400 dark:text-surface-500">{{ dateInterviews.length }} interview{{ dateInterviews.length === 1 ? '' : 's' }}</span>
+            <label class="ml-auto inline-flex cursor-pointer items-center gap-1.5 text-xs text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors">
+              <input
+                type="checkbox"
+                :checked="isDaySelected(dateLabel)"
+                class="size-3.5 rounded border-surface-300 dark:border-surface-600 text-brand-600 focus:ring-brand-500"
+                @change="toggleDaySelect(dateLabel)"
+              />
+              Select day
+            </label>
           </div>
 
           <div class="ml-3.5 border-l-2 border-surface-200 dark:border-surface-700/60 pl-6 space-y-3">
