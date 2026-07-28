@@ -38,11 +38,12 @@ export function useJobs(options?: {
     status?: 'draft' | 'open'
     questions?: Array<{
       label: string
-      type: 'short_text' | 'long_text' | 'single_select' | 'multi_select' | 'number' | 'date' | 'url' | 'checkbox' | 'file_upload' | 'info'
+      type: 'short_text' | 'long_text' | 'single_select' | 'multi_select' | 'number' | 'date' | 'url' | 'checkbox' | 'file_upload' | 'info' | 'rating'
       description?: string
       content?: string
       required: boolean
       options?: string[]
+      config?: { ratingMax?: number, ratingMinLabel?: string | null, ratingMaxLabel?: string | null } | null
       displayOrder: number
       sectionId?: string | null
     }>

@@ -12,6 +12,8 @@ const questionResponseSchema = z.object({
     z.array(z.string()),
     z.number(),
     z.boolean(),
+    // `rating` questions answer as { row label → score }.
+    z.record(z.string().max(200), z.number().int().min(1).max(10)),
   ]),
 })
 

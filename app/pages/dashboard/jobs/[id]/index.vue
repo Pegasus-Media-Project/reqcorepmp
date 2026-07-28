@@ -780,12 +780,6 @@ function formatStatusLabel(status: string) {
   return status.charAt(0).toUpperCase() + status.slice(1)
 }
 
-function formatResponseValue(value: unknown): string {
-  if (Array.isArray(value)) return value.join(', ')
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
-  return String(value ?? '—')
-}
-
 function formatDocumentType(value: SwipeDocument['type']) {
   if (value === 'cover_letter') return 'Cover Letter'
   if (value === 'resume') return 'Resume'

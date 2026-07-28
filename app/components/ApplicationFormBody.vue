@@ -24,6 +24,12 @@ type Question = {
   content?: string | null
   required: boolean
   options?: string[] | null
+  /** Type-specific settings (rating grids carry their scale here). */
+  config?: {
+    ratingMax?: number
+    ratingMinLabel?: string | null
+    ratingMaxLabel?: string | null
+  } | null
   sectionId?: string | null
 }
 
@@ -69,7 +75,7 @@ const form = defineModel<{
   phone: string
   website: string
 }>('form', { required: true })
-const responses = defineModel<Record<string, string | string[] | number | boolean>>('responses', { required: true })
+const responses = defineModel<Record<string, string | string[] | number | boolean | Record<string, number>>>('responses', { required: true })
 const resume = defineModel<File | null>('resume', { default: null })
 const coverLetter = defineModel<string>('coverLetter', { default: '' })
 
@@ -163,10 +169,6 @@ const currentSectionMeta = computed(() => {
 const stepErrors = ref<Record<string, string>>({})
 const displayErrors = computed<Record<string, string>>(() => ({ ...props.errors, ...stepErrors.value }))
 
-function isEmpty(v: unknown) {
-  return v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)
-}
-
 /** Validate only the fields on the current step before advancing. */
 function validateCurrentStep(): boolean {
   const errs: Record<string, string> = {}
@@ -181,7 +183,7 @@ function validateCurrentStep(): boolean {
   }
   else if (step?.key === 'section' || step?.key === 'default') {
     for (const q of visibleQuestions.value) {
-      if (q.required && q.type !== 'file_upload' && isEmpty(responses.value[q.id])) {
+      if (q.required && q.type !== 'file_upload' && isAnswerMissing(q, responses.value[q.id])) {
         errs[`q-${q.id}`] = t('jobs.apply.validation.fieldRequired')
       }
     }

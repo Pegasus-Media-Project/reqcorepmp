@@ -61,6 +61,7 @@ export default defineEventHandler(async (event) => {
           content: true,
           required: true,
           options: true,
+          config: true,
           displayOrder: true,
         },
       },

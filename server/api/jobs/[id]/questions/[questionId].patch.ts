@@ -57,6 +57,7 @@ export default defineEventHandler(async (event) => {
       content: jobQuestion.content,
       required: jobQuestion.required,
       options: jobQuestion.options,
+      config: jobQuestion.config,
       displayOrder: jobQuestion.displayOrder,
       createdAt: jobQuestion.createdAt,
       updatedAt: jobQuestion.updatedAt,

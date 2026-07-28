@@ -4,21 +4,42 @@ import { z } from 'zod'
 // Job question validation schemas
 // ─────────────────────────────────────────────
 
-const questionTypes = ['short_text', 'long_text', 'single_select', 'multi_select', 'number', 'date', 'url', 'checkbox', 'file_upload', 'info'] as const
+const questionTypes = ['short_text', 'long_text', 'single_select', 'multi_select', 'number', 'date', 'url', 'checkbox', 'file_upload', 'info', 'rating'] as const
 
 /** Max size of an info block's rich HTML body (allows a couple of inline base64 images). */
 const MAX_CONTENT_LENGTH = 5_000_000
+
+/** Rating scale bounds (columns on the matrix). */
+export const RATING_MIN_SCALE = 2
+export const RATING_MAX_SCALE = 10
+
+/**
+ * Type-specific settings. Only `rating` uses it: `options` holds the rows to
+ * rate and this holds the scale plus its optional endpoint captions.
+ */
+export const questionConfigSchema = z.object({
+  ratingMax: z.number().int().min(RATING_MIN_SCALE).max(RATING_MAX_SCALE).optional(),
+  ratingMinLabel: z.string().trim().max(100).nullish(),
+  ratingMaxLabel: z.string().trim().max(100).nullish(),
+})
+
+/** `rating` reuses `options` for its rows, so both need the same option checks. */
+function usesOptions(type: typeof questionTypes[number]) {
+  return type === 'single_select' || type === 'multi_select' || type === 'rating'
+}
 
 function validateSelectOptions(
   data: { type: typeof questionTypes[number], options?: string[] | null },
   ctx: z.RefinementCtx,
 ) {
-  if (data.type !== 'single_select' && data.type !== 'multi_select') return
+  if (!usesOptions(data.type)) return
 
   if (!data.options?.length) {
     ctx.addIssue({
       code: 'custom',
-      message: 'Options are required for select-type questions',
+      message: data.type === 'rating'
+        ? 'At least one item to rate is required for rating questions'
+        : 'Options are required for select-type questions',
       path: ['options'],
     })
     return
@@ -58,6 +79,7 @@ export const createQuestionSchema = z.object({
   content: z.string().max(MAX_CONTENT_LENGTH).optional(),
   required: z.boolean().default(false),
   options: z.array(z.string().trim().min(1).max(200)).min(1).max(50).optional(),
+  config: questionConfigSchema.nullish(),
   displayOrder: z.number().int().min(0).default(0),
   /** Optional wizard section/page this question belongs to. Null = default page. */
   sectionId: z.string().min(1).nullish(),
@@ -74,6 +96,7 @@ export const updateQuestionSchema = z.object({
   content: z.string().max(MAX_CONTENT_LENGTH).nullish(),
   required: z.boolean().optional(),
   options: z.array(z.string().trim().min(1).max(200)).min(1).max(50).nullish(),
+  config: questionConfigSchema.nullish(),
   displayOrder: z.number().int().min(0).optional(),
   /** Pass null to move the question back to the default page. */
   sectionId: z.string().min(1).nullish(),

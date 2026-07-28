@@ -155,11 +155,6 @@ const statusBadgeClasses: Record<string, string> = {
   rejected: 'bg-surface-100 text-surface-500 dark:bg-surface-800 dark:text-surface-400',
 }
 
-function formatResponseValue(value: unknown): string {
-  if (Array.isArray(value)) return value.join(', ')
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
-  return String(value ?? '—')
-}
 </script>
 
 <template>

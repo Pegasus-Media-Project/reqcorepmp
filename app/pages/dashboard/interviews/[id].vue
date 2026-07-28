@@ -50,13 +50,6 @@ const applicationStatusBadges: Record<string, string> = {
   rejected: 'bg-surface-100 text-surface-500 dark:bg-surface-800 dark:text-surface-400',
 }
 
-function formatResponseValue(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—'
-  if (Array.isArray(value)) return value.join(', ')
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
-  return String(value)
-}
-
 // ─── Assigned reviewers ──────────────────────────────────────────
 const showReviewersModal = ref(false)
 const { data: reviewersData, refresh: refreshReviewers } = useFetch(

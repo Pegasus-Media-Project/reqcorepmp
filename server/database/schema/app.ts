@@ -36,6 +36,8 @@ export const questionTypeEnum = pgEnum('question_type', [
   'number', 'date', 'url', 'checkbox', 'file_upload',
   // Display-only informational content block (rich HTML), not an input.
   'info',
+  // Matrix of rows (`options`) rated on a 1..n scale (see jobQuestion.config).
+  'rating',
 ])
 export const propertyEntityTypeEnum = pgEnum('property_entity_type', ['candidate', 'application'])
 export const propertyTypeEnum = pgEnum('property_type', [
@@ -341,6 +343,16 @@ export const jobQuestion = pgTable('job_question', {
   content: text('content'),
   required: boolean('required').notNull().default(false),
   options: jsonb('options').$type<string[]>(),
+  /**
+   * Type-specific settings. Only `rating` uses it today: the rows come from
+   * `options`, and this carries the scale (`ratingMax`) plus the optional
+   * endpoint captions shown above the first and last columns.
+   */
+  config: jsonb('config').$type<{
+    ratingMax?: number
+    ratingMinLabel?: string | null
+    ratingMaxLabel?: string | null
+  } | null>(),
   displayOrder: integer('display_order').notNull().default(0),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -370,14 +382,14 @@ export const employmentType = pgTable('employment_type', {
 /**
  * Applicant responses to custom questions, stored per application.
  * `value` is stored as JSONB to support different response types
- * (string, string[], number, boolean).
+ * (string, string[], number, boolean, or row → rating for `rating` questions).
  */
 export const questionResponse = pgTable('question_response', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
   applicationId: text('application_id').notNull().references(() => application.id, { onDelete: 'cascade' }),
   questionId: text('question_id').notNull().references(() => jobQuestion.id, { onDelete: 'cascade' }),
-  value: jsonb('value').$type<string | string[] | number | boolean>().notNull(),
+  value: jsonb('value').$type<string | string[] | number | boolean | Record<string, number>>().notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 }, (t) => ([
   index('question_response_organization_id_idx').on(t.organizationId),

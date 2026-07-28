@@ -65,7 +65,7 @@ export default defineEventHandler(async (event) => {
   let email: string
   let phone: string | undefined
   let website: string | undefined
-  let responseArray: { questionId: string; value: string | string[] | number | boolean }[] = []
+  let responseArray: { questionId: string; value: string | string[] | number | boolean | Record<string, number> }[] = []
   let coverLetterText: string | undefined
   let sourceRef: string | undefined
   let utmSource: string | undefined
@@ -258,9 +258,21 @@ export default defineEventHandler(async (event) => {
   const fileQuestions = questions.filter((q) => q.type === 'file_upload')
   const fileQuestionIds = new Set(fileQuestions.map((q) => q.id))
 
+  // A required rating grid only counts as answered once every row has a score.
+  const responseByQuestionId = new Map(responseArray.map((r) => [r.questionId, r.value]))
+  const isRatingComplete = (questionId: string, rows: string[] | null) => {
+    const value = responseByQuestionId.get(questionId)
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+    return (rows ?? []).every((row) => typeof (value as Record<string, number>)[row] === 'number')
+  }
+
   const unanswered = requiredQuestionIds.filter((id) => {
     if (fileQuestionIds.has(id)) {
       return !uploadedFiles.has(id)
+    }
+    const question = questions.find((q) => q.id === id)
+    if (question?.type === 'rating') {
+      return !isRatingComplete(id, question.options)
     }
     return !answeredIds.has(id)
   })
@@ -477,9 +489,13 @@ export default defineEventHandler(async (event) => {
 
   // Build a read-only copy of the submitted application for the email.
   const questionById = new Map(questions.map((q) => [q.id, q]))
-  const formatAnswer = (value: string | string[] | number | boolean): string => {
+  const formatAnswer = (value: string | string[] | number | boolean | Record<string, number>): string => {
     if (Array.isArray(value)) return value.join(', ')
     if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+    // `rating` grids answer as { row → score }.
+    if (value && typeof value === 'object') {
+      return Object.entries(value).map(([row, score]) => `${row}: ${score}`).join('; ')
+    }
     return String(value)
   }
   const summary: Array<{ label: string, value: string }> = [

@@ -34,6 +34,8 @@ export function useJobQuestions(jobId: MaybeRefOrGetter<string>) {
     content?: string
     required?: boolean
     options?: string[]
+    /** Type-specific settings (rating grids carry their scale here). */
+    config?: { ratingMax?: number, ratingMinLabel?: string | null, ratingMaxLabel?: string | null } | null
     displayOrder?: number
     sectionId?: string | null
   }) {
@@ -58,6 +60,7 @@ export function useJobQuestions(jobId: MaybeRefOrGetter<string>) {
     content?: string | null
     required?: boolean
     options?: string[] | null
+    config?: { ratingMax?: number, ratingMinLabel?: string | null, ratingMaxLabel?: string | null } | null
     displayOrder?: number
     sectionId?: string | null
   }) {

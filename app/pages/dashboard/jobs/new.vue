@@ -71,6 +71,14 @@ type QuestionType =
   | 'checkbox'
   | 'file_upload'
   | 'info'
+  | 'rating'
+
+/** Type-specific settings; only rating grids use it today. */
+type QuestionConfig = {
+  ratingMax?: number
+  ratingMinLabel?: string | null
+  ratingMaxLabel?: string | null
+}
 
 type DraftQuestion = {
   id: string
@@ -80,6 +88,7 @@ type DraftQuestion = {
   content?: string | null
   required: boolean
   options?: string[] | null
+  config?: QuestionConfig | null
   sectionId?: string | null
 }
 
@@ -328,11 +337,16 @@ const formSchema = z.object({
 const draftQuestionSchema = z.object({
   id: z.string().min(1),
   label: z.string().trim().max(500).default(''),
-  type: z.enum(['short_text', 'long_text', 'single_select', 'multi_select', 'number', 'date', 'url', 'checkbox', 'file_upload', 'info']),
+  type: z.enum(['short_text', 'long_text', 'single_select', 'multi_select', 'number', 'date', 'url', 'checkbox', 'file_upload', 'info', 'rating']),
   description: z.string().trim().max(1000).nullish(),
   content: z.string().max(5_000_000).nullish(),
   required: z.boolean(),
   options: z.array(z.string().trim().min(1).max(200)).max(50).nullish(),
+  config: z.object({
+    ratingMax: z.number().int().min(2).max(10).optional(),
+    ratingMinLabel: z.string().trim().max(100).nullish(),
+    ratingMaxLabel: z.string().trim().max(100).nullish(),
+  }).nullish(),
   sectionId: z.string().min(1).nullish(),
 })
 
@@ -347,7 +361,7 @@ const applicationFormSchema = z.object({
   phoneRequirement: z.enum(['hidden', 'optional', 'required']),
   requireResume: z.boolean(),
   requireCoverLetter: z.boolean(),
-  questions: z.array(draftQuestionSchema).max(50),
+  questions: z.array(draftQuestionSchema).max(500),
   sections: z.array(draftSectionSchema).max(20).optional().default([]),
 })
 
@@ -766,6 +780,7 @@ async function handleSubmit(mode: 'publish' | 'draft' = publishChoice.value) {
         content: question.content || undefined,
         required: question.required,
         options: question.options || undefined,
+        config: question.config || undefined,
         displayOrder: index,
         // Holds the draft section id (ref); the server maps it to the real id.
         sectionId: question.sectionId ?? undefined,

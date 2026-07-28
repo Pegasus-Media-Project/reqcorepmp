@@ -61,7 +61,14 @@ const {
 
 type QuestionType =
   | 'short_text' | 'long_text' | 'single_select' | 'multi_select'
-  | 'number' | 'date' | 'url' | 'checkbox' | 'file_upload' | 'info'
+  | 'number' | 'date' | 'url' | 'checkbox' | 'file_upload' | 'info' | 'rating'
+
+/** Type-specific settings; only rating grids use it today. */
+type QuestionConfig = {
+  ratingMax?: number
+  ratingMinLabel?: string | null
+  ratingMaxLabel?: string | null
+}
 
 type BuilderQuestion = {
   id: string
@@ -71,6 +78,7 @@ type BuilderQuestion = {
   content?: string | null
   required: boolean
   options?: string[] | null
+  config?: QuestionConfig | null
   sectionId?: string | null
 }
 
@@ -107,6 +115,7 @@ watch(jobQuestions, (qs) => {
     content: q.content ?? null,
     required: q.required,
     options: q.options ?? null,
+    config: q.config ?? null,
     sectionId: q.sectionId ?? null,
   }))
 }, { immediate: true })

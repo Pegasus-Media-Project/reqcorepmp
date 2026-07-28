@@ -66,16 +66,22 @@ describe('job creation validation', () => {
   })
 
   it('caps nested records before they reach the transaction', () => {
-    const questions = Array.from({ length: 51 }, (_, index) => ({
+    const buildQuestions = (count: number) => Array.from({ length: count }, (_, index) => ({
       label: `Question ${index}`,
       type: 'short_text' as const,
       required: false,
       displayOrder: index,
     }))
 
+    // There is no product-level question limit — only a request-size guard.
     expect(createJobWizardSchema.safeParse({
       title: 'QA Engineer',
-      questions,
+      questions: buildQuestions(120),
+    }).success).toBe(true)
+
+    expect(createJobWizardSchema.safeParse({
+      title: 'QA Engineer',
+      questions: buildQuestions(501),
     }).success).toBe(false)
   })
 })

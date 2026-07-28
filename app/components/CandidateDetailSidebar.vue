@@ -448,12 +448,6 @@ watch(() => props.applicationId, () => {
 // Display helpers
 // ─────────────────────────────────────────────
 
-function formatResponseValue(value: unknown): string {
-  if (Array.isArray(value)) return value.join(', ')
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
-  return String(value ?? '—')
-}
-
 const responsesCount = computed(() => application.value?.responses?.length ?? 0)
 // Group responses by form page (section) to match the application form.
 const responseGroups = computed(() => groupResponsesBySection(application.value?.responses ?? []))

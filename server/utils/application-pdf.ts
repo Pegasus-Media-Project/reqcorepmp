@@ -135,10 +135,15 @@ function escapeHtml(value: unknown): string {
     .replace(/'/g, '&#39;')
 }
 
-function formatAnswer(value: string | string[] | number | boolean | null | undefined): string {
+function formatAnswer(value: string | string[] | number | boolean | Record<string, number> | null | undefined): string {
   if (value === null || value === undefined || value === '') return '—'
   if (Array.isArray(value)) return value.join(', ')
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  // `rating` grids answer as { row → score }.
+  if (typeof value === 'object') {
+    const entries = Object.entries(value)
+    return entries.length ? entries.map(([row, score]) => `${row}: ${score}`).join('; ') : '—'
+  }
   return String(value)
 }
 

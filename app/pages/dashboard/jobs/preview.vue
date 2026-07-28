@@ -19,6 +19,12 @@ type DraftQuestion = {
   description?: string | null
   required: boolean
   options?: string[] | null
+  /** Type-specific settings (rating grids carry their scale here). */
+  config?: {
+    ratingMax?: number
+    ratingMinLabel?: string | null
+    ratingMaxLabel?: string | null
+  } | null
 }
 
 type JobDraft = {

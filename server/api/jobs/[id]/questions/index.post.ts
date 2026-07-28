@@ -30,6 +30,7 @@ export default defineEventHandler(async (event) => {
     content: body.content ?? null,
     required: body.required,
     options: body.options,
+    config: body.config ?? null,
     displayOrder: body.displayOrder,
   }).returning({
     id: jobQuestion.id,
@@ -41,6 +42,7 @@ export default defineEventHandler(async (event) => {
     content: jobQuestion.content,
     required: jobQuestion.required,
     options: jobQuestion.options,
+    config: jobQuestion.config,
     displayOrder: jobQuestion.displayOrder,
     createdAt: jobQuestion.createdAt,
     updatedAt: jobQuestion.updatedAt,

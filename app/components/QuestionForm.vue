@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { X, Plus, Trash2 } from 'lucide-vue-next'
 
+type QuestionConfig = {
+  ratingMax?: number
+  ratingMinLabel?: string | null
+  ratingMaxLabel?: string | null
+}
+
 const props = defineProps<{
   /** If provided, we're editing an existing question */
   question?: {
@@ -11,6 +17,7 @@ const props = defineProps<{
     content?: string | null
     required: boolean
     options?: string[] | null
+    config?: QuestionConfig | null
   }
   /** Preselects the field type when adding a new item (e.g. 'info'). */
   initialType?: string
@@ -24,6 +31,7 @@ const emit = defineEmits<{
     content?: string
     required: boolean
     options?: string[]
+    config?: QuestionConfig | null
   }): void
   (e: 'cancel'): void
 }>()
@@ -33,6 +41,7 @@ const questionTypes = [
   { value: 'long_text', label: 'Long Text' },
   { value: 'single_select', label: 'Single Select' },
   { value: 'multi_select', label: 'Multi Select' },
+  { value: 'rating', label: 'Rating scale (grid)' },
   { value: 'number', label: 'Number' },
   { value: 'date', label: 'Date' },
   { value: 'url', label: 'URL' },
@@ -41,6 +50,9 @@ const questionTypes = [
   { value: 'info', label: 'Information block (no answer)' },
 ]
 
+/** Default rating scale when adding a new grid. */
+const DEFAULT_RATING_MAX = 5
+
 const form = ref({
   label: props.question?.label ?? '',
   type: props.question?.type ?? props.initialType ?? 'short_text',
@@ -48,12 +60,28 @@ const form = ref({
   content: props.question?.content ?? '',
   required: props.question?.required ?? false,
   options: props.question?.options ?? [''],
+  ratingMax: props.question?.config?.ratingMax ?? DEFAULT_RATING_MAX,
+  ratingMinLabel: props.question?.config?.ratingMinLabel ?? '',
+  ratingMaxLabel: props.question?.config?.ratingMaxLabel ?? '',
 })
 
 const errors = ref<Record<string, string>>({})
 
 const isSelectType = computed(() =>
   form.value.type === 'single_select' || form.value.type === 'multi_select',
+)
+
+/** Rating grids reuse `options` as their rows (the things being rated). */
+const isRating = computed(() => form.value.type === 'rating')
+
+/** Both select types and rating grids collect a list of options/rows. */
+const hasOptionList = computed(() => isSelectType.value || isRating.value)
+
+const ratingScaleChoices = [2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+/** Preview of the columns a candidate will see. */
+const ratingColumns = computed(() =>
+  Array.from({ length: form.value.ratingMax }, (_, i) => i + 1),
 )
 
 /** Info blocks are display-only content, not an input field. */
@@ -99,14 +127,17 @@ function validate(): boolean {
     errors.value.description = 'Help text must be 1,000 characters or less'
   }
 
-  if (isSelectType.value) {
+  if (hasOptionList.value) {
+    const noun = isRating.value ? 'Items' : 'Options'
     const nonEmpty = form.value.options.map(o => o.trim()).filter(Boolean)
     if (nonEmpty.length === 0) {
-      errors.value.options = 'At least one option is required for select questions'
+      errors.value.options = isRating.value
+        ? 'Add at least one item to rate'
+        : 'At least one option is required for select questions'
     } else if (nonEmpty.some(option => option.length > 200)) {
-      errors.value.options = 'Options must be 200 characters or less'
+      errors.value.options = `${noun} must be 200 characters or less`
     } else if (new Set(nonEmpty.map(option => option.toLocaleLowerCase())).size !== nonEmpty.length) {
-      errors.value.options = 'Options must be unique'
+      errors.value.options = `${noun} must be unique`
     }
   }
 
@@ -123,6 +154,7 @@ function handleSubmit() {
     content?: string
     required: boolean
     options?: string[]
+    config?: QuestionConfig | null
   } = {
     label: form.value.label.trim(),
     type: form.value.type,
@@ -140,11 +172,21 @@ function handleSubmit() {
     data.description = form.value.description.trim()
   }
 
-  if (isSelectType.value) {
+  if (hasOptionList.value) {
     data.options = form.value.options
       .map((o) => o.trim())
       .filter((o) => o.length > 0)
   }
+
+  // Clear the config when the type is switched away from a rating grid so a
+  // stale scale can't linger on the question.
+  data.config = isRating.value
+    ? {
+        ratingMax: form.value.ratingMax,
+        ratingMinLabel: form.value.ratingMinLabel.trim() || null,
+        ratingMaxLabel: form.value.ratingMaxLabel.trim() || null,
+      }
+    : null
 
   emit('save', data)
 }
@@ -228,18 +270,71 @@ const isEditing = computed(() => !!props.question)
         <p v-if="errors.description" class="mt-1 text-xs text-danger-600 dark:text-danger-400">{{ errors.description }}</p>
       </div>
 
-      <!-- Options (for select types) -->
-      <div v-if="isSelectType && !isInfo">
+      <!-- Rating scale settings -->
+      <div v-if="isRating" class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-800/50 p-3 space-y-3">
+        <div>
+          <label for="q-rating-max" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
+            Scale
+          </label>
+          <select
+            id="q-rating-max"
+            v-model.number="form.ratingMax"
+            class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors bg-white dark:bg-surface-800"
+          >
+            <option v-for="n in ratingScaleChoices" :key="n" :value="n">1 to {{ n }}</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="q-rating-min-label" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
+              Label for 1 <span class="text-surface-400 font-normal">(optional)</span>
+            </label>
+            <input
+              id="q-rating-min-label"
+              v-model="form.ratingMinLabel"
+              type="text"
+              maxlength="100"
+              placeholder="e.g. Not experienced"
+              class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-1.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
+            />
+          </div>
+          <div>
+            <label for="q-rating-max-label" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
+              Label for {{ form.ratingMax }} <span class="text-surface-400 font-normal">(optional)</span>
+            </label>
+            <input
+              id="q-rating-max-label"
+              v-model="form.ratingMaxLabel"
+              type="text"
+              maxlength="100"
+              placeholder="e.g. Very experienced"
+              class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-1.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
+            />
+          </div>
+        </div>
+        <p class="text-xs text-surface-400 dark:text-surface-500">
+          Applicants pick one rating per item:
+          <span class="text-surface-500 dark:text-surface-400">
+            {{ ratingColumns.map(n => n === 1 && form.ratingMinLabel.trim() ? `1 – ${form.ratingMinLabel.trim()}` : n === form.ratingMax && form.ratingMaxLabel.trim() ? `${n} – ${form.ratingMaxLabel.trim()}` : n).join(' · ') }}
+          </span>
+        </p>
+      </div>
+
+      <!-- Options (select types) / items to rate (rating grid) -->
+      <div v-if="hasOptionList && !isInfo">
         <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-          Options <span class="text-danger-500">*</span>
+          {{ isRating ? 'Items to rate' : 'Options' }} <span class="text-danger-500">*</span>
         </label>
+        <p v-if="isRating" class="mb-2 text-xs text-surface-400 dark:text-surface-500">
+          One row per item — e.g. each piece of equipment or software.
+        </p>
         <div class="space-y-2">
           <div v-for="(_, index) in form.options" :key="index" class="flex items-center gap-2">
             <input
               v-model="form.options[index]"
               type="text"
               maxlength="200"
-              :placeholder="`Option ${index + 1}`"
+              :placeholder="isRating ? `Item ${index + 1}` : `Option ${index + 1}`"
               class="flex-1 rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-1.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
             />
             <button
@@ -259,7 +354,7 @@ const isEditing = computed(() => !!props.question)
           @click="addOption"
         >
           <Plus class="size-3.5" />
-          Add option
+          {{ isRating ? 'Add item' : 'Add option' }}
         </button>
         <p v-if="errors.options" class="mt-1 text-xs text-danger-600 dark:text-danger-400">{{ errors.options }}</p>
       </div>

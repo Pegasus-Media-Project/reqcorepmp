@@ -118,6 +118,7 @@ export default defineEventHandler(async (event) => {
         content: question.content,
         required: question.required,
         options: question.options,
+        config: question.config ?? null,
         displayOrder: index,
       })))
     }

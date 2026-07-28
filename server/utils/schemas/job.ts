@@ -70,7 +70,8 @@ export const createJobSchema = z.object({
  */
 export const createJobWizardSchema = createJobSchema.extend({
   status: z.enum(['draft', 'open']).optional().default('draft'),
-  questions: z.array(createQuestionSchema).max(50).optional().default([]),
+  // No product-level cap on form items; 500 is only a request-size guard.
+  questions: z.array(createQuestionSchema).max(500).optional().default([]),
   criteria: z.array(createCriterionSchema).max(20).optional().default([]),
   /**
    * Wizard sections (pages). Each carries a client-side `ref`; a question's

@@ -67,7 +67,7 @@ const form = ref({
 })
 
 // Dynamic question responses: questionId → value
-const responses = ref<Record<string, string | string[] | number | boolean>>({})
+const responses = ref<Record<string, string | string[] | number | boolean | Record<string, number>>>({})
 
 // File uploads: questionId → File object
 const fileUploads = ref<Record<string, File>>({})
@@ -140,14 +140,8 @@ function validate(): boolean {
           if (!fileUploads.value[q.id]) {
             errors.value[`q-${q.id}`] = t('jobs.apply.validation.fieldRequired')
           }
-        } else {
-          const val = responses.value[q.id]
-          const isEmpty = val === undefined || val === null || val === '' ||
-            (Array.isArray(val) && val.length === 0)
-
-          if (isEmpty) {
-            errors.value[`q-${q.id}`] = t('jobs.apply.validation.fieldRequired')
-          }
+        } else if (isAnswerMissing(q, responses.value[q.id])) {
+          errors.value[`q-${q.id}`] = t('jobs.apply.validation.fieldRequired')
         }
       }
     }
@@ -179,9 +173,7 @@ async function handleSubmit() {
     const responseArray = Object.entries(responses.value)
       .filter(([questionId, value]) => {
         if (fileQuestionIds.has(questionId)) return false
-        if (value === undefined || value === null || value === '') return false
-        if (Array.isArray(value) && value.length === 0) return false
-        return true
+        return hasAnswerValue(value)
       })
       .map(([questionId, value]) => ({ questionId, value }))
 

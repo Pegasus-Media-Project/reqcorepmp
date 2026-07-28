@@ -16,6 +16,11 @@ const props = defineProps<{
     description?: string | null
     required: boolean
     options?: string[] | null
+    config?: {
+      ratingMax?: number
+      ratingMinLabel?: string | null
+      ratingMaxLabel?: string | null
+    } | null
   }
   error?: string
 }>()
@@ -24,7 +29,7 @@ const emit = defineEmits<{
   (e: 'file-selected', questionId: string, file: File | null): void
 }>()
 
-const model = defineModel<string | string[] | number | boolean | undefined>()
+const model = defineModel<string | string[] | number | boolean | Record<string, number> | undefined>()
 
 const { t } = useI18n()
 
@@ -67,6 +72,36 @@ function toggleMultiOption(option: string) {
 
 function isOptionSelected(option: string): boolean {
   return Array.isArray(model.value) && model.value.includes(option)
+}
+
+// ─────────────────────────────────────────────
+// Rating grid: one row per item in `options`, one column per point on the
+// scale. The answer is a { row label → rating } map.
+// ─────────────────────────────────────────────
+
+const DEFAULT_RATING_MAX = 5
+
+const ratingColumns = computed(() => {
+  const max = props.question.config?.ratingMax ?? DEFAULT_RATING_MAX
+  return Array.from({ length: max }, (_, i) => i + 1)
+})
+
+/** Column heading: the endpoints carry their captions, the rest are numbers. */
+function ratingColumnLabel(value: number): string {
+  const cfg = props.question.config
+  if (value === 1 && cfg?.ratingMinLabel) return `1 – ${cfg.ratingMinLabel}`
+  if (value === ratingColumns.value.length && cfg?.ratingMaxLabel) return `${value} – ${cfg.ratingMaxLabel}`
+  return String(value)
+}
+
+const ratings = computed<Record<string, number>>(() =>
+  (model.value && typeof model.value === 'object' && !Array.isArray(model.value))
+    ? model.value as Record<string, number>
+    : {},
+)
+
+function setRating(row: string, value: number) {
+  model.value = { ...ratings.value, [row]: value }
 }
 
 // ─────────────────────────────────────────────
@@ -169,6 +204,54 @@ const normalBorderClass = 'border-surface-300 dark:border-surface-700'
         />
         <span class="text-sm text-surface-700 dark:text-surface-300">{{ opt }}</span>
       </label>
+    </div>
+
+    <!-- Rating grid -->
+    <div
+      v-else-if="question.type === 'rating'"
+      class="mt-1 overflow-x-auto rounded-lg border"
+      :class="error ? errorBorderClass : normalBorderClass"
+    >
+      <table class="w-full min-w-md border-collapse text-sm">
+        <thead>
+          <tr class="border-b border-surface-200 dark:border-surface-800">
+            <th class="sticky left-0 z-10 bg-white dark:bg-surface-900 px-3 py-2 text-left text-xs font-medium text-surface-500 dark:text-surface-400" />
+            <th
+              v-for="col in ratingColumns"
+              :key="col"
+              scope="col"
+              class="px-2 py-2 text-center text-xs font-medium text-surface-500 dark:text-surface-400 whitespace-nowrap"
+            >
+              {{ ratingColumnLabel(col) }}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="(row, rowIndex) in question.options ?? []"
+            :key="row"
+            class="border-b border-surface-100 dark:border-surface-800 last:border-0"
+          >
+            <th
+              scope="row"
+              class="sticky left-0 z-10 bg-white dark:bg-surface-900 px-3 py-2 text-left text-sm font-normal text-surface-700 dark:text-surface-300"
+            >
+              {{ row }}
+            </th>
+            <td v-for="col in ratingColumns" :key="col" class="px-2 py-2 text-center">
+              <input
+                type="radio"
+                :name="`q-${question.id}-${rowIndex}`"
+                :value="col"
+                :checked="ratings[row] === col"
+                :aria-label="`${row}: ${ratingColumnLabel(col)}`"
+                class="size-4 border-surface-300 dark:border-surface-700 text-brand-600 focus:ring-brand-500"
+                @change="setRating(row, col)"
+              />
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <!-- Number -->

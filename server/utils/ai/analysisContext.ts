@@ -23,9 +23,13 @@ export const DEFAULT_ANALYSIS_CONTEXT: AnalysisContext = {
 }
 
 /** Render a stored question-response value into a human-readable answer string. */
-function formatAnswer(value: string | string[] | number | boolean): string {
+function formatAnswer(value: string | string[] | number | boolean | Record<string, number>): string {
   if (Array.isArray(value)) return value.join(', ')
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  // `rating` grids answer as { row → score }.
+  if (value && typeof value === 'object') {
+    return Object.entries(value).map(([row, score]) => `${row}: ${score}`).join('; ')
+  }
   return String(value)
 }
 
