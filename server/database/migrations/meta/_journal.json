@@ -393,6 +393,13 @@
       "when": 1785195991487,
       "tag": "0055_secret_chamber",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1785197347971,
+      "tag": "0056_known_karnak",
+      "breakpoints": true
     }
   ]
 }

@@ -363,6 +363,32 @@ export const jobQuestion = pgTable('job_question', {
 ]))
 
 /**
+ * Shareable read-only preview of a job's application form.
+ *
+ * Lets a recruiter send the form to a colleague before the posting is
+ * published: the link resolves whatever the job's status, requires no account,
+ * and never accepts a submission. One active (unrevoked, unexpired) link per
+ * job — creating a new one revokes the previous.
+ */
+export const jobPreviewLink = pgTable('job_preview_link', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  jobId: text('job_id').notNull().references(() => job.id, { onDelete: 'cascade' }),
+  createdById: text('created_by_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  token: text('token').notNull().unique(),
+  expiresAt: timestamp('expires_at').notNull(),
+  revokedAt: timestamp('revoked_at'),
+  /** Lightweight usage signal so the recruiter can tell if anyone opened it. */
+  viewCount: integer('view_count').notNull().default(0),
+  lastViewedAt: timestamp('last_viewed_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (t) => ([
+  index('job_preview_link_organization_id_idx').on(t.organizationId),
+  index('job_preview_link_job_id_idx').on(t.jobId),
+  index('job_preview_link_token_idx').on(t.token),
+]))
+
+/**
  * Org-configurable employment types (e.g. "Full-time", "Freelance").
  * Populates the employment-type picker on the job form. `job.type` stores the
  * chosen label directly, so these rows are the editable source of that list.
@@ -1268,6 +1294,13 @@ export const jobRelations = relations(job, ({ one, many }) => ({
   scoringCriteria: many(scoringCriterion),
   trackingLinks: many(trackingLink),
   assignments: many(jobAssignment),
+  previewLinks: many(jobPreviewLink),
+}))
+
+export const jobPreviewLinkRelations = relations(jobPreviewLink, ({ one }) => ({
+  organization: one(organization, { fields: [jobPreviewLink.organizationId], references: [organization.id] }),
+  job: one(job, { fields: [jobPreviewLink.jobId], references: [job.id] }),
+  createdBy: one(user, { fields: [jobPreviewLink.createdById], references: [user.id] }),
 }))
 
 export const programRelations = relations(program, ({ one, many }) => ({

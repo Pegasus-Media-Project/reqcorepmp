@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Link2, ClipboardCopy } from 'lucide-vue-next'
+import { Link2, ClipboardCopy, Eye, RefreshCw, Trash2 } from 'lucide-vue-next'
 
 definePageMeta({
   layout: 'dashboard',
@@ -38,6 +38,65 @@ async function copyApplicationLink() {
   } catch {
     // Fallback for non-HTTPS contexts
     toast.info(applicationUrl.value)
+  }
+}
+
+// ─────────────────────────────────────────────
+// Review link — a read-only share of this form, usable while the job is still
+// a draft. Anyone with the link can page through the form but cannot submit.
+// ─────────────────────────────────────────────
+
+const { link: previewLink, createLink, revokeLink } = useJobPreviewLink(jobId)
+
+const previewUrl = computed(() => {
+  if (!previewLink.value) return ''
+  return `${requestUrl.protocol}//${requestUrl.host}/jobs/preview/${previewLink.value.token}`
+})
+
+const previewBusy = ref(false)
+const previewCopied = ref(false)
+
+const previewExpiryLabel = computed(() => {
+  if (!previewLink.value) return ''
+  return new Date(previewLink.value.expiresAt).toLocaleDateString(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric',
+  })
+})
+
+const previewViewsLabel = computed(() => {
+  const count = previewLink.value?.viewCount ?? 0
+  if (count === 0) return 'not opened yet'
+  return `opened ${count} ${count === 1 ? 'time' : 'times'}`
+})
+
+async function runPreviewOp(op: () => Promise<unknown>, failure: string) {
+  previewBusy.value = true
+  try {
+    await op()
+  } catch {
+    toast.error(failure)
+  } finally {
+    previewBusy.value = false
+  }
+}
+
+const createPreviewLink = () => runPreviewOp(() => createLink(), 'Could not create the review link.')
+const rotatePreviewLink = () => runPreviewOp(async () => {
+  await createLink()
+  toast.success('New review link created. The old one no longer works.')
+}, 'Could not refresh the review link.')
+const revokePreviewLink = () => runPreviewOp(async () => {
+  await revokeLink()
+  toast.success('Review link revoked.')
+}, 'Could not revoke the review link.')
+
+async function copyPreviewLink() {
+  try {
+    await navigator.clipboard.writeText(previewUrl.value)
+    previewCopied.value = true
+    setTimeout(() => { previewCopied.value = false }, 2000)
+  } catch {
+    toast.info(previewUrl.value)
   }
 }
 
@@ -201,6 +260,67 @@ const builderOperations = {
               <ClipboardCopy class="size-3.5" />
               {{ linkCopied ? 'Copied!' : 'Copy link' }}
             </button>
+          </div>
+
+          <!-- Review link: share the form before the job is published -->
+          <div class="flex items-center gap-3 px-5 py-3 border-b border-surface-100 dark:border-surface-800">
+            <Eye class="size-4 text-surface-400 dark:text-surface-500 shrink-0" />
+            <div class="flex-1 min-w-0">
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-0.5">
+                Review link
+              </p>
+              <template v-if="previewLink">
+                <input
+                  type="text"
+                  readonly
+                  :value="previewUrl"
+                  class="w-full bg-transparent text-xs text-surface-600 dark:text-surface-300 select-all outline-none font-mono"
+                />
+                <p class="mt-0.5 text-[11px] text-surface-400 dark:text-surface-500">
+                  Read-only, no sign-in needed &middot; expires {{ previewExpiryLabel }} &middot; {{ previewViewsLabel }}
+                </p>
+              </template>
+              <p v-else class="text-xs text-surface-500 dark:text-surface-400">
+                Share this form with someone for feedback — works while the job is still a draft, and nothing they enter is submitted.
+              </p>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <template v-if="previewLink">
+                <button
+                  :disabled="previewBusy"
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-1.5 text-xs font-semibold text-surface-700 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors disabled:opacity-50"
+                  @click="copyPreviewLink"
+                >
+                  <ClipboardCopy class="size-3.5" />
+                  {{ previewCopied ? 'Copied!' : 'Copy link' }}
+                </button>
+                <button
+                  :disabled="previewBusy"
+                  title="Create a new link and stop the old one working"
+                  class="rounded-lg p-1.5 text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors disabled:opacity-50"
+                  @click="rotatePreviewLink"
+                >
+                  <RefreshCw class="size-3.5" />
+                </button>
+                <button
+                  :disabled="previewBusy"
+                  title="Revoke this link"
+                  class="rounded-lg p-1.5 text-surface-400 hover:text-danger-600 dark:hover:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors disabled:opacity-50"
+                  @click="revokePreviewLink"
+                >
+                  <Trash2 class="size-3.5" />
+                </button>
+              </template>
+              <button
+                v-else
+                :disabled="previewBusy"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-1.5 text-xs font-semibold text-surface-700 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors disabled:opacity-50"
+                @click="createPreviewLink"
+              >
+                <Link2 class="size-3.5" />
+                Create review link
+              </button>
+            </div>
           </div>
           <div class="p-5">
             <ApplicationBuilder
