@@ -44,7 +44,21 @@ const feeAmountLabel = computed(() => {
 
 const verifyingStep = ref<'fee' | 'documents' | null>(null)
 
-async function setStepStatus(step: 'fee' | 'documents', status: 'pending' | 'verified') {
+/** Verified and waived both settle the step; only the wording differs. */
+const feeSettled = computed(() => props.feeStatus === 'verified' || props.feeStatus === 'waived')
+const feeWaived = computed(() => props.feeStatus === 'waived')
+
+const feeStatusLabel = computed(() => {
+  if (feeWaived.value) return 'Waived'
+  return props.feeStatus === 'verified' ? 'Verified' : 'Pending'
+})
+
+const feeStatusDetail = computed(() => {
+  if (feeWaived.value) return 'Fee waived — the applicant owes nothing'
+  return props.feeStatus === 'verified' ? 'Payment verified' : 'Awaiting manual verification of payment'
+})
+
+async function setStepStatus(step: 'fee' | 'documents', status: 'pending' | 'verified' | 'waived') {
   verifyingStep.value = step
   try {
     await $fetch(`/api/applications/${props.applicationId}/verifications`, {
@@ -77,27 +91,39 @@ async function setStepStatus(step: 'fee' | 'documents', status: 'pending' | 'ver
             Application fee<span v-if="feeAmountLabel" class="text-surface-500"> · {{ feeAmountLabel }}</span>
           </p>
           <p class="text-xs text-surface-500 dark:text-surface-400">
-            {{ feeStatus === 'verified' ? 'Payment verified' : 'Awaiting manual verification of payment' }}
+            {{ feeStatusDetail }}
           </p>
         </div>
         <div class="flex shrink-0 items-center gap-2">
           <span
             class="rounded-full px-2.5 py-0.5 text-xs font-semibold"
-            :class="feeStatus === 'verified' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'"
+            :class="feeWaived
+              ? 'bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-300'
+              : feeStatus === 'verified' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'"
           >
-            {{ feeStatus === 'verified' ? 'Verified' : 'Pending' }}
+            {{ feeStatusLabel }}
           </span>
+          <template v-if="canManage && !feeSettled">
+            <button
+              type="button"
+              :disabled="verifyingStep === 'fee'"
+              class="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+              @click="setStepStatus('fee', 'verified')"
+            >
+              {{ verifyingStep === 'fee' ? 'Saving…' : 'Mark verified' }}
+            </button>
+            <button
+              type="button"
+              :disabled="verifyingStep === 'fee'"
+              title="Excuse this applicant from the fee"
+              class="rounded-md border border-surface-300 dark:border-surface-600 px-3 py-1.5 text-xs font-medium text-surface-600 dark:text-surface-300 transition hover:bg-surface-100 dark:hover:bg-surface-800 disabled:opacity-60"
+              @click="setStepStatus('fee', 'waived')"
+            >
+              Waive fee
+            </button>
+          </template>
           <button
-            v-if="canManage && feeStatus !== 'verified'"
-            type="button"
-            :disabled="verifyingStep === 'fee'"
-            class="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
-            @click="setStepStatus('fee', 'verified')"
-          >
-            {{ verifyingStep === 'fee' ? 'Saving…' : 'Mark verified' }}
-          </button>
-          <button
-            v-else-if="canManage && feeStatus === 'verified'"
+            v-else-if="canManage && feeSettled"
             type="button"
             :disabled="verifyingStep === 'fee'"
             class="rounded-md border border-surface-300 dark:border-surface-600 px-3 py-1.5 text-xs font-medium text-surface-600 dark:text-surface-300 transition hover:bg-surface-100 dark:hover:bg-surface-800 disabled:opacity-60"

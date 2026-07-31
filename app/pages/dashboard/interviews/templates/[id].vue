@@ -39,7 +39,7 @@ const sourceTemplateType = computed(() => {
   return ((source as { type?: string, templateType?: string })?.type
     ?? (source as { templateType?: string })?.templateType
     ?? 'interview_invitation') as
-    'interview_invitation' | 'application_accepted' | 'application_rejected' | 'fee_verified' | 'documents_verified' | 'self_schedule_invitation'
+    'interview_invitation' | 'application_accepted' | 'application_rejected' | 'fee_verified' | 'fee_waived' | 'documents_verified' | 'self_schedule_invitation'
 })
 const sourceTemplateTypeLabel = computed(() => EMAIL_TEMPLATE_TYPE_LABELS[sourceTemplateType.value] ?? sourceTemplateType.value)
 

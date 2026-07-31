@@ -13,6 +13,7 @@ export const EMAIL_TEMPLATE_TYPES = [
   'application_accepted',
   'application_rejected',
   'fee_verified',
+  'fee_waived',
   'documents_verified',
   'self_schedule_invitation',
 ] as const
@@ -54,6 +55,7 @@ export const TEMPLATE_VARIABLES_BY_TYPE: Record<EmailTemplateType, readonly stri
   application_accepted: [...COMMON_LIFECYCLE_VARIABLES, 'actionUrl'],
   application_rejected: COMMON_LIFECYCLE_VARIABLES,
   fee_verified: COMMON_LIFECYCLE_VARIABLES,
+  fee_waived: COMMON_LIFECYCLE_VARIABLES,
   documents_verified: COMMON_LIFECYCLE_VARIABLES,
   self_schedule_invitation: [
     'candidateName',

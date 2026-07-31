@@ -21,7 +21,7 @@ export const updateApplicationSchema = z.object({
 })
 
 /** Allowed values for a manual onboarding-step verification. */
-export const applicationStepStatusValues = ['pending', 'submitted', 'verified'] as const
+export const applicationStepStatusValues = ['pending', 'submitted', 'verified', 'waived'] as const
 
 /**
  * Schema for staff manually setting the fee / signed-documents verification

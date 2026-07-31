@@ -1942,10 +1942,14 @@ function closeDocPreview() {
                     class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset"
                     :class="app.feeStatus === 'verified'
                       ? 'bg-success-50 text-success-700 ring-success-200 dark:bg-success-950/60 dark:text-success-400 dark:ring-success-800'
-                      : 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-400 dark:ring-amber-800'"
-                    :title="app.feeStatus === 'verified' ? 'Application fee verified' : 'Application fee not yet verified'"
+                      : app.feeStatus === 'waived'
+                        ? 'bg-surface-100 text-surface-600 ring-surface-200 dark:bg-surface-800 dark:text-surface-300 dark:ring-surface-700'
+                        : 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-400 dark:ring-amber-800'"
+                    :title="app.feeStatus === 'verified'
+                      ? 'Application fee verified'
+                      : app.feeStatus === 'waived' ? 'Application fee waived' : 'Application fee not yet verified'"
                   >
-                    {{ app.feeStatus === 'verified' ? 'Fee paid' : 'Fee due' }}
+                    {{ app.feeStatus === 'verified' ? 'Fee paid' : app.feeStatus === 'waived' ? 'Fee waived' : 'Fee due' }}
                   </span>
                 </div>
               </div>

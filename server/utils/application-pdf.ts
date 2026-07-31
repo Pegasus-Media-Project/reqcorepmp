@@ -27,6 +27,7 @@ const FEE_STATUS_LABELS: Record<string, string> = {
   pending: 'Not paid',
   submitted: 'Submitted',
   verified: 'Paid',
+  waived: 'Waived',
 }
 
 const INTERVIEW_TYPE_LABELS: Record<string, string> = {

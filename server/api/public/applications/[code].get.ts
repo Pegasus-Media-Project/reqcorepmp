@@ -66,13 +66,16 @@ export default defineEventHandler(async (event) => {
   // they've reached the offer/hired stage. No PII is exposed either way.
   const isAcceptedStage = row.status === 'offer' || row.status === 'hired'
 
+  // A waived fee is settled: nothing to pay, nothing to verify.
+  const feeSettled = row.feeStatus === 'verified' || row.feeStatus === 'waived'
   const fee = row.applicationFeeEnabled
     ? {
         status: row.feeStatus,
         amount: row.applicationFeeAmount,
         currency: row.applicationFeeCurrency,
-        actionUrl: row.applicationFeeUrl,
-        awaitingManualVerification: row.feeStatus !== 'verified',
+        // The pay link is withheld once the fee is settled — see status.vue.
+        actionUrl: feeSettled ? null : row.applicationFeeUrl,
+        awaitingManualVerification: !feeSettled,
       }
     : null
 

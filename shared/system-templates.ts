@@ -4,6 +4,7 @@ export type SystemTemplateType =
   | 'application_accepted'
   | 'application_rejected'
   | 'fee_verified'
+  | 'fee_waived'
   | 'documents_verified'
   | 'self_schedule_invitation'
 
@@ -144,6 +145,21 @@ Sincerely,
     body: `Dear {{candidateFirstName}},
 
 Good news — we've confirmed your application fee for the {{jobTitle}} position at {{organizationName}}. No further action is needed for this step.
+
+You can check your application status here: {{statusUrl}}
+
+Thank you,
+{{organizationName}}`,
+  },
+  {
+    id: 'system-fee-waived',
+    type: 'fee_waived',
+    name: 'Application Fee Waived',
+    description: 'Sent when staff waive the application fee for an applicant.',
+    subject: 'Your application fee has been waived — {{jobTitle}}',
+    body: `Dear {{candidateFirstName}},
+
+We've waived the application fee for your {{jobTitle}} application at {{organizationName}}. There's nothing to pay, and no further action is needed for this step.
 
 You can check your application status here: {{statusUrl}}
 

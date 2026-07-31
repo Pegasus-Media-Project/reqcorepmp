@@ -27,6 +27,7 @@ export const EMAIL_TEMPLATE_TYPE_LABELS: Record<string, string> = {
   application_accepted: 'Acceptance letter',
   application_rejected: 'Rejection letter',
   fee_verified: 'Application fee verified',
+  fee_waived: 'Application fee waived',
   documents_verified: 'Documents verified',
   self_schedule_invitation: 'Self-schedule invitation',
 }

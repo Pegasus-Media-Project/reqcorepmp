@@ -28,9 +28,10 @@ export const documentTypeEnum = pgEnum('document_type', ['resume', 'cover_letter
  * Verification state for a per-application onboarding step (application fee,
  * signed documents). `submitted` is reserved for applicant self-report / a
  * future DocuSign webhook; v1 goes straight from `pending` to a staff-set
- * `verified`.
+ * `verified`. `waived` settles the step without it having been met — used to
+ * excuse an individual applicant from the fee.
  */
-export const applicationStepStatusEnum = pgEnum('application_step_status', ['pending', 'submitted', 'verified'])
+export const applicationStepStatusEnum = pgEnum('application_step_status', ['pending', 'submitted', 'verified', 'waived'])
 export const questionTypeEnum = pgEnum('question_type', [
   'short_text', 'long_text', 'single_select', 'multi_select',
   'number', 'date', 'url', 'checkbox', 'file_upload',
@@ -264,6 +265,7 @@ export const application = pgTable('application', {
   // ── Onboarding-step verification (only meaningful when the job requires them) ──
   // Application fee (submission phase).
   feeStatus: applicationStepStatusEnum('fee_status').notNull().default('pending'),
+  // Who settled the fee step and when — set for both `verified` and `waived`.
   feeVerifiedById: text('fee_verified_by_id').references(() => user.id),
   feeVerifiedAt: timestamp('fee_verified_at'),
   // Signed documents (acceptance phase).
@@ -913,6 +915,7 @@ export const emailTemplateTypeEnum = pgEnum('email_template_type', [
   'application_accepted',
   'application_rejected',
   'fee_verified',
+  'fee_waived',
   'documents_verified',
   'self_schedule_invitation',
 ])

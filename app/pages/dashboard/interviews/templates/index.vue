@@ -27,6 +27,7 @@ const TYPE_ORDER = [
   'application_accepted',
   'application_rejected',
   'fee_verified',
+  'fee_waived',
   'documents_verified',
 ] as const
 

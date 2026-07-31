@@ -42,15 +42,18 @@ export default defineEventHandler(async (event) => {
   const now = new Date()
   const updates: Record<string, unknown> = { updatedAt: now }
 
+  // Both `verified` and `waived` settle a step, so both stamp who and when.
+  const settles = (status: string | undefined) => status === 'verified' || status === 'waived'
+
   if (body.feeStatus !== undefined) {
     updates.feeStatus = body.feeStatus
-    updates.feeVerifiedById = body.feeStatus === 'verified' ? session.user.id : null
-    updates.feeVerifiedAt = body.feeStatus === 'verified' ? now : null
+    updates.feeVerifiedById = settles(body.feeStatus) ? session.user.id : null
+    updates.feeVerifiedAt = settles(body.feeStatus) ? now : null
   }
   if (body.documentsStatus !== undefined) {
     updates.documentsStatus = body.documentsStatus
-    updates.documentsVerifiedById = body.documentsStatus === 'verified' ? session.user.id : null
-    updates.documentsVerifiedAt = body.documentsStatus === 'verified' ? now : null
+    updates.documentsVerifiedById = settles(body.documentsStatus) ? session.user.id : null
+    updates.documentsVerifiedAt = settles(body.documentsStatus) ? now : null
   }
 
   const [updated] = await db.update(application)
@@ -80,11 +83,14 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  // Best-effort lifecycle emails when a step newly becomes verified.
+  // Best-effort lifecycle emails when a step newly settles. A waived fee gets
+  // its own note — telling someone their payment is "confirmed" when they were
+  // excused from paying would be wrong.
   const feeNewlyVerified = body.feeStatus === 'verified' && current.feeStatus !== 'verified'
+  const feeNewlyWaived = body.feeStatus === 'waived' && current.feeStatus !== 'waived'
   const documentsNewlyVerified = body.documentsStatus === 'verified' && current.documentsStatus !== 'verified'
 
-  if ((feeNewlyVerified || documentsNewlyVerified) && current.confirmationCode) {
+  if ((feeNewlyVerified || feeNewlyWaived || documentsNewlyVerified) && current.confirmationCode) {
     const origin = getRequestURL(event).origin
     const statusUrl = `${origin}/status?code=${current.confirmationCode}`
     const branding = await resolveOrgEmailBranding(orgId, origin)
@@ -104,6 +110,16 @@ export default defineEventHandler(async (event) => {
         organizationName: branding.organizationName,
         logoUrl: branding.logoUrl,
       }).catch(e => console.error('[Pegasus] Failed to send fee_verified email:', e))
+    }
+    if (feeNewlyWaived) {
+      void sendLifecycleEmail({
+        to: current.candidateEmail,
+        organizationId: orgId,
+        templateType: 'fee_waived',
+        vars,
+        organizationName: branding.organizationName,
+        logoUrl: branding.logoUrl,
+      }).catch(e => console.error('[Pegasus] Failed to send fee_waived email:', e))
     }
     if (documentsNewlyVerified) {
       void sendLifecycleEmail({

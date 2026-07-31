@@ -13,7 +13,8 @@ useSeoMeta({
 const route = useRoute()
 
 interface OnboardingStep {
-  status: 'pending' | 'submitted' | 'verified'
+  /** `waived` settles the step without it having been met (fee only, today). */
+  status: 'pending' | 'submitted' | 'verified' | 'waived'
   actionUrl: string | null
   awaitingManualVerification: boolean
 }
@@ -157,7 +158,10 @@ onMounted(() => {
       <div class="flex items-start justify-between gap-4">
         <div>
           <h2 class="text-sm font-semibold text-surface-900">Application fee</h2>
-          <p class="mt-1 text-xs text-surface-500">
+          <p v-if="result.fee.status === 'waived'" class="mt-1 text-xs text-surface-500">
+            The fee has been waived for your application — there's nothing to pay.
+          </p>
+          <p v-else class="mt-1 text-xs text-surface-500">
             <template v-if="formatFee(result.fee.amount, result.fee.currency)">
               A fee of <strong>{{ formatFee(result.fee.amount, result.fee.currency) }}</strong> is required for this application.
             </template>
@@ -167,13 +171,15 @@ onMounted(() => {
         </div>
         <span
           class="shrink-0 rounded-full px-3 py-1 text-xs font-semibold"
-          :class="result.fee.status === 'verified' ? 'bg-success-50 text-success-700' : 'bg-amber-50 text-amber-700'"
+          :class="result.fee.status === 'verified' || result.fee.status === 'waived'
+            ? 'bg-success-50 text-success-700'
+            : 'bg-amber-50 text-amber-700'"
         >
-          {{ result.fee.status === 'verified' ? 'Verified' : 'Awaiting staff verification' }}
+          {{ result.fee.status === 'waived' ? 'Waived' : result.fee.status === 'verified' ? 'Verified' : 'Awaiting staff verification' }}
         </span>
       </div>
       <a
-        v-if="result.fee.actionUrl && result.fee.status !== 'verified'"
+        v-if="result.fee.actionUrl"
         :href="result.fee.actionUrl"
         target="_blank"
         rel="noopener noreferrer"
