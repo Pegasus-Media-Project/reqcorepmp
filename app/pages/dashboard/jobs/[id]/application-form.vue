@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Link2, ClipboardCopy, Eye, RefreshCw, Trash2 } from 'lucide-vue-next'
+import { Link2, ClipboardCopy, Eye, RefreshCw, Trash2, FileText, Download } from 'lucide-vue-next'
 
 definePageMeta({
   layout: 'dashboard',
@@ -261,6 +261,26 @@ const builderOperations = {
               <ClipboardCopy class="size-3.5" />
               {{ linkCopied ? 'Copied!' : 'Copy link' }}
             </button>
+          </div>
+
+          <!-- Word handout of the blank form -->
+          <div class="flex items-center gap-3 px-5 py-3 border-b border-surface-100 dark:border-surface-800">
+            <FileText class="size-4 text-surface-400 dark:text-surface-500 shrink-0" />
+            <div class="flex-1 min-w-0">
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-0.5">
+                Questionnaire
+              </p>
+              <p class="text-xs text-surface-500 dark:text-surface-400">
+                Download the blank form as a Word document — every question with room to answer, ready to edit, print or attach.
+              </p>
+            </div>
+            <a
+              :href="`/api/jobs/${jobId}/questionnaire.docx`"
+              class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-1.5 text-xs font-semibold text-surface-700 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors no-underline"
+            >
+              <Download class="size-3.5" />
+              Word (.docx)
+            </a>
           </div>
 
           <!-- Review link: share the form before the job is published -->
