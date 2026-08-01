@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, User, Briefcase, Calendar, Clock, Hash, FileText, FileDown, MessageSquare, Star, Copy, Check } from 'lucide-vue-next'
+import { ArrowLeft, User, Briefcase, Calendar, Clock, Hash, FileText, FileDown, MessageSquare, Star, Copy, Check, Trash2 } from 'lucide-vue-next'
 import { usePreviewReadOnly } from '~/composables/usePreviewReadOnly'
 
 definePageMeta({
@@ -24,6 +24,16 @@ const { formatCandidateName } = useOrgSettings()
 const aiScoringEnabled = useFeatureFlagEnabled('ai-scoring')
 // Guests are read-only: no stage moves, reject, or scheduling.
 const { allowed: canManageApplication } = usePermission({ application: ['update'] })
+// Deleting an application is owner/admin only.
+const { allowed: canDeleteApplication } = usePermission({ application: ['delete'] })
+
+const showDeleteDialog = ref(false)
+const localePath = useLocalePath()
+
+// The record is gone — there's nothing left on this page to return to.
+function onDeleted() {
+  navigateTo(localePath('/dashboard/applications'))
+}
 const { reviews } = useReviews(applicationId)
 function stageAvg(stage: 'screening' | 'interview'): number | null {
   const scores = reviews.value.filter(r => r.stage === stage && r.rating != null).map(r => r.rating as number)
@@ -190,14 +200,25 @@ const statusBadgeClasses: Record<string, string> = {
           <p class="text-xs font-medium uppercase tracking-wide text-surface-500 dark:text-surface-400">
             Application Overview
           </p>
-          <a
-            :href="`/api/applications/${application.id}/export.pdf`"
-            target="_blank"
-            class="inline-flex items-center gap-1.5 rounded-lg border border-surface-300 dark:border-surface-700 px-2.5 py-1.5 text-xs font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
-          >
-            <FileDown class="size-3.5" />
-            Export PDF
-          </a>
+          <div class="flex items-center gap-2">
+            <a
+              :href="`/api/applications/${application.id}/export.pdf`"
+              target="_blank"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-surface-300 dark:border-surface-700 px-2.5 py-1.5 text-xs font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+            >
+              <FileDown class="size-3.5" />
+              Export PDF
+            </a>
+            <button
+              v-if="canDeleteApplication"
+              type="button"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-surface-300 dark:border-surface-700 px-2.5 py-1.5 text-xs font-medium text-surface-600 dark:text-surface-400 hover:border-danger-300 hover:bg-danger-50 hover:text-danger-700 dark:hover:border-danger-800 dark:hover:bg-danger-950 dark:hover:text-danger-400 transition-colors"
+              @click="showDeleteDialog = true"
+            >
+              <Trash2 class="size-3.5" />
+              Delete
+            </button>
+          </div>
         </div>
         <div class="mb-2 flex flex-wrap items-center gap-2 text-surface-400">
           <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50 truncate">
@@ -504,5 +525,14 @@ const statusBadgeClasses: Record<string, string> = {
     :job-title="application.job.title"
     @close="showInterviewSidebar = false"
     @scheduled="showInterviewSidebar = false"
+  />
+
+  <DeleteApplicationDialog
+    v-if="application"
+    v-model:open="showDeleteDialog"
+    :application-id="applicationId"
+    :candidate-name="formatCandidateName(application.candidate)"
+    :job-title="application.job.title"
+    @deleted="onDeleted"
   />
 </template>

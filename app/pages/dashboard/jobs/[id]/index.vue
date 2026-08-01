@@ -607,6 +607,8 @@ interface ApplicationNote {
 const { allowed: canCreateNote, role: noteRole } = usePermission({ comment: ['create'] })
 // Guests are read-only: no stage moves, reject, or scheduling.
 const { allowed: canManageApplication } = usePermission({ application: ['update'] })
+// Deleting an application is owner/admin only.
+const { allowed: canDeleteApplication } = usePermission({ application: ['delete'] })
 
 // Only used to decide which notes the current user owns, and notes are never
 // rendered during SSR — so resolve the session on the client rather than
@@ -1208,6 +1210,24 @@ async function handleReschedule() {
   } finally {
     isRescheduling.value = false
   }
+}
+
+// ── Delete one application ────────────────────────────────────────────────
+const showDeleteDialog = ref(false)
+
+/** Move to a neighbour before the deleted candidate disappears from the list. */
+async function onApplicationDeleted(applicationId: string) {
+  const index = filteredApplications.value.findIndex(a => a.id === applicationId)
+  const neighbour = index === -1
+    ? null
+    : filteredApplications.value[index + 1]?.id ?? filteredApplications.value[index - 1]?.id ?? null
+
+  selectedApplicationId.value = neighbour
+  const stillSelected = new Set(selectedAppIds.value)
+  stillSelected.delete(applicationId)
+  selectedAppIds.value = stillSelected
+
+  await refreshApps()
 }
 
 async function changeStatus(status: string) {
@@ -2089,6 +2109,15 @@ function closeDocPreview() {
                         >
                           <ExternalLink class="size-4" />
                         </NuxtLink>
+                        <button
+                          v-if="canDeleteApplication"
+                          type="button"
+                          class="flex cursor-pointer items-center justify-center rounded-lg border border-surface-200 p-1.5 text-surface-500 transition-all duration-150 hover:border-danger-300 hover:bg-danger-50 hover:text-danger-600 dark:border-surface-700 dark:text-surface-400 dark:hover:border-danger-800 dark:hover:bg-danger-950 dark:hover:text-danger-400"
+                          title="Delete this application"
+                          @click="showDeleteDialog = true"
+                        >
+                          <Trash2 class="size-4" />
+                        </button>
                       </div>
                     </div>
                     <div class="mt-2 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-surface-500 dark:text-surface-400">
@@ -3230,6 +3259,15 @@ function closeDocPreview() {
       :open="showSlotManager"
       :job-id="jobId"
       @close="showSlotManager = false"
+    />
+
+    <DeleteApplicationDialog
+      v-if="currentSummary"
+      v-model:open="showDeleteDialog"
+      :application-id="currentSummary.id"
+      :candidate-name="formatPersonName(currentSummary.candidateFirstName, currentSummary.candidateLastName)"
+      :job-title="jobData?.title"
+      @deleted="onApplicationDeleted"
     />
 
     <!-- Document Preview Modal -->

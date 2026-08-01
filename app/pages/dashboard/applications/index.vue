@@ -408,6 +408,14 @@ function clearSelection() {
 
 const selectedIdList = computed(() => [...selectedIds.value])
 
+/** A deleted application must leave the list and any pending selection. */
+function onApplicationDeleted(applicationId: string) {
+  const next = new Set(selectedIds.value)
+  next.delete(applicationId)
+  selectedIds.value = next
+  refresh()
+}
+
 // ── Export ────────────────────────────────────────────────────────────────────
 // "Selected" sends the ticked ids; "Everything" sends the active filters and
 // lets the server resolve them, so the export isn't limited to this page.
@@ -899,6 +907,7 @@ function onExport({ format, scope }: { format: 'xlsx' | 'pdf', scope: 'all' | 's
     v-if="selectedApplicationId"
     :application-id="selectedApplicationId"
     @close="selectedApplicationId = null"
+    @deleted="onApplicationDeleted"
   />
 
   <!-- Bulk email modal -->

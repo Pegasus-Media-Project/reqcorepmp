@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { X, ExternalLink, User, Briefcase, Calendar, Clock, Hash, FileText, FileDown, MessageSquare, Star } from 'lucide-vue-next'
+import { X, ExternalLink, User, Briefcase, Calendar, Clock, Hash, FileText, FileDown, MessageSquare, Star, Trash2 } from 'lucide-vue-next'
 import { APPLICATION_STATUS_TRANSITIONS } from '~~/shared/status-transitions'
 import { usePreviewReadOnly } from '~/composables/usePreviewReadOnly'
 
@@ -9,6 +9,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
+  /** The application no longer exists — the list behind the drawer must refresh. */
+  deleted: [applicationId: string]
 }>()
 
 const localePath = useLocalePath()
@@ -29,6 +31,15 @@ const { formatCandidateName } = useOrgSettings()
 const aiScoringEnabled = useFeatureFlagEnabled('ai-scoring')
 // Guests are read-only: no stage moves, reject, or scheduling.
 const { allowed: canManageApplication } = usePermission({ application: ['update'] })
+// Deleting an application is owner/admin only.
+const { allowed: canDeleteApplication } = usePermission({ application: ['delete'] })
+const showDeleteDialog = ref(false)
+
+function onDeleted(applicationId: string) {
+  emit('deleted', applicationId)
+  emit('close')
+}
+
 const { reviews } = useReviews(() => props.applicationId)
 function stageAvg(stage: 'screening' | 'interview'): number | null {
   const scores = reviews.value.filter(r => r.stage === stage && r.rating != null).map(r => r.rating as number)
@@ -190,6 +201,15 @@ onUnmounted(() => {
               <ExternalLink class="size-3.5" />
               Open full page
             </NuxtLink>
+            <button
+              v-if="canDeleteApplication"
+              type="button"
+              title="Delete this application"
+              class="rounded-lg p-1.5 text-surface-500 hover:bg-danger-50 hover:text-danger-600 dark:hover:bg-danger-950 dark:hover:text-danger-400 transition-colors"
+              @click="showDeleteDialog = true"
+            >
+              <Trash2 class="size-4" />
+            </button>
             <button
               class="rounded-lg p-1.5 text-surface-500 hover:text-surface-700 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
               @click="emit('close')"
@@ -506,6 +526,15 @@ onUnmounted(() => {
       :job-title="application.job.title"
       @close="showInterviewSidebar = false"
       @scheduled="showInterviewSidebar = false"
+    />
+
+    <DeleteApplicationDialog
+      v-if="application"
+      v-model:open="showDeleteDialog"
+      :application-id="applicationId"
+      :candidate-name="formatCandidateName(application.candidate)"
+      :job-title="application.job.title"
+      @deleted="onDeleted"
     />
   </Teleport>
 </template>
