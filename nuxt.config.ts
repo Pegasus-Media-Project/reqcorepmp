@@ -41,6 +41,23 @@ const i18nLocales = [
   },
 ];
 
+// Public job routes that must never be served from the ISR cache. The job
+// posting itself is static marketing copy and benefits from caching, but these
+// render live, recruiter-editable state:
+//
+//   - the application form is built from the job's questions, and the submit
+//     endpoint validates against the CURRENT questions. A cached form is a form
+//     whose fields can disagree with what the server requires — an applicant is
+//     then told a required answer is missing for a field their page never drew.
+//   - the confirmation and review-link pages are per-applicant / per-token.
+//
+// These are more specific than `/jobs/**`, so Nitro applies them instead.
+const uncachedJobRoutes = (prefix = "") => [
+  [`${prefix}/jobs/*/apply`, { isr: false }],
+  [`${prefix}/jobs/*/confirmation`, { isr: false }],
+  [`${prefix}/jobs/preview/**`, { isr: false }],
+];
+
 const localizedPublicRouteRules = Object.fromEntries(
   i18nLocales
     .filter((locale) => locale.code !== i18nDefaultLocale)
@@ -48,6 +65,7 @@ const localizedPublicRouteRules = Object.fromEntries(
       [`/${locale.code}/pricing`, { isr: 3600 }],
       [`/${locale.code}/jobs`, { isr: 3600 }],
       [`/${locale.code}/jobs/**`, { isr: 3600 }],
+      ...uncachedJobRoutes(`/${locale.code}`),
     ]),
 );
 
@@ -288,6 +306,7 @@ export default defineNuxtConfig({
     "/pricing": { isr: 3600 },
     "/jobs": { isr: 3600 },
     "/jobs/**": { isr: 3600 },
+    ...Object.fromEntries(uncachedJobRoutes()),
     ...localizedPublicRouteRules,
   },
 

@@ -260,7 +260,8 @@
       "selectOption": "Velg et alternativ…",
       "yes": "Ja",
       "chooseFileHint": "Velg fil (PDF, DOC, DOCX — maks 10 MB)",
-      "urlPlaceholder": "https://…"
+      "urlPlaceholder": "https://…",
+      "ratingNoItems": "Dette spørsmålet har ingen elementer å vurdere ennå."
     }
   },
   "programs": {

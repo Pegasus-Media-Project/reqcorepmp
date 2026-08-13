@@ -268,7 +268,8 @@
       "selectOption": "Select an option…",
       "yes": "Yes",
       "chooseFileHint": "Choose file (PDF, DOC, DOCX — max 10 MB)",
-      "urlPlaceholder": "https://…"
+      "urlPlaceholder": "https://…",
+      "ratingNoItems": "This question has no items to rate yet."
     }
   },
   "programs": {

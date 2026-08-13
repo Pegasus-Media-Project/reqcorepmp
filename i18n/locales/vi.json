@@ -260,7 +260,8 @@
       "selectOption": "Chọn một tùy chọn…",
       "yes": "Có",
       "chooseFileHint": "Chọn tệp (PDF, DOC, DOCX — tối đa 10 MB)",
-      "urlPlaceholder": "https://…"
+      "urlPlaceholder": "https://…",
+      "ratingNoItems": "Câu hỏi này chưa có mục nào để đánh giá."
     }
   },
   "programs": {

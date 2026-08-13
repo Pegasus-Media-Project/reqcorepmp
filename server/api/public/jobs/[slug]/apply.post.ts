@@ -267,11 +267,16 @@ export default defineEventHandler(async (event) => {
   const visibleIds = visibleQuestionIds(questions, answersById)
 
   // A required rating grid only counts as answered once every row has a score.
+  // Rows the form can't render (missing, blank, or not a string) are ignored on
+  // both sides: a grid with none of them shows no input, so requiring one would
+  // reject an application the applicant had no way to complete.
   const responseByQuestionId = new Map(responseArray.map((r) => [r.questionId, r.value]))
-  const isRatingComplete = (questionId: string, rows: string[] | null) => {
+  const isRatingComplete = (questionId: string, options: string[] | null) => {
+    const rows = (options ?? []).filter((row): row is string => typeof row === 'string' && row.trim() !== '')
+    if (rows.length === 0) return true
     const value = responseByQuestionId.get(questionId)
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false
-    return (rows ?? []).every((row) => typeof (value as Record<string, number>)[row] === 'number')
+    return rows.every((row) => typeof (value as Record<string, number>)[row] === 'number')
   }
 
   const unanswered = requiredQuestionIds.filter((id) => {

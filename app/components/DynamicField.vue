@@ -119,6 +119,12 @@ function ratingColumnLabel(value: number): string {
   return String(value)
 }
 
+/**
+ * The rows to rate. Shared with validation so the grid and the "answer this"
+ * check can never disagree about what has to be scored.
+ */
+const ratingRowLabels = computed(() => ratingRows(props.question))
+
 const ratings = computed<Record<string, number>>(() =>
   (model.value && typeof model.value === 'object' && !Array.isArray(model.value))
     ? model.value as Record<string, number>
@@ -231,6 +237,15 @@ const normalBorderClass = 'border-surface-300 dark:border-surface-700'
       </label>
     </div>
 
+    <!-- Rating grid: nothing to score means the question was misconfigured —
+         say so rather than showing an empty table with no way to answer. -->
+    <p
+      v-else-if="question.type === 'rating' && ratingRowLabels.length === 0"
+      class="mt-1 text-sm text-surface-500 dark:text-surface-400"
+    >
+      {{ t('jobs.question.ratingNoItems') }}
+    </p>
+
     <!-- Rating grid -->
     <div
       v-else-if="question.type === 'rating'"
@@ -253,7 +268,7 @@ const normalBorderClass = 'border-surface-300 dark:border-surface-700'
         </thead>
         <tbody>
           <tr
-            v-for="(row, rowIndex) in question.options ?? []"
+            v-for="(row, rowIndex) in ratingRowLabels"
             :key="row"
             class="border-b border-surface-100 dark:border-surface-800 last:border-0"
           >

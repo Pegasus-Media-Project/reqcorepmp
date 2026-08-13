@@ -260,7 +260,8 @@
       "selectOption": "Selecciona una opción…",
       "yes": "Sí",
       "chooseFileHint": "Elegir archivo (PDF, DOC, DOCX — máx. 10 MB)",
-      "urlPlaceholder": "https://…"
+      "urlPlaceholder": "https://…",
+      "ratingNoItems": "Esta pregunta aún no tiene elementos para valorar."
     }
   },
   "programs": {

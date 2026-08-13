@@ -157,7 +157,10 @@ function validate(): boolean {
             errors.value[`q-${q.id}`] = t('jobs.apply.validation.fieldRequired')
           }
         } else if (isAnswerMissing(q, responses.value[q.id])) {
-          errors.value[`q-${q.id}`] = t('jobs.apply.validation.fieldRequired')
+          // A half-scored rating grid looks answered — name the unrated rows.
+          errors.value[`q-${q.id}`] = q.type === 'rating'
+            ? `${t('jobs.apply.validation.fieldRequired')}: ${unratedRows(q, responses.value[q.id]).join(', ')}`
+            : t('jobs.apply.validation.fieldRequired')
         }
       }
     }

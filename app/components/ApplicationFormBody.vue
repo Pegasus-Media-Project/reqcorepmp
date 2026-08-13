@@ -266,6 +266,11 @@ function fieldError(key: string): string | null {
       return t('jobs.apply.validation.numberInvalid')
     }
     if (question.required && question.type !== 'file_upload' && isAnswerMissing(question, answer)) {
+      // A half-scored grid looks answered, so name the rows still waiting.
+      if (question.type === 'rating') {
+        const missing = unratedRows(question, answer)
+        return `${t('jobs.apply.validation.fieldRequired')}: ${missing.join(', ')}`
+      }
       return t('jobs.apply.validation.fieldRequired')
     }
   }

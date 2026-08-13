@@ -11,17 +11,28 @@ type AnsweredQuestion = {
   options?: string[] | null
 }
 
-/** A rating grid is only complete once every one of its rows has a rating. */
-function isRatingIncomplete(question: AnsweredQuestion, value: AnswerShape): boolean {
-  const rows = question.options ?? []
-  if (rows.length === 0) return false
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return true
-  return rows.some(row => typeof (value as Record<string, number>)[row] !== 'number')
+/**
+ * The rows of a rating grid, as the labels actually rendered and used as answer
+ * keys. Anything that isn't a usable label is dropped rather than stringified —
+ * a row that reads `[object Object]` can neither be shown nor answered.
+ */
+export function ratingRows(question: AnsweredQuestion): string[] {
+  return (question.options ?? []).filter((row): row is string => typeof row === 'string' && row.trim() !== '')
+}
+
+/** Rows of a rating grid still waiting for a score. */
+export function unratedRows(question: AnsweredQuestion, value: AnswerShape): string[] {
+  const rows = ratingRows(question)
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return rows
+  return rows.filter(row => typeof (value as Record<string, number>)[row] !== 'number')
 }
 
 /** Whether a required question still needs an answer. */
 export function isAnswerMissing(question: AnsweredQuestion, value: AnswerShape): boolean {
-  if (question.type === 'rating') return isRatingIncomplete(question, value)
+  // A rating grid is only complete once every one of its rows has a score. A
+  // grid with no usable rows renders no input at all, so it can never be
+  // "missing" — the server agrees, or the applicant would be stuck.
+  if (question.type === 'rating') return unratedRows(question, value).length > 0
   if (value === undefined || value === null || value === '') return true
   if (Array.isArray(value) && value.length === 0) return true
   return false

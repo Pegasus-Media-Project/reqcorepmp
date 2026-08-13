@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { createQuestionSchema, updateQuestionSchema } from '../../server/utils/schemas/jobQuestion'
 import { publicApplicationSchema } from '../../server/utils/schemas/publicApplication'
+import { isAnswerMissing, ratingRows, unratedRows } from '../../app/utils/questionAnswers'
 
 /**
  * `rating` questions render a grid: `options` holds the rows to rate and
@@ -68,5 +69,36 @@ describe('rating questions', () => {
       responses: [{ questionId: 'q1', value: { 'Cinema Camera': 0 } }],
     })
     expect(parsed.success).toBe(false)
+  })
+})
+
+/**
+ * The candidate form and the submit endpoint have to agree on what an
+ * unanswered grid is, or an applicant hits a required error they can't clear.
+ */
+describe('rating completeness', () => {
+  const question = { type: 'rating', options: ['Cinema Camera', 'DSLR Camera'] }
+
+  it('counts a grid as answered only once every row is scored', () => {
+    expect(isAnswerMissing(question, { 'Cinema Camera': 4 })).toBe(true)
+    expect(isAnswerMissing(question, { 'Cinema Camera': 4, 'DSLR Camera': 2 })).toBe(false)
+  })
+
+  it('names the rows still waiting for a score', () => {
+    expect(unratedRows(question, { 'Cinema Camera': 4 })).toEqual(['DSLR Camera'])
+    expect(unratedRows(question, undefined)).toEqual(['Cinema Camera', 'DSLR Camera'])
+  })
+
+  it('never requires a grid that renders no rows to score', () => {
+    // No rows means no radio buttons on screen: requiring an answer would lock
+    // the applicant out of submitting entirely.
+    expect(isAnswerMissing({ type: 'rating', options: [] }, undefined)).toBe(false)
+    expect(isAnswerMissing({ type: 'rating', options: null }, undefined)).toBe(false)
+  })
+
+  it('ignores rows that could never be rendered or answered', () => {
+    const malformed = { type: 'rating', options: ['Cinema Camera', '  ', null, { label: 'x' }] as never }
+    expect(ratingRows(malformed)).toEqual(['Cinema Camera'])
+    expect(isAnswerMissing(malformed, { 'Cinema Camera': 3 })).toBe(false)
   })
 })
