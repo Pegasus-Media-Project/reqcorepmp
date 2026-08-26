@@ -29,6 +29,7 @@ const TYPE_ORDER = [
   'fee_verified',
   'fee_waived',
   'documents_verified',
+  'self_schedule_invitation',
 ] as const
 
 const systemByType = computed(() =>

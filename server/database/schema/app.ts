@@ -901,6 +901,51 @@ export const interviewSlotBooking = pgTable('interview_slot_booking', {
   index('slot_booking_application_id_idx').on(t.applicationId),
 ]))
 
+export const slotSignupSourceEnum = pgEnum('slot_signup_source', [
+  'manual', 'availability',
+])
+
+/**
+ * A reviewer's (member or guest) self-assignment as an interviewer on a slot.
+ * `manual` rows come from clicking Join on a slot; `availability` rows are
+ * auto-created when the slot falls inside one of the reviewer's stored
+ * availability ranges. The names of signed-up reviewers are merged with the
+ * slot's free-text `interviewers` when interviews are materialized or synced.
+ */
+export const interviewSlotSignup = pgTable('interview_slot_signup', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  slotId: text('slot_id').notNull().references(() => interviewSlot.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  source: slotSignupSourceEnum('source').notNull().default('manual'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (t) => ([
+  uniqueIndex('slot_signup_slot_user_idx').on(t.slotId, t.userId),
+  index('slot_signup_organization_id_idx').on(t.organizationId),
+  index('slot_signup_slot_id_idx').on(t.slotId),
+  index('slot_signup_user_id_idx').on(t.userId),
+]))
+
+/**
+ * A reviewer's declared availability window for a job's interviews. Every slot
+ * that fits entirely inside a range auto-assigns the reviewer (see
+ * interviewSlotSignup, source 'availability') — both existing slots when the
+ * range is saved and slots created later while the range still covers them.
+ */
+export const reviewerSlotAvailability = pgTable('reviewer_slot_availability', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  jobId: text('job_id').notNull().references(() => job.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  startsAt: timestamp('starts_at').notNull(),
+  endsAt: timestamp('ends_at').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (t) => ([
+  index('reviewer_slot_availability_job_user_idx').on(t.jobId, t.userId),
+  index('reviewer_slot_availability_organization_id_idx').on(t.organizationId),
+]))
+
 // ─────────────────────────────────────────────
 // Email Templates
 // ─────────────────────────────────────────────

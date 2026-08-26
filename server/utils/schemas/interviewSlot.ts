@@ -144,6 +144,27 @@ export const rescheduleInterviewSchema = z.object({
 }).refine(d => !!d.slotId !== !!d.startsAt, { message: 'Provide either a slot or a one-off time' })
   .refine(d => !d.startsAt || new Date(d.startsAt) > new Date(), { message: 'The new time must be in the future', path: ['startsAt'] })
 
+/** Reviewer: list a job's (or all in-scope) slots for interviewer signup. */
+export const reviewerSlotsQuerySchema = z.object({
+  jobId: z.string().min(1).optional(),
+})
+
+/**
+ * Reviewer: replace their availability ranges for a job. Every future slot that
+ * fits entirely inside a range auto-assigns them as an interviewer.
+ */
+export const reviewerAvailabilitySchema = z.object({
+  jobId: z.string().min(1, 'Job is required'),
+  ranges: z.array(
+    z.object({
+      startsAt: z.string().datetime({ message: 'Valid ISO 8601 datetime required' }),
+      endsAt: z.string().datetime({ message: 'Valid ISO 8601 datetime required' }),
+    }).refine(r => new Date(r.endsAt) > new Date(r.startsAt), {
+      message: 'Range end must be after its start', path: ['endsAt'],
+    }),
+  ).max(50, 'At most 50 ranges'),
+})
+
 /** Public: token identifies the invited application. */
 export const publicSlotsQuerySchema = z.object({
   token: z.string().min(1, 'Token is required'),

@@ -40,6 +40,9 @@ export default defineEventHandler(async (event) => {
 
   if (!created) throw createError({ statusCode: 500, statusMessage: 'Failed to create slot' })
 
+  // Auto-assign reviewers whose stored availability covers the new slot.
+  await applyAvailabilitySignups({ orgId, jobId: body.jobId, slotIds: [created.id] })
+
   recordActivity({
     organizationId: orgId,
     actorId: session.user.id,

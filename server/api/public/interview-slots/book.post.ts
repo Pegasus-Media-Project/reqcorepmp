@@ -80,7 +80,12 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 409, statusMessage: 'That time was just taken. Please choose another slot.' })
     }
 
-    // 2. Materialize the interview at the slot's time.
+    // 2. Materialize the interview at the slot's time. Interviewers = the
+    // slot's manually typed names + everyone signed up to interview it.
+    const mergedInterviewers = mergeInterviewerNames(
+      claimed.interviewers,
+      await getSlotSignupNames(app.organizationId, claimed.id),
+    )
     const [createdInterview] = await tx.insert(interview).values({
       organizationId: app.organizationId,
       applicationId: app.id,
@@ -90,7 +95,7 @@ export default defineEventHandler(async (event) => {
       scheduledAt: claimed.startsAt,
       duration: claimed.duration,
       location: claimed.location,
-      interviewers: claimed.interviewers,
+      interviewers: mergedInterviewers.length ? mergedInterviewers : null,
       createdById: claimed.createdById,
       candidateResponse: 'accepted',
       candidateRespondedAt: new Date(),

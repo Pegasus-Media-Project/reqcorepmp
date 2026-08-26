@@ -140,6 +140,10 @@ export default defineEventHandler(async (event) => {
     return { availability, created: fresh.length, removed, bookedFutureIds: bookedFuture.map(b => b.id) }
   })
 
+  // Auto-assign reviewers whose stored availability covers the regenerated
+  // slot grid (idempotent — existing signups are untouched).
+  await applyAvailabilitySignups({ orgId, jobId: id })
+
   // Rebook: cancel the booked interviews (with a heads-up email) and send each
   // affected candidate a fresh time-picker link into the new schedule.
   let rebooked = 0
