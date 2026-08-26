@@ -108,6 +108,18 @@ export const sendInterviewInvitationSchema = z.object({
   { message: 'Either a template ID or both custom subject and body are required' },
 )
 
+/**
+ * Schema for sending a test render of a template to the calling staff member.
+ * Provide a template id (system 'system-*' id or custom row id) — the template
+ * is rendered with sample data and emailed to the caller's own address.
+ */
+export const testEmailTemplateSchema = z.object({
+  templateId: z.string().min(1).max(100).optional(),
+  templateType: z.enum(EMAIL_TEMPLATE_TYPES).optional(),
+}).refine(d => d.templateId || d.templateType, {
+  message: 'Provide a template id or a template type',
+})
+
 // ─────────────────────────────────────────────
 // Pre-made (system) templates — single source of truth in shared/
 // ─────────────────────────────────────────────

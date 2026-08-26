@@ -62,7 +62,68 @@ const form = ref({
   applicationFeeCurrency: 'USD',
   requireSignedDocuments: false,
   signingUrl: '',
+  acceptedTemplateId: '',
+  rejectedTemplateId: '',
 })
+
+// Template choices for the decision-email selects: built-in system templates
+// of each type plus the org's custom templates of that type.
+const { templates: orgEmailTemplates } = useEmailTemplates()
+const decisionTemplates = computed(() => ({
+  acceptedSystem: SYSTEM_TEMPLATES.filter(t => t.type === 'application_accepted'),
+  rejectedSystem: SYSTEM_TEMPLATES.filter(t => t.type === 'application_rejected'),
+  acceptedCustom: (orgEmailTemplates.value ?? []).filter(t => t.templateType === 'application_accepted'),
+  rejectedCustom: (orgEmailTemplates.value ?? []).filter(t => t.templateType === 'application_rejected'),
+  selfScheduleCustom: (orgEmailTemplates.value ?? []).filter(t => t.templateType === 'self_schedule_invitation'),
+}))
+
+// ── Interview signup (self-schedule) invitation template ──
+// Lives on the job's interview availability — the same field the interview
+// slots modal saves — so it only becomes editable once availability exists.
+const { data: interviewAvailabilityData, refresh: refreshInterviewAvailability } = useFetch<{
+  availability: { invitationTemplateId?: string | null } | null
+}>(`/api/jobs/${jobId}/interview-availability`, {
+  key: `settings-availability-${jobId}`,
+  headers: useRequestHeaders(['cookie']),
+})
+const hasInterviewAvailability = computed(() => !!interviewAvailabilityData.value?.availability)
+const invitationTemplateId = ref('')
+watch(interviewAvailabilityData, (d) => {
+  invitationTemplateId.value = d?.availability?.invitationTemplateId ?? ''
+}, { immediate: true })
+
+// Re-load when the slots modal closes — it may have created availability or
+// changed the template.
+watch(() => showSlotManager.value, (open) => {
+  if (!open) refreshInterviewAvailability()
+})
+
+// ── Test sends: email yourself a sample render of a decision email ──
+const sendingTest = ref<'accepted' | 'rejected' | 'invitation' | null>(null)
+async function sendTestEmail(kind: 'accepted' | 'rejected' | 'invitation') {
+  sendingTest.value = kind
+  try {
+    const body = kind === 'invitation'
+      ? { templateId: invitationTemplateId.value || 'system-self-schedule' }
+      : kind === 'accepted'
+        ? (form.value.acceptedTemplateId
+            ? { templateId: form.value.acceptedTemplateId }
+            : { templateType: 'application_accepted' })
+        : (form.value.rejectedTemplateId
+            ? { templateId: form.value.rejectedTemplateId }
+            : { templateType: 'application_rejected' })
+    const res = await $fetch<{ to: string }>('/api/email-templates/test', { method: 'POST', body })
+    toast.success(`Test email sent to ${res.to}`)
+  }
+  catch (err: any) {
+    if (!handlePreviewReadOnlyError(err)) {
+      toast.error(err?.data?.statusMessage ?? 'Failed to send the test email')
+    }
+  }
+  finally {
+    sendingTest.value = null
+  }
+}
 
 /**
  * Format a stored timestamp as a `YYYY-MM-DDTHH:mm` string in the viewer's
@@ -107,6 +168,8 @@ watch(job, (j) => {
       applicationFeeCurrency: (j as { applicationFeeCurrency?: string | null }).applicationFeeCurrency ?? 'USD',
       requireSignedDocuments: (j as { requireSignedDocuments?: boolean }).requireSignedDocuments ?? false,
       signingUrl: (j as { signingUrl?: string | null }).signingUrl ?? '',
+      acceptedTemplateId: (j as { acceptedTemplateId?: string | null }).acceptedTemplateId ?? '',
+      rejectedTemplateId: (j as { rejectedTemplateId?: string | null }).rejectedTemplateId ?? '',
     }
   }
 }, { immediate: true })
@@ -151,6 +214,8 @@ const editSchema = z.object({
   applicationFeeCurrency: z.string().length(3).optional().or(z.literal('')),
   requireSignedDocuments: z.boolean().optional(),
   signingUrl: z.string().url('Enter a valid signing URL').optional().or(z.literal('')),
+  acceptedTemplateId: z.string().optional().or(z.literal('')),
+  rejectedTemplateId: z.string().optional().or(z.literal('')),
 }).superRefine((data, ctx) => {
   if (data.applicationFeeEnabled && !data.applicationFeeUrl) {
     ctx.addIssue({ code: 'custom', message: 'A payment link is required when the fee is enabled', path: ['applicationFeeUrl'] })
@@ -199,6 +264,8 @@ async function handleSave() {
       applicationFeeCurrency: form.value.applicationFeeCurrency || null,
       requireSignedDocuments: form.value.requireSignedDocuments,
       signingUrl: form.value.signingUrl || null,
+      acceptedTemplateId: form.value.acceptedTemplateId || null,
+      rejectedTemplateId: form.value.rejectedTemplateId || null,
       salaryNegotiable: form.value.salaryNegotiable,
       // Always send salary fields so cleared values write null to the DB
       salaryMin: form.value.salaryNegotiable ? null : (form.value.salaryMin ?? null),
@@ -212,6 +279,17 @@ async function handleSave() {
     }
 
     await updateJob(payload as any)
+
+    // The invitation template lives on interview availability, not the job row.
+    const savedInvitationTemplateId = interviewAvailabilityData.value?.availability?.invitationTemplateId ?? ''
+    if (hasInterviewAvailability.value && invitationTemplateId.value !== savedInvitationTemplateId) {
+      await $fetch(`/api/jobs/${jobId}/invitation-template`, {
+        method: 'PATCH',
+        body: { invitationTemplateId: invitationTemplateId.value || null },
+      })
+      await refreshInterviewAvailability()
+    }
+
     track('job_settings_saved', { job_id: jobId })
     saved.value = true
     setTimeout(() => { saved.value = false }, 2000)
@@ -710,6 +788,109 @@ function onSalaryMaxChange(e: Event) {
             />
             <p v-if="errors.signingUrl" class="mt-1 text-xs text-danger-600">{{ errors.signingUrl }}</p>
           </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════ -->
+        <!-- SECTION: Decision Emails                 -->
+        <!-- ═══════════════════════════════════════ -->
+        <section class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-6">
+          <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100 mb-1">Decision Emails</h2>
+          <p class="text-xs text-surface-400 dark:text-surface-500 mb-5">
+            Which templates this job uses for the acceptance and rejection emails. Emails are sent manually from the pipeline after moving an applicant — nothing sends automatically.
+          </p>
+
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label for="accepted-template" class="block text-sm font-medium text-surface-700 dark:text-surface-300">Acceptance email template</label>
+                <button
+                  :disabled="sendingTest !== null"
+                  type="button"
+                  class="cursor-pointer inline-flex items-center gap-1 text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Email yourself this template rendered with sample data"
+                  @click="sendTestEmail('accepted')"
+                >
+                  {{ sendingTest === 'accepted' ? 'Sending…' : 'Send test' }}
+                </button>
+              </div>
+              <select
+                id="accepted-template"
+                v-model="form.acceptedTemplateId"
+                class="w-full rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value="">Organization default</option>
+                <optgroup label="Built-in">
+                  <option v-for="t in decisionTemplates.acceptedSystem" :key="t.id" :value="t.id">{{ t.name }}</option>
+                </optgroup>
+                <optgroup v-if="decisionTemplates.acceptedCustom.length" label="Your templates">
+                  <option v-for="t in decisionTemplates.acceptedCustom" :key="t.id" :value="t.id">{{ t.name }}</option>
+                </optgroup>
+              </select>
+            </div>
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label for="rejected-template" class="block text-sm font-medium text-surface-700 dark:text-surface-300">Rejection email template</label>
+                <button
+                  :disabled="sendingTest !== null"
+                  type="button"
+                  class="cursor-pointer inline-flex items-center gap-1 text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Email yourself this template rendered with sample data"
+                  @click="sendTestEmail('rejected')"
+                >
+                  {{ sendingTest === 'rejected' ? 'Sending…' : 'Send test' }}
+                </button>
+              </div>
+              <select
+                id="rejected-template"
+                v-model="form.rejectedTemplateId"
+                class="w-full rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value="">Organization default</option>
+                <optgroup label="Built-in">
+                  <option v-for="t in decisionTemplates.rejectedSystem" :key="t.id" :value="t.id">{{ t.name }}</option>
+                </optgroup>
+                <optgroup v-if="decisionTemplates.rejectedCustom.length" label="Your templates">
+                  <option v-for="t in decisionTemplates.rejectedCustom" :key="t.id" :value="t.id">{{ t.name }}</option>
+                </optgroup>
+              </select>
+            </div>
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label for="invitation-template" class="block text-sm font-medium text-surface-700 dark:text-surface-300">Interview signup invitation</label>
+                <button
+                  :disabled="sendingTest !== null"
+                  type="button"
+                  class="cursor-pointer inline-flex items-center gap-1 text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Email yourself this template rendered with sample data"
+                  @click="sendTestEmail('invitation')"
+                >
+                  {{ sendingTest === 'invitation' ? 'Sending…' : 'Send test' }}
+                </button>
+              </div>
+              <select
+                id="invitation-template"
+                v-model="invitationTemplateId"
+                :disabled="!hasInterviewAvailability"
+                class="w-full rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <option value="">Built-in: Self-Schedule Invitation</option>
+                <optgroup v-if="decisionTemplates.selfScheduleCustom.length" label="Your templates">
+                  <option v-for="t in decisionTemplates.selfScheduleCustom" :key="t.id" :value="t.id">{{ t.name }}</option>
+                </optgroup>
+              </select>
+              <p v-if="!hasInterviewAvailability" class="mt-1 text-xs text-surface-400 dark:text-surface-500">
+                Set up interview availability first —
+                <button type="button" class="cursor-pointer text-brand-600 dark:text-brand-400 hover:underline" @click="showSlotManager = true">Manage availability &amp; interview slots</button>.
+              </p>
+              <p v-else class="mt-1 text-xs text-surface-400 dark:text-surface-500">
+                Same setting as the interview slots modal — the email sent when you invite an applicant to pick their own interview time.
+              </p>
+            </div>
+          </div>
+          <p class="mt-3 text-xs text-surface-400 dark:text-surface-500">
+            "Organization default" uses your custom template for the event if one exists, otherwise the built-in letter. Manage templates under
+            <NuxtLink :to="$localePath('/dashboard/interviews/templates')" class="text-brand-600 dark:text-brand-400 hover:underline">Email Templates</NuxtLink>.
+          </p>
         </section>
 
         <!-- ═══════════════════════════════════════ -->

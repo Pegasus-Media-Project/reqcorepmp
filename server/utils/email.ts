@@ -676,14 +676,32 @@ interface ResolvedTemplate {
 }
 
 /**
- * Resolve the template to use for a lifecycle event: the org's custom template
- * for that type if one exists, otherwise the built-in system default. Mirrors
- * the resolution order in the interview send-invitation endpoint.
+ * Resolve the template to use for a lifecycle event, in order:
+ *   1. `preferredTemplateId` (a per-job override) — a system template id or a
+ *      custom emailTemplate row id belonging to the org;
+ *   2. the org's custom template for that type, if one exists;
+ *   3. the built-in system default.
+ * Mirrors the resolution order in the interview send-invitation endpoint.
  */
 export async function resolveLifecycleTemplate(
   organizationId: string,
   templateType: SystemTemplateType,
+  preferredTemplateId?: string | null,
 ): Promise<ResolvedTemplate | null> {
+  if (preferredTemplateId) {
+    const system = SYSTEM_TEMPLATES.find(t => t.id === preferredTemplateId)
+    if (system) return { subject: system.subject, body: system.body }
+    const preferred = await db.query.emailTemplate.findFirst({
+      where: and(
+        eq(emailTemplate.id, preferredTemplateId),
+        eq(emailTemplate.organizationId, organizationId),
+      ),
+      columns: { subject: true, body: true },
+    })
+    if (preferred) return { subject: preferred.subject, body: preferred.body }
+    // Dangling override (template deleted) — fall through to the defaults.
+  }
+
   const custom = await db.query.emailTemplate.findFirst({
     where: and(
       eq(emailTemplate.organizationId, organizationId),
@@ -750,10 +768,14 @@ export interface LifecycleEmailParams {
   to: string
   organizationId: string
   templateType: SystemTemplateType
+  /** Per-job template override (system id or custom emailTemplate id). */
+  templateId?: string | null
   /** Values substituted into the resolved subject/body template. */
   vars: Record<string, string>
   organizationName?: string
   logoUrl?: string
+  /** Prepended verbatim to the rendered subject (used by test sends). */
+  subjectPrefix?: string
 }
 
 /**
@@ -762,14 +784,14 @@ export interface LifecycleEmailParams {
  * without sending if no template (custom or system) exists for the type.
  */
 export async function sendLifecycleEmail(params: LifecycleEmailParams): Promise<void> {
-  const template = await resolveLifecycleTemplate(params.organizationId, params.templateType)
+  const template = await resolveLifecycleTemplate(params.organizationId, params.templateType, params.templateId)
   if (!template) {
     logError('email.lifecycle_template_missing', { template_type: params.templateType })
     return
   }
   const orgName = params.organizationName?.trim() || 'Pegasus Media Project'
   const vars = { organizationName: orgName, ...params.vars }
-  const subject = renderTemplateGeneric(template.subject, vars)
+  const subject = (params.subjectPrefix ?? '') + renderTemplateGeneric(template.subject, vars)
   const body = renderTemplateGeneric(template.body, vars)
 
   await sendEmail({

@@ -144,6 +144,14 @@ export const rescheduleInterviewSchema = z.object({
 }).refine(d => !!d.slotId !== !!d.startsAt, { message: 'Provide either a slot or a one-off time' })
   .refine(d => !d.startsAt || new Date(d.startsAt) > new Date(), { message: 'The new time must be in the future', path: ['startsAt'] })
 
+/**
+ * Recruiter: set just the job's self-schedule invitation template without
+ * touching the availability schedule (job settings dropdown).
+ */
+export const invitationTemplatePatchSchema = z.object({
+  invitationTemplateId: z.string().max(100).nullable(),
+})
+
 /** Reviewer: list a job's (or all in-scope) slots for interviewer signup. */
 export const reviewerSlotsQuerySchema = z.object({
   jobId: z.string().min(1).optional(),

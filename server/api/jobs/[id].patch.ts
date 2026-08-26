@@ -105,6 +105,8 @@ export default defineEventHandler(async (event) => {
       applicationFeeCurrency: job.applicationFeeCurrency,
       requireSignedDocuments: job.requireSignedDocuments,
       signingUrl: job.signingUrl,
+      acceptedTemplateId: job.acceptedTemplateId,
+      rejectedTemplateId: job.rejectedTemplateId,
       autoScoreOnApply: job.autoScoreOnApply,
       analysisContext: job.analysisContext,
       experienceLevel: job.experienceLevel,

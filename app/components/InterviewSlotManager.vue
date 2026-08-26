@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { X, Plus, Trash2, Loader2, CalendarClock, Check, AlertTriangle, ExternalLink } from 'lucide-vue-next'
+import { X, Plus, Trash2, Loader2, CalendarClock, Check, AlertTriangle, ExternalLink, Send } from 'lucide-vue-next'
 
 const props = defineProps<{
   open: boolean
@@ -168,6 +168,26 @@ const invitationTemplateOptions = computed(() => [
 ])
 const hasAvailability = ref(false)
 const savingAvailability = ref(false)
+
+// Send a test render of the currently selected invitation template to the
+// signed-in user's own email address.
+const sendingTestInvitation = ref(false)
+async function sendTestInvitation() {
+  sendingTestInvitation.value = true
+  try {
+    const res = await $fetch<{ to: string }>('/api/email-templates/test', {
+      method: 'POST',
+      body: { templateId: avail.invitationTemplateId || 'system-self-schedule' },
+    })
+    toast.success(`Test invitation sent to ${res.to}`)
+  }
+  catch (err: any) {
+    toast.error(err?.data?.statusMessage ?? 'Failed to send the test email')
+  }
+  finally {
+    sendingTestInvitation.value = false
+  }
+}
 
 async function loadAvailability() {
   try {
@@ -602,7 +622,19 @@ function formatSlot(s: Slot) {
           </div>
           <input v-model="avail.location" type="text" placeholder="Location / link (optional)" class="mt-2 w-full rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
           <label class="mt-2 flex flex-col gap-1 text-[11px] text-surface-500">
-            Invitation email template
+            <span class="flex items-center justify-between">
+              Invitation email template
+              <button
+                :disabled="sendingTestInvitation"
+                type="button"
+                class="cursor-pointer inline-flex items-center gap-1 text-[11px] font-medium text-brand-600 dark:text-brand-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Email yourself this template rendered with sample data"
+                @click="sendTestInvitation"
+              >
+                <Send class="size-3" />
+                {{ sendingTestInvitation ? 'Sending…' : 'Send test' }}
+              </button>
+            </span>
             <select v-model="avail.invitationTemplateId" class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-2 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500">
               <option v-for="o in invitationTemplateOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
             </select>

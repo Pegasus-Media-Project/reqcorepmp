@@ -125,32 +125,10 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // ── Lifecycle emails on acceptance / rejection (best-effort) ──
-  const statusChanged = body.status && body.status !== current.status
-  if (statusChanged && (body.status === 'offer' || body.status === 'rejected') && current.confirmationCode) {
-    const origin = getRequestURL(event).origin
-    const statusUrl = `${origin}/status?code=${current.confirmationCode}`
-    const branding = await resolveOrgEmailBranding(orgId, origin)
-    const vars: Record<string, string> = {
-      candidateFirstName: current.candidateFirstName,
-      candidateLastName: current.candidateLastName,
-      candidateName: `${current.candidateFirstName} ${current.candidateLastName}`.trim(),
-      jobTitle: current.jobTitle,
-      statusUrl,
-      // Acceptance action link points at signing when the job requires it,
-      // otherwise falls back to the status page.
-      actionUrl: (current.requireSignedDocuments && current.signingUrl) ? current.signingUrl : statusUrl,
-    }
-    const templateType = body.status === 'offer' ? 'application_accepted' : 'application_rejected'
-    void sendLifecycleEmail({
-      to: current.candidateEmail,
-      organizationId: orgId,
-      templateType,
-      vars,
-      organizationName: branding.organizationName,
-      logoUrl: branding.logoUrl,
-    }).catch(e => console.error(`[Pegasus] Failed to send ${templateType} email:`, e))
-  }
+  // Acceptance / rejection emails are NOT sent automatically on a status
+  // change — staff review the applicant and send them explicitly via
+  // POST /api/applications/:id/send-decision-email, which also stamps the
+  // sent-at marker shown in the pipeline.
 
   return updated
 })

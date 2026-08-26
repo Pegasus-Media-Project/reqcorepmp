@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {
   ArrowLeft, Save, Eye, EyeOff, Copy, Trash2, Lock,
-  FileText, Mail, AlertCircle,
+  FileText, Mail, AlertCircle, Send,
 } from 'lucide-vue-next'
 
 definePageMeta({
@@ -97,6 +97,28 @@ async function handleSave() {
     saveError.value = err?.data?.statusMessage ?? 'Failed to save template'
   } finally {
     isSaving.value = false
+  }
+}
+
+// ─── Send a test render to the signed-in user ────────────────────
+const isSendingTest = ref(false)
+const testSent = ref(false)
+
+async function handleSendTest() {
+  isSendingTest.value = true
+  saveError.value = ''
+  try {
+    await $fetch('/api/email-templates/test', {
+      method: 'POST',
+      body: { templateId },
+    })
+    testSent.value = true
+    setTimeout(() => { testSent.value = false }, 2500)
+  } catch (err: any) {
+    if (handlePreviewReadOnlyError(err)) return
+    saveError.value = err?.data?.statusMessage ?? 'Failed to send the test email'
+  } finally {
+    isSendingTest.value = false
   }
 }
 
@@ -232,6 +254,15 @@ useSeoMeta({
           >
             <component :is="showPreview ? EyeOff : Eye" class="size-4" />
             {{ showPreview ? 'Hide Preview' : 'Preview' }}
+          </button>
+          <button
+            :disabled="isSendingTest"
+            class="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-surface-200 dark:border-surface-700 px-3.5 py-2 text-sm font-medium text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            title="Email yourself this template rendered with sample data"
+            @click="handleSendTest"
+          >
+            <Send class="size-4" />
+            {{ isSendingTest ? 'Sending…' : testSent ? 'Test Sent!' : 'Send Test' }}
           </button>
           <button
             v-if="isSystemTemplate"

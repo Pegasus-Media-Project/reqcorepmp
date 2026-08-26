@@ -239,6 +239,16 @@ const statusBadgeClasses: Record<string, string> = {
           >
             {{ application.status }}
           </span>
+          <DecisionEmailChip
+            :application="{
+              id: application.id,
+              status: application.status,
+              acceptedEmailSentAt: (application as any).acceptedEmailSentAt,
+              rejectedEmailSentAt: (application as any).rejectedEmailSentAt,
+            }"
+            :can-send="canManageApplication"
+            @sent="refresh()"
+          />
           <TimelineDateLink :date="application.createdAt" class="text-sm text-surface-500 dark:text-surface-400">
             Applied {{ new Date(application.createdAt).toLocaleDateString() }}
           </TimelineDateLink>

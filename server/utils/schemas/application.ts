@@ -55,6 +55,11 @@ export const applicationIdParamSchema = z.object({
   id: z.string().min(1),
 })
 
+/** Manually send the acceptance / rejection email for an application. */
+export const sendDecisionEmailSchema = z.object({
+  type: z.enum(['accepted', 'rejected']),
+})
+
 /**
  * Schema for sending a custom email to a hand-picked set of applications.
  * Subject/body may contain {{candidateName}}, {{candidateFirstName}},

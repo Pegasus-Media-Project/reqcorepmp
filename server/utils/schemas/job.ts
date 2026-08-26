@@ -156,6 +156,10 @@ export const updateJobSchema = z.object({
   analysisContext: analysisContextSchema.optional(),
   /** Experience level required for this role */
   experienceLevel: z.enum(['junior', 'mid', 'senior', 'lead']).nullable().optional(),
+  // ── Decision email templates (system id or custom emailTemplate id). ──
+  // Null = org-wide resolution (custom template of the type, else built-in).
+  acceptedTemplateId: z.string().max(100).nullable().optional(),
+  rejectedTemplateId: z.string().max(100).nullable().optional(),
   status: z.enum(['draft', 'open', 'closed', 'archived']).optional(),
 })
 

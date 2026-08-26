@@ -40,6 +40,8 @@ export default defineEventHandler(async (event) => {
       applicationFeeCurrency: true,
       requireSignedDocuments: true,
       signingUrl: true,
+      acceptedTemplateId: true,
+      rejectedTemplateId: true,
       autoScoreOnApply: true,
       analysisContext: true,
       experienceLevel: true,

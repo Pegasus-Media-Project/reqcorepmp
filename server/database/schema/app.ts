@@ -151,6 +151,12 @@ export const job = pgTable('job', {
   requireSignedDocuments: boolean('require_signed_documents').notNull().default(false),
   /** External signing / DocuSign link (scaffold; embed comes later). */
   signingUrl: text('signing_url'),
+  // ── Decision email templates (per-job overrides) ──
+  // A system template id (e.g. 'system-application-accepted') or a custom
+  // emailTemplate row id. Null = the org-wide resolution (custom template of
+  // the matching type, else the built-in default).
+  acceptedTemplateId: text('accepted_template_id'),
+  rejectedTemplateId: text('rejected_template_id'),
   // ── AI scoring settings ──
   autoScoreOnApply: boolean('auto_score_on_apply').notNull().default(false),
   /**
@@ -272,6 +278,11 @@ export const application = pgTable('application', {
   documentsStatus: applicationStepStatusEnum('documents_status').notNull().default('pending'),
   documentsVerifiedById: text('documents_verified_by_id').references(() => user.id),
   documentsVerifiedAt: timestamp('documents_verified_at'),
+  // ── Decision emails (manual send) ──
+  // When the acceptance / rejection email was last sent to the candidate.
+  // Null = not sent yet. Set by POST /api/applications/:id/send-decision-email.
+  acceptedEmailSentAt: timestamp('accepted_email_sent_at'),
+  rejectedEmailSentAt: timestamp('rejected_email_sent_at'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (t) => ([

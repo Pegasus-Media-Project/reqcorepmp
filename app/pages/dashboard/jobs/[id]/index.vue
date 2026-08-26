@@ -2051,6 +2051,17 @@ function closeDocPreview() {
                         >
                           {{ currentSummary.status }}
                         </span>
+                        <DecisionEmailChip
+                          v-if="resolvedCurrentApplication && resolvedCurrentApplication.id === currentSummary.id"
+                          :application="{
+                            id: currentSummary.id,
+                            status: currentSummary.status,
+                            acceptedEmailSentAt: (resolvedCurrentApplication as any).acceptedEmailSentAt,
+                            rejectedEmailSentAt: (resolvedCurrentApplication as any).rejectedEmailSentAt,
+                          }"
+                          :can-send="canManageApplication"
+                          @sent="executeDetailFetch()"
+                        />
                         <span
                           v-if="aiScoringEnabled && currentSummary.score != null"
                           class="inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset"
