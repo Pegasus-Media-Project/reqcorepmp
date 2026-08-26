@@ -1600,40 +1600,44 @@ function closeDocPreview() {
       <!-- PIPELINE STATUS TABS                     -->
       <!-- ═══════════════════════════════════════ -->
       <div class="shrink-0 border-b border-surface-200/80 bg-white dark:border-surface-800/60 dark:bg-surface-900">
-        <div class="flex items-center gap-1 overflow-x-auto scrollbar-thin sm:scrollbar-none px-3 sm:px-5 py-2">
-          <button
-            v-for="status in PIPELINE_STATUSES"
-            :key="`tab-${status}`"
-            class="relative flex shrink-0 cursor-pointer items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-all duration-200 focus:outline-none"
-            :class="isFocusStatus(status)
-              ? 'bg-brand-50 text-brand-700 shadow-sm ring-1 ring-brand-200/60 dark:bg-brand-950/40 dark:text-brand-300 dark:ring-brand-800/40'
-              : 'text-surface-500 hover:bg-surface-50 hover:text-surface-700 dark:text-surface-400 dark:hover:bg-surface-800/60 dark:hover:text-surface-200'"
-            @click="setFocusStatus(status)"
-          >
-            <span class="pipeline-status-dot size-2 rounded-full" :class="{
-              'bg-blue-500 dark:bg-blue-400': status === 'new',
-              'bg-violet-500 dark:bg-violet-400': status === 'screening',
-              'bg-amber-500 dark:bg-amber-400': status === 'interview',
-              'bg-rose-500 dark:bg-rose-400': status === 'waitlist',
-              'bg-teal-500 dark:bg-teal-400': status === 'offer',
-              'bg-green-600 dark:bg-green-300': status === 'hired',
-              'bg-surface-400 dark:bg-surface-500': status === 'rejected',
-            }" />
-            {{ formatStatusLabel(status) }}
-            <span
-              class="inline-flex min-w-[20px] items-center justify-center rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums transition-colors duration-200"
+        <!-- Tabs scroll in their own container; the action buttons live outside it
+             so the export dropdown isn't clipped by the horizontal scroller. -->
+        <div class="flex items-center gap-1 px-3 sm:px-5 py-2">
+          <div class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto scrollbar-thin sm:scrollbar-none">
+            <button
+              v-for="status in PIPELINE_STATUSES"
+              :key="`tab-${status}`"
+              class="relative flex shrink-0 cursor-pointer items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-all duration-200 focus:outline-none"
               :class="isFocusStatus(status)
-                ? 'bg-brand-100 text-brand-700 dark:bg-brand-900/50 dark:text-brand-300'
-                : 'bg-surface-100 text-surface-500 dark:bg-surface-800/80 dark:text-surface-400'"
+                ? 'bg-brand-50 text-brand-700 shadow-sm ring-1 ring-brand-200/60 dark:bg-brand-950/40 dark:text-brand-300 dark:ring-brand-800/40'
+                : 'text-surface-500 hover:bg-surface-50 hover:text-surface-700 dark:text-surface-400 dark:hover:bg-surface-800/60 dark:hover:text-surface-200'"
+              @click="setFocusStatus(status)"
             >
-              {{ statusCounts[status] ?? 0 }}
-            </span>
-          </button>
+              <span class="pipeline-status-dot size-2 rounded-full" :class="{
+                'bg-blue-500 dark:bg-blue-400': status === 'new',
+                'bg-violet-500 dark:bg-violet-400': status === 'screening',
+                'bg-amber-500 dark:bg-amber-400': status === 'interview',
+                'bg-rose-500 dark:bg-rose-400': status === 'waitlist',
+                'bg-teal-500 dark:bg-teal-400': status === 'offer',
+                'bg-green-600 dark:bg-green-300': status === 'hired',
+                'bg-surface-400 dark:bg-surface-500': status === 'rejected',
+              }" />
+              {{ formatStatusLabel(status) }}
+              <span
+                class="inline-flex min-w-[20px] items-center justify-center rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums transition-colors duration-200"
+                :class="isFocusStatus(status)
+                  ? 'bg-brand-100 text-brand-700 dark:bg-brand-900/50 dark:text-brand-300'
+                  : 'bg-surface-100 text-surface-500 dark:bg-surface-800/80 dark:text-surface-400'"
+              >
+                {{ statusCounts[status] ?? 0 }}
+              </span>
+            </button>
+          </div>
 
           <!-- Manage bookable interview slots (candidate self-scheduling) -->
           <button
             type="button"
-            class="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-surface-500 hover:bg-surface-100 hover:text-surface-700 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:text-surface-200 transition-all duration-200 focus:outline-none"
+            class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-surface-500 hover:bg-surface-100 hover:text-surface-700 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:text-surface-200 transition-all duration-200 focus:outline-none"
             title="Manage interview slots"
             @click="showSlotManager = true"
           >

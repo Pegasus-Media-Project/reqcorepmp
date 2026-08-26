@@ -1,6 +1,6 @@
 import { and, eq, inArray, desc } from 'drizzle-orm'
 import { application, candidate, organization } from '../../../database/schema'
-import { applicationExportSchema, MAX_EXPORT_ROWS } from '../../../utils/schemas/export'
+import { applicationExportSchema, MAX_EXPORT_ROWS, MAX_XLSX_EXPORT_ROWS } from '../../../utils/schemas/export'
 import { buildApplicationFilterConditions } from '../../../utils/applicationFilters'
 import { loadApplicationsForPdf, buildApplicationsPdfHtml } from '../../../utils/application-pdf'
 import { buildApplicationsWorkbook } from '../../../utils/exports/applicationsWorkbook'
@@ -22,6 +22,9 @@ export default defineEventHandler(async (event) => {
 
   const scope = await getManagedJobScope(session)
   const scopeCondition = jobScopeCondition(scope, application.jobId)
+
+  // A spreadsheet row costs nothing; a PDF page per applicant does not.
+  const maxRows = body.format === 'xlsx' ? MAX_XLSX_EXPORT_ROWS : MAX_EXPORT_ROWS
 
   // Resolve which applications to export, always within the caller's job scope.
   let applicationIds: string[]
@@ -54,17 +57,19 @@ export default defineEventHandler(async (event) => {
           .innerJoin(candidate, eq(candidate.id, application.candidateId))
           .where(and(...conditions))
           .orderBy(desc(application.createdAt))
-          .limit(MAX_EXPORT_ROWS + 1)
+          .limit(maxRows + 1)
     applicationIds = rows.map(r => r.id)
   }
 
   if (!applicationIds.length) {
     throw createError({ statusCode: 404, statusMessage: 'No applications to export' })
   }
-  if (applicationIds.length > MAX_EXPORT_ROWS) {
+  if (applicationIds.length > maxRows) {
     throw createError({
       statusCode: 413,
-      statusMessage: `Too many applications to export at once (limit ${MAX_EXPORT_ROWS}). Narrow the results with a filter, or select the ones you need.`,
+      statusMessage: body.format === 'pdf'
+        ? `Too many applications for one PDF (limit ${MAX_EXPORT_ROWS}). Narrow the results with a filter, select the ones you need, or export as Excel instead.`
+        : `Too many applications to export at once (limit ${maxRows}). Narrow the results with a filter, or select the ones you need.`,
     })
   }
 

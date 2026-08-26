@@ -8,8 +8,11 @@ import { applicationQuerySchema } from './application'
 export const exportFormatSchema = z.enum(['xlsx', 'pdf'])
 export type ExportFormat = z.infer<typeof exportFormatSchema>
 
-/** Hard cap on one export, whatever the format. */
+/** Hard cap on one PDF export — every applicant becomes rendered pages. */
 export const MAX_EXPORT_ROWS = 200
+
+/** Spreadsheets are one row per applicant, so "everything" can mean everything. */
+export const MAX_XLSX_EXPORT_ROWS = 10000
 
 /**
  * Export a hand-picked set of applications, or everything matching the list's
@@ -18,7 +21,7 @@ export const MAX_EXPORT_ROWS = 200
  */
 export const applicationExportSchema = z.object({
   format: exportFormatSchema,
-  applicationIds: z.array(z.string().min(1)).min(1).max(MAX_EXPORT_ROWS).optional(),
+  applicationIds: z.array(z.string().min(1)).min(1).max(MAX_XLSX_EXPORT_ROWS).optional(),
   filters: applicationQuerySchema
     .pick({ jobId: true, candidateId: true, status: true, search: true, score: true, interview: true, propertyFilters: true })
     .optional(),

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import ExcelJS from 'exceljs'
 import { buildApplicationsWorkbook } from '../../server/utils/exports/applicationsWorkbook'
 import { buildInterviewsWorkbook, buildInterviewsHtml, type InterviewExportRow } from '../../server/utils/exports/interviewsExport'
-import { applicationExportSchema, interviewExportSchema, ratingsExportSchema, MAX_EXPORT_ROWS } from '../../server/utils/schemas/export'
+import { applicationExportSchema, interviewExportSchema, ratingsExportSchema, MAX_EXPORT_ROWS, MAX_XLSX_EXPORT_ROWS } from '../../server/utils/schemas/export'
 
 /** Minimal stand-in for a loaded application row. */
 function app(overrides: Record<string, any> = {}): any {
@@ -175,7 +175,11 @@ describe('export request schemas', () => {
 
   it('caps a single export', () => {
     const ids = Array.from({ length: MAX_EXPORT_ROWS + 1 }, (_, i) => `app_${i}`)
-    expect(applicationExportSchema.safeParse({ format: 'xlsx', applicationIds: ids }).success).toBe(false)
+    // Applications allow big spreadsheet exports (the endpoint enforces the
+    // tighter PDF cap by format); interviews keep the shared cap.
+    expect(applicationExportSchema.safeParse({ format: 'xlsx', applicationIds: ids }).success).toBe(true)
+    const tooMany = Array.from({ length: MAX_XLSX_EXPORT_ROWS + 1 }, (_, i) => `app_${i}`)
+    expect(applicationExportSchema.safeParse({ format: 'xlsx', applicationIds: tooMany }).success).toBe(false)
     expect(interviewExportSchema.safeParse({ format: 'xlsx', interviewIds: ids }).success).toBe(false)
   })
 })
