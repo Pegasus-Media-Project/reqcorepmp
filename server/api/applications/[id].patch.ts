@@ -52,17 +52,18 @@ export default defineEventHandler(async (event) => {
     }
 
     // ── Onboarding-step gates ──
-    // Submission phase: the application fee must be verified before a job with a
-    // fee can move out of `new` into review.
+    // Submission phase: the application fee must be settled — verified or
+    // waived — before a job with a fee can move out of `new` into review.
     if (
       current.status === 'new'
       && (body.status === 'screening' || body.status === 'interview')
       && current.applicationFeeEnabled
       && current.feeStatus !== 'verified'
+      && current.feeStatus !== 'waived'
     ) {
       throw createError({
         statusCode: 422,
-        statusMessage: 'Verify the application fee before advancing this application.',
+        statusMessage: 'Verify or waive the application fee before advancing this application.',
       })
     }
     // Acceptance phase: signed documents must be verified before hiring.
