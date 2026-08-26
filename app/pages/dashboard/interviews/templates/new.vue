@@ -2,6 +2,7 @@
 import {
   ArrowLeft, Save, Eye, EyeOff, Mail, AlertCircle, FileText,
 } from 'lucide-vue-next'
+import { renderEmailMarkdown } from '~~/shared/email-markdown'
 
 definePageMeta({
   layout: 'dashboard',
@@ -66,6 +67,8 @@ const sampleVariables: Record<string, string> = {
 
 const previewSubject = computed(() => renderTemplatePreview(form.subject, sampleVariables))
 const previewBody = computed(() => renderTemplatePreview(form.body, sampleVariables))
+// Bodies support a Markdown subset; the preview shows it rendered like the email.
+const previewBodyHtml = computed(() => renderEmailMarkdown(previewBody.value))
 
 // ─── Save ────────────────────────────────────────────────────────
 async function handleCreate() {
@@ -206,6 +209,9 @@ async function handleCreate() {
             placeholder="Write your invitation email here. Use {{variables}} for dynamic content…"
             class="w-full rounded-lg border border-surface-200 dark:border-surface-700 px-3.5 py-2.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all resize-none font-mono text-[13px] leading-relaxed"
           />
+          <p class="mt-2 text-xs text-surface-400 dark:text-surface-500">
+            Rich text supported: **bold**, *italic*, [link text](https://…), # headings, and - or 1. lists. Toggle Preview to see it rendered.
+          </p>
         </div>
       </div>
 
@@ -236,9 +242,11 @@ async function handleCreate() {
               </div>
               <div class="border-t border-surface-100 dark:border-surface-800 pt-4">
                 <span class="text-[10px] uppercase tracking-wider font-semibold text-surface-400 block mb-2">Body</span>
-                <div class="text-sm text-surface-700 dark:text-surface-300 whitespace-pre-wrap leading-relaxed">
-                  {{ previewBody || 'Start writing to see a preview…' }}
+                <div v-if="!previewBody" class="text-sm text-surface-700 dark:text-surface-300 leading-relaxed">
+                  Start writing to see a preview…
                 </div>
+                <!-- eslint-disable-next-line vue/no-v-html — renderEmailMarkdown escapes all input -->
+                <div v-else class="text-sm text-surface-700 dark:text-surface-300 leading-relaxed" v-html="previewBodyHtml" />
               </div>
             </div>
             <div class="border-t border-surface-100 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-950/30 px-5 py-2.5">

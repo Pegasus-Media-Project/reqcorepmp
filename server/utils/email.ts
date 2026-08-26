@@ -4,6 +4,7 @@ import type { Transporter } from 'nodemailer'
 import { and, eq } from 'drizzle-orm'
 import { emailTemplate } from '../database/schema'
 import { SYSTEM_TEMPLATES, type SystemTemplateType } from '~~/shared/system-templates'
+import { renderEmailMarkdown } from '~~/shared/email-markdown'
 
 // ─── Resend client ────────────────────────────────────────────────────────────
 
@@ -715,14 +716,12 @@ export async function resolveLifecycleTemplate(
   return system ? { subject: system.subject, body: system.body } : null
 }
 
-/** Turn a rendered plain-text body into safe HTML: escape, linkify, break lines. */
+/**
+ * Turn a rendered template body into safe HTML. Bodies support a Markdown
+ * subset (bold, italic, links, lists, headings) — see shared/email-markdown.
+ */
 function lifecycleBodyToHtml(bodyText: string): string {
-  const escaped = escapeHtml(bodyText)
-  const linked = escaped.replace(
-    /(https?:\/\/[^\s<]+)/g,
-    '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;word-break:break-all;">$1</a>',
-  )
-  return linked.replace(/\n/g, '<br />')
+  return renderEmailMarkdown(bodyText)
 }
 
 /** Wrap a rendered lifecycle body in the standard branded email shell. */
@@ -1131,7 +1130,8 @@ export async function sendReviewerInterviewInvitationEmail(params: {
 }
 
 function buildInterviewInvitationHtml(subject: string, bodyText: string, data: InterviewEmailData): string {
-  const bodyHtml = escapeHtml(bodyText).replace(/\n/g, '<br />')
+  // Bodies support the shared Markdown subset (bold, italic, links, lists).
+  const bodyHtml = renderEmailMarkdown(bodyText)
 
   // Build response buttons HTML when URLs are available
   const responseButtonsHtml = data.responseUrls

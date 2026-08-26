@@ -177,7 +177,7 @@ async function sendTestInvitation() {
   try {
     const res = await $fetch<{ to: string }>('/api/email-templates/test', {
       method: 'POST',
-      body: { templateId: avail.invitationTemplateId || 'system-self-schedule' },
+      body: { templateId: avail.invitationTemplateId || 'system-self-schedule', jobId: props.jobId },
     })
     toast.success(`Test invitation sent to ${res.to}`)
   }

@@ -1,7 +1,7 @@
 import { and, eq, gt, lt, sql } from 'drizzle-orm'
 import { application, candidate, job, organization, interviewSlot, interviewSlotBooking } from '../../../database/schema'
 import { publicSlotsQuerySchema } from '../../../utils/schemas/interviewSlot'
-import { verifyBookingToken } from '../../../utils/interview-token'
+import { verifyBookingToken, verifyTestBookingToken } from '../../../utils/interview-token'
 
 /**
  * GET /api/public/interview-slots?token=…
@@ -16,7 +16,43 @@ export default defineEventHandler(async (event) => {
 
   const payload = verifyBookingToken(token, env.BETTER_AUTH_SECRET)
   if (!payload) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid or expired link' })
+    // Staff test links (from "send test email") browse a job's real slots but
+    // can't book — the page shows them in test mode.
+    const testPayload = verifyTestBookingToken(token, env.BETTER_AUTH_SECRET)
+    if (!testPayload) {
+      throw createError({ statusCode: 400, statusMessage: 'Invalid or expired link' })
+    }
+
+    const jobRow = await db.query.job.findFirst({
+      where: eq(job.id, testPayload.jobId),
+      columns: { id: true, title: true, organizationId: true },
+    })
+    if (!jobRow) {
+      throw createError({ statusCode: 404, statusMessage: 'Job not found' })
+    }
+    const testOrg = await db.query.organization.findFirst({
+      where: eq(organization.id, jobRow.organizationId),
+      columns: { name: true },
+    })
+    const testSlots = await db.query.interviewSlot.findMany({
+      where: and(
+        eq(interviewSlot.organizationId, jobRow.organizationId),
+        eq(interviewSlot.jobId, jobRow.id),
+        eq(interviewSlot.status, 'open'),
+        gt(interviewSlot.startsAt, new Date()),
+        lt(interviewSlot.bookedCount, sql`${interviewSlot.capacity}`),
+      ),
+      columns: { id: true, title: true, startsAt: true, duration: true, timezone: true, location: true, type: true },
+      orderBy: (s, { asc }) => [asc(s.startsAt)],
+    })
+    return {
+      test: true,
+      candidateFirstName: null,
+      jobTitle: jobRow.title,
+      organizationName: testOrg?.name ?? null,
+      alreadyBooked: null,
+      slots: testSlots,
+    }
   }
 
   const app = await db.query.application.findFirst({

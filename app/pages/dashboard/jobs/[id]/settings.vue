@@ -104,7 +104,7 @@ async function sendTestEmail(kind: 'accepted' | 'rejected' | 'invitation') {
   sendingTest.value = kind
   try {
     const body = kind === 'invitation'
-      ? { templateId: invitationTemplateId.value || 'system-self-schedule' }
+      ? { templateId: invitationTemplateId.value || 'system-self-schedule', jobId }
       : kind === 'accepted'
         ? (form.value.acceptedTemplateId
             ? { templateId: form.value.acceptedTemplateId }

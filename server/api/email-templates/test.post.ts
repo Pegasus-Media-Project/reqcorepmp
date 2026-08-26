@@ -2,6 +2,7 @@ import { testEmailTemplateSchema } from '../../utils/schemas/emailTemplate'
 import type { SystemTemplateType } from '~~/shared/system-templates'
 import { SYSTEM_TEMPLATES } from '~~/shared/system-templates'
 import { resolveLifecycleTemplate, sendLifecycleEmail } from '../../utils/email'
+import { generateTestBookingToken } from '../../utils/interview-token'
 
 /**
  * POST /api/email-templates/test  { templateId } | { templateType }
@@ -45,6 +46,27 @@ export default defineEventHandler(async (event) => {
   const branding = await resolveOrgEmailBranding(orgId, origin)
   const orgName = branding.organizationName?.trim() || 'Pegasus Media Project'
 
+  // Self-schedule tests get a REAL booking link when a job is given: it opens
+  // the actual booking page with that job's live availability, in a test mode
+  // where nothing can be booked — so the whole flow can be walked through.
+  let bookingUrl = `${origin}/interview/book?token=sample`
+  let expiresAt = 'Friday, March 20, 2026'
+  if (body.jobId) {
+    const jobRow = await db.query.job.findFirst({
+      where: (j, { and, eq }) => and(eq(j.id, body.jobId!), eq(j.organizationId, orgId)),
+      columns: { id: true },
+    })
+    if (!jobRow) {
+      throw createError({ statusCode: 404, statusMessage: 'Job not found' })
+    }
+    await assertJobInScope(session, body.jobId)
+    const token = generateTestBookingToken(body.jobId, env.BETTER_AUTH_SECRET)
+    bookingUrl = `${origin}/interview/book?token=${encodeURIComponent(token)}`
+    expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', {
+      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+    })
+  }
+
   // Sample values covering every placeholder any template type may use.
   const vars: Record<string, string> = {
     candidateName: 'Alex Johnson',
@@ -62,8 +84,8 @@ export default defineEventHandler(async (event) => {
     organizationName: orgName,
     statusUrl: `${origin}/status?code=SAMPLE1`,
     actionUrl: `${origin}/status?code=SAMPLE1`,
-    bookingUrl: `${origin}/interview/book?token=sample`,
-    expiresAt: 'Friday, March 20, 2026',
+    bookingUrl,
+    expiresAt,
   }
 
   await sendLifecycleEmail({

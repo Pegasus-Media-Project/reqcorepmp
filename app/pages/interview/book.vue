@@ -20,6 +20,7 @@ const token = computed(() => {
 })
 
 const { data, error: fetchError, status: fetchStatus, refresh } = await useFetch<{
+  test?: boolean
   candidateFirstName: string | null
   jobTitle: string | null
   organizationName: string | null
@@ -134,6 +135,9 @@ useHead({ title: 'Schedule Your Interview' })
 
     <!-- Just booked -->
     <div v-else-if="bookedSlot" class="text-center">
+      <div v-if="data?.test" class="mb-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-400">
+        Test link — no booking was made. This is exactly what a candidate sees after booking.
+      </div>
       <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
         <span class="text-2xl">✓</span>
       </div>
@@ -156,6 +160,9 @@ useHead({ title: 'Schedule Your Interview' })
 
     <!-- Slot picker -->
     <div v-else-if="data">
+      <div v-if="data.test" class="mb-6 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-400 text-center">
+        Test link — this is the candidate booking page with this job's real availability. Booking here won't save anything.
+      </div>
       <h1 class="text-xl font-semibold text-surface-900 dark:text-surface-100 mb-1 text-center">
         Schedule your interview
       </h1>

@@ -116,6 +116,11 @@ export const sendInterviewInvitationSchema = z.object({
 export const testEmailTemplateSchema = z.object({
   templateId: z.string().min(1).max(100).optional(),
   templateType: z.enum(EMAIL_TEMPLATE_TYPES).optional(),
+  /**
+   * For self-schedule invitation tests: the job whose real availability the
+   * test booking link should open (in side-effect-free test mode).
+   */
+  jobId: z.string().min(1).optional(),
 }).refine(d => d.templateId || d.templateType, {
   message: 'Provide a template id or a template type',
 })

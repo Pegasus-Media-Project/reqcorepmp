@@ -1,7 +1,7 @@
 import { and, eq, gt, lt, sql } from 'drizzle-orm'
 import { application, interview, interviewSlot, interviewSlotBooking, organization } from '../../../database/schema'
 import { bookSlotSchema } from '../../../utils/schemas/interviewSlot'
-import { verifyBookingToken } from '../../../utils/interview-token'
+import { verifyBookingToken, verifyTestBookingToken } from '../../../utils/interview-token'
 import { sendBookingConfirmationEmail, getFromEmail } from '../../../utils/email'
 import { generateInterviewICS } from '../../../utils/ical'
 
@@ -18,7 +18,26 @@ export default defineEventHandler(async (event) => {
 
   const payload = verifyBookingToken(body.token, env.BETTER_AUTH_SECRET)
   if (!payload) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid or expired link' })
+    // Staff test links simulate the booking: validate the slot exactly like a
+    // real booking would, then return success WITHOUT writing anything.
+    const testPayload = verifyTestBookingToken(body.token, env.BETTER_AUTH_SECRET)
+    if (!testPayload) {
+      throw createError({ statusCode: 400, statusMessage: 'Invalid or expired link' })
+    }
+    const testSlot = await db.query.interviewSlot.findFirst({
+      where: and(
+        eq(interviewSlot.id, body.slotId),
+        eq(interviewSlot.jobId, testPayload.jobId),
+        eq(interviewSlot.status, 'open'),
+        gt(interviewSlot.startsAt, new Date()),
+        lt(interviewSlot.bookedCount, sql`${interviewSlot.capacity}`),
+      ),
+      columns: { id: true, title: true, startsAt: true, duration: true, timezone: true, location: true, type: true },
+    })
+    if (!testSlot) {
+      throw createError({ statusCode: 409, statusMessage: 'That time was just taken. Please choose another slot.' })
+    }
+    return { success: true, test: true, slot: testSlot }
   }
 
   const app = await db.query.application.findFirst({

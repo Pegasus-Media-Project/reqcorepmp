@@ -208,6 +208,80 @@ export function verifyBookingToken(
   return { applicationId: payload.aid }
 }
 
+// ─────────────────────────────────────────────
+// TEST booking tokens (staff previews)
+// ─────────────────────────────────────────────
+//
+// A job-scoped, side-effect-free variant used by "send test email": the link
+// opens the real booking page with the job's real availability, but booking is
+// simulated — nothing is written. The distinct discriminator keeps test links
+// from ever acting as real booking authorizations (and vice-versa).
+
+const SLOT_BOOK_TEST_TAG = 'slot_book_test'
+
+/** Test links expire quickly — they exist to preview the flow, not to book. */
+const TEST_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000
+
+interface TestBookingTokenPayload {
+  /** Job UUID whose open slots the test link may browse. */
+  jid: string
+  t: typeof SLOT_BOOK_TEST_TAG
+  exp: number
+}
+
+/** Generate a signed TEST booking token scoped to a job. */
+export function generateTestBookingToken(
+  jobId: string,
+  secret: string,
+  expiryMs: number = TEST_EXPIRY_MS,
+): string {
+  const payload: TestBookingTokenPayload = {
+    jid: jobId,
+    t: SLOT_BOOK_TEST_TAG,
+    exp: Date.now() + expiryMs,
+  }
+  const payloadStr = Buffer.from(JSON.stringify(payload)).toString('base64url')
+  return `${payloadStr}.${sign(payloadStr, secret)}`
+}
+
+/**
+ * Verify and decode a TEST booking token. Returns `{ jobId }` if valid,
+ * or null on bad signature / wrong discriminator / expiry.
+ */
+export function verifyTestBookingToken(
+  token: string,
+  secret: string,
+): { jobId: string } | null {
+  const dotIndex = token.indexOf('.')
+  if (dotIndex === -1) return null
+
+  const payloadStr = token.slice(0, dotIndex)
+  const providedSig = token.slice(dotIndex + 1)
+
+  const expectedSig = sign(payloadStr, secret)
+  if (providedSig.length !== expectedSig.length) return null
+  if (!timingSafeEqual(Buffer.from(providedSig, 'hex'), Buffer.from(expectedSig, 'hex'))) return null
+
+  let payload: TestBookingTokenPayload
+  try {
+    payload = JSON.parse(Buffer.from(payloadStr, 'base64url').toString('utf-8')) as TestBookingTokenPayload
+  }
+  catch {
+    return null
+  }
+
+  if (
+    typeof payload.jid !== 'string'
+    || payload.t !== SLOT_BOOK_TEST_TAG
+    || typeof payload.exp !== 'number'
+  ) {
+    return null
+  }
+  if (Date.now() > payload.exp) return null
+
+  return { jobId: payload.jid }
+}
+
 /** Build the candidate-facing booking URL for an application. */
 export function buildBookingUrl(
   baseUrl: string,
