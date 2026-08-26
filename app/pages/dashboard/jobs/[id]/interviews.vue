@@ -32,8 +32,9 @@ const view = ref<'board' | 'signup'>(route.query.view === 'signup' ? 'signup' : 
 
 <template>
   <div>
-    <!-- View switcher -->
-    <div class="mx-auto max-w-7xl px-6 pt-6">
+    <!-- View switcher — same container as the views below it, so the tabs line
+         up with the board's search row and cards. -->
+    <div class="mx-auto mb-4 max-w-5xl">
       <div class="inline-flex overflow-hidden rounded-lg border border-surface-200 dark:border-surface-700">
         <button
           class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium transition-all cursor-pointer"
@@ -59,7 +60,7 @@ const view = ref<'board' | 'signup'>(route.query.view === 'signup' ? 'signup' : 
     </div>
 
     <InterviewsBoard v-if="view === 'board'" :job-id="jobId" />
-    <div v-else class="mx-auto max-w-5xl px-6 py-6">
+    <div v-else class="mx-auto max-w-5xl">
       <p class="text-sm text-surface-500 dark:text-surface-400 mb-6 max-w-xl">
         Join individual interview slots for this job, or set your availability and get assigned to everything inside it automatically.
       </p>
