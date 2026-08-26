@@ -22,6 +22,20 @@ interface FeeStep extends OnboardingStep {
   amount: number | null
   currency: string | null
 }
+/** Scheduling step — only present once the application reaches `interview`. */
+interface InterviewStep {
+  booked: {
+    title: string
+    startsAt: string
+    duration: number
+    timezone: string
+    location: string | null
+    type: string
+  } | null
+  otherTimesAvailable: boolean
+  /** Signed booking link, present only while there is something to pick from. */
+  bookingUrl: string | null
+}
 interface StatusResult {
   statusKey: string
   status: string
@@ -29,7 +43,32 @@ interface StatusResult {
   submittedAt: string
   fee: FeeStep | null
   documents: OnboardingStep | null
+  interview: InterviewStep | null
 }
+
+const INTERVIEW_TYPE_LABELS: Record<string, string> = {
+  video: 'Video call',
+  phone: 'Phone call',
+  in_person: 'In person',
+  technical: 'Technical interview',
+  panel: 'Panel interview',
+  take_home: 'Take-home assignment',
+}
+
+const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString(undefined, {
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', timeZone: localTz,
+  })
+}
+
+/** A booked interview that hasn't happened yet is still the candidate's to move. */
+const bookedIsUpcoming = computed(() => {
+  const startsAt = result.value?.interview?.booked?.startsAt
+  return !!startsAt && new Date(startsAt) > new Date()
+})
 
 function formatFee(amount: number | null, currency: string | null): string | null {
   if (amount == null) return null
@@ -187,6 +226,54 @@ onMounted(() => {
       >
         Pay application fee
       </a>
+    </div>
+
+    <!-- Interview scheduling (interview stage) -->
+    <div v-if="result && result.interview" class="mt-4 rounded-xl border border-surface-200 bg-white p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h2 class="text-sm font-semibold text-surface-900">Interview</h2>
+          <p v-if="result.interview.booked" class="mt-1 text-xs text-surface-500">
+            Your interview time is confirmed. A calendar invite was emailed to you.
+          </p>
+          <p v-else-if="result.interview.bookingUrl" class="mt-1 text-xs text-surface-500">
+            You've reached the interview stage — pick a time that works for you.
+          </p>
+          <p v-else class="mt-1 text-xs text-surface-500">
+            You've reached the interview stage. The team will be in touch with times shortly.
+          </p>
+        </div>
+        <span
+          class="shrink-0 rounded-full px-3 py-1 text-xs font-semibold"
+          :class="result.interview.booked ? 'bg-success-50 text-success-700' : 'bg-amber-50 text-amber-700'"
+        >
+          {{ result.interview.booked ? 'Scheduled' : 'Time not chosen' }}
+        </span>
+      </div>
+
+      <div v-if="result.interview.booked" class="mt-4 rounded-lg bg-surface-50 px-4 py-3">
+        <p class="text-sm font-semibold text-surface-900">{{ formatDateTime(result.interview.booked.startsAt) }}</p>
+        <p class="mt-1 text-xs text-surface-500">
+          {{ result.interview.booked.title }}
+          · {{ INTERVIEW_TYPE_LABELS[result.interview.booked.type] ?? result.interview.booked.type }}
+          · {{ result.interview.booked.duration }} min
+        </p>
+        <p v-if="result.interview.booked.location" class="mt-1 text-xs text-surface-500">
+          {{ result.interview.booked.location }}
+        </p>
+        <p class="mt-1 text-xs text-surface-400">Times shown in your local timezone ({{ localTz }}).</p>
+      </div>
+
+      <NuxtLink
+        v-if="result.interview.bookingUrl && (!result.interview.booked || bookedIsUpcoming)"
+        :to="result.interview.bookingUrl"
+        class="mt-4 inline-block rounded-lg px-5 py-2.5 text-sm font-semibold transition"
+        :class="result.interview.booked
+          ? 'border border-surface-300 text-surface-700 hover:bg-surface-50'
+          : 'bg-brand-600 text-white hover:bg-brand-700'"
+      >
+        {{ result.interview.booked ? 'Change my time' : 'Choose an interview time' }}
+      </NuxtLink>
     </div>
 
     <!-- Signed documents (acceptance phase) -->

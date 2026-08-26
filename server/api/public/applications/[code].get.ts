@@ -1,5 +1,6 @@
-import { eq } from 'drizzle-orm'
-import { application, job } from '../../../database/schema'
+import { and, eq, gt, lt, ne, sql } from 'drizzle-orm'
+import { application, job, interviewSlot, interviewSlotBooking } from '../../../database/schema'
+import { buildBookingUrl } from '../../../utils/interview-token'
 
 /**
  * GET /api/public/applications/:code
@@ -42,6 +43,8 @@ export default defineEventHandler(async (event) => {
 
   const [row] = await db
     .select({
+      applicationId: application.id,
+      jobId: application.jobId,
       status: application.status,
       submittedAt: application.createdAt,
       jobTitle: job.title,
@@ -87,6 +90,14 @@ export default defineEventHandler(async (event) => {
       }
     : null
 
+  // Interview self-scheduling. The confirmation code already proves this is the
+  // applicant, so we can mint the same booking token the invitation email
+  // carries: they can pick a time (or move the one they picked) straight from
+  // here instead of hunting for that email.
+  const interview = row.status === 'interview'
+    ? await buildInterviewStep(row.applicationId, row.jobId)
+    : null
+
   return {
     statusKey: row.status,
     status: STATUS_LABELS[row.status] ?? 'Received',
@@ -94,5 +105,65 @@ export default defineEventHandler(async (event) => {
     submittedAt: row.submittedAt,
     fee,
     documents,
+    interview,
   }
 })
+
+/**
+ * The applicant-facing scheduling step: the slot they hold (if any), and a
+ * booking link whenever there is something for them to pick from. No PII —
+ * just the shared slot's time, place and shape.
+ */
+async function buildInterviewStep(applicationId: string, jobId: string) {
+  // Manual join — the slot tables intentionally declare no Drizzle relations.
+  const [booked] = await db
+    .select({
+      id: interviewSlot.id,
+      title: interviewSlot.title,
+      startsAt: interviewSlot.startsAt,
+      duration: interviewSlot.duration,
+      timezone: interviewSlot.timezone,
+      location: interviewSlot.location,
+      type: interviewSlot.type,
+    })
+    .from(interviewSlotBooking)
+    .innerJoin(interviewSlot, eq(interviewSlotBooking.slotId, interviewSlot.id))
+    .where(and(
+      eq(interviewSlotBooking.applicationId, applicationId),
+      eq(interviewSlotBooking.status, 'confirmed'),
+    ))
+    .limit(1)
+
+  // Are there other times to pick? The slot they already hold doesn't count as
+  // an alternative, so a lone booked slot correctly reads as "no other times".
+  const [available] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(interviewSlot)
+    .where(and(
+      eq(interviewSlot.jobId, jobId),
+      eq(interviewSlot.status, 'open'),
+      gt(interviewSlot.startsAt, new Date()),
+      lt(interviewSlot.bookedCount, sql`${interviewSlot.capacity}`),
+      ...(booked ? [ne(interviewSlot.id, booked.id)] : []),
+    ))
+
+  const otherTimesAvailable = (available?.count ?? 0) > 0
+
+  return {
+    booked: booked
+      ? {
+          title: booked.title,
+          startsAt: booked.startsAt,
+          duration: booked.duration,
+          timezone: booked.timezone,
+          location: booked.location,
+          type: booked.type,
+        }
+      : null,
+    otherTimesAvailable,
+    // Relative — same app serves the booking page.
+    bookingUrl: otherTimesAvailable
+      ? buildBookingUrl('', applicationId, env.BETTER_AUTH_SECRET)
+      : null,
+  }
+}

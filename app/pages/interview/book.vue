@@ -46,6 +46,10 @@ const selectedSlotId = ref<string>('')
 const booking = ref(false)
 const bookError = ref('')
 const bookedSlot = ref<Slot | null>(null)
+// Set when someone with a confirmed booking asks to move it: the same picker is
+// shown, but confirming moves the booking instead of creating one.
+const changing = ref(false)
+const isChange = computed(() => changing.value && !!data.value?.alreadyBooked)
 
 // Group available slots by local calendar day.
 const groupedSlots = computed(() => {
@@ -78,11 +82,15 @@ async function confirmBooking() {
   booking.value = true
   bookError.value = ''
   try {
-    const res = await $fetch<{ success: boolean, slot: Slot }>('/api/public/interview-slots/book', {
+    const endpoint = isChange.value
+      ? '/api/public/interview-slots/rebook'
+      : '/api/public/interview-slots/book'
+    const res = await $fetch<{ success: boolean, slot: Slot }>(endpoint, {
       method: 'POST',
       body: { token: token.value, slotId: selectedSlotId.value },
     })
     bookedSlot.value = res.slot
+    changing.value = false
   }
   catch (err: any) {
     const status = err?.data?.statusCode ?? err?.statusCode
@@ -148,14 +156,23 @@ useHead({ title: 'Schedule Your Interview' })
     </div>
 
     <!-- Already booked earlier -->
-    <div v-else-if="data?.alreadyBooked" class="text-center">
+    <div v-else-if="data?.alreadyBooked && !changing" class="text-center">
       <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 mb-4">
         <span class="text-2xl">ℹ</span>
       </div>
       <h1 class="text-xl font-semibold text-surface-900 dark:text-surface-100 mb-2">Interview Already Scheduled</h1>
       <p class="text-surface-500 mb-2">You've already booked your interview for:</p>
       <p class="text-surface-900 dark:text-surface-100 font-semibold">{{ formatDateTime(data.alreadyBooked.slot.startsAt) }}</p>
-      <p class="text-xs text-surface-400 mt-1">Need to change it? Please contact the hiring team.</p>
+      <p class="text-xs text-surface-400 mt-1">Times shown in your local timezone ({{ localTz }}).</p>
+      <button
+        v-if="data.slots.length"
+        type="button"
+        class="mt-5 rounded-lg border border-surface-300 dark:border-surface-600 px-5 py-2.5 text-sm font-semibold text-surface-700 dark:text-surface-200 transition-colors hover:bg-surface-100 dark:hover:bg-surface-800"
+        @click="changing = true"
+      >
+        Change my time
+      </button>
+      <p v-else class="text-xs text-surface-400 mt-4">Need to change it? Please contact the hiring team.</p>
     </div>
 
     <!-- Slot picker -->
@@ -164,8 +181,11 @@ useHead({ title: 'Schedule Your Interview' })
         Test link — this is the candidate booking page with this job's real availability. Booking here won't save anything.
       </div>
       <h1 class="text-xl font-semibold text-surface-900 dark:text-surface-100 mb-1 text-center">
-        Schedule your interview
+        {{ isChange ? 'Pick a new time' : 'Schedule your interview' }}
       </h1>
+      <p v-if="isChange && data.alreadyBooked" class="text-sm text-surface-500 text-center mb-1">
+        Currently booked for {{ formatDateTime(data.alreadyBooked.slot.startsAt) }}. Choosing a new time releases that one.
+      </p>
       <p class="text-sm text-surface-500 text-center mb-6">
         <template v-if="data.jobTitle">{{ data.jobTitle }}<span v-if="data.organizationName"> · {{ data.organizationName }}</span></template>
       </p>
@@ -213,8 +233,17 @@ useHead({ title: 'Schedule Your Interview' })
           class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           @click="confirmBooking"
         >
-          <span v-if="booking">Booking…</span>
-          <span v-else>Confirm this time</span>
+          <span v-if="booking">{{ isChange ? 'Moving…' : 'Booking…' }}</span>
+          <span v-else>{{ isChange ? 'Move my interview here' : 'Confirm this time' }}</span>
+        </button>
+
+        <button
+          v-if="isChange"
+          type="button"
+          class="w-full mt-2 py-2.5 text-sm font-medium text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"
+          @click="changing = false; selectedSlotId = ''; bookError = ''"
+        >
+          Keep my current time
         </button>
       </template>
     </div>

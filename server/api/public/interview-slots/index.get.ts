@@ -1,4 +1,4 @@
-import { and, eq, gt, lt, sql } from 'drizzle-orm'
+import { and, eq, gt, lt, ne, sql } from 'drizzle-orm'
 import { application, candidate, job, organization, interviewSlot, interviewSlotBooking } from '../../../database/schema'
 import { publicSlotsQuerySchema } from '../../../utils/schemas/interviewSlot'
 import { verifyBookingToken, verifyTestBookingToken } from '../../../utils/interview-token'
@@ -92,20 +92,21 @@ export default defineEventHandler(async (event) => {
     ))
     .limit(1)
 
-  // Available slots for this job (open, in the future, and not full).
-  const slots = existingBooking
-    ? []
-    : await db.query.interviewSlot.findMany({
-        where: and(
-          eq(interviewSlot.organizationId, app.organizationId),
-          eq(interviewSlot.jobId, app.jobId),
-          eq(interviewSlot.status, 'open'),
-          gt(interviewSlot.startsAt, new Date()),
-          lt(interviewSlot.bookedCount, sql`${interviewSlot.capacity}`),
-        ),
-        columns: { id: true, title: true, startsAt: true, duration: true, timezone: true, location: true, type: true },
-        orderBy: (s, { asc }) => [asc(s.startsAt)],
-      })
+  // Available slots for this job (open, in the future, and not full). Still
+  // listed for someone who already booked — that's what they choose from when
+  // moving their interview — minus the slot they're currently holding.
+  const slots = await db.query.interviewSlot.findMany({
+    where: and(
+      eq(interviewSlot.organizationId, app.organizationId),
+      eq(interviewSlot.jobId, app.jobId),
+      eq(interviewSlot.status, 'open'),
+      gt(interviewSlot.startsAt, new Date()),
+      lt(interviewSlot.bookedCount, sql`${interviewSlot.capacity}`),
+      ...(existingBooking ? [ne(interviewSlot.id, existingBooking.id)] : []),
+    ),
+    columns: { id: true, title: true, startsAt: true, duration: true, timezone: true, location: true, type: true },
+    orderBy: (s, { asc }) => [asc(s.startsAt)],
+  })
 
   return {
     candidateFirstName: app.candidate?.firstName ?? null,
