@@ -464,7 +464,7 @@ const localePath = useLocalePath()
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl px-6 py-8">
+  <div class="mx-auto max-w-7xl px-6 py-8">
     <!-- Back link -->
     <NuxtLink
       :to="$localePath('/dashboard/interviews')"
@@ -569,7 +569,145 @@ const localePath = useLocalePath()
         </div>
       </div>
 
-      <!-- Two columns on large screens: interview process left, application right -->
+      <!-- Sticky review workspace: candidate + reviews side by side, pinned to
+           the top while the full-width application scrolls beneath — so notes
+           can be written against any part of the application. -->
+      <!-- -top-8 tucks the pinned bar over the scroll container's own top
+           padding so content can't peek through above it. -->
+      <div class="sticky -top-8 z-30 -mt-2 pt-2 pb-3 mb-4 bg-surface-50/95 dark:bg-surface-950/95 backdrop-blur-sm">
+        <div class="grid gap-4 lg:grid-cols-2 lg:items-stretch">
+          <!-- Candidate -->
+          <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5 max-h-[38vh] overflow-y-auto scrollbar-thin">
+            <div class="flex items-center justify-between gap-2 mb-3">
+              <div class="flex items-center gap-2">
+                <UserRound class="size-4 text-surface-500 dark:text-surface-400" />
+                <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Candidate</h2>
+                <span
+                  v-if="interviewApplication?.status"
+                  class="rounded-full px-2 py-0.5 text-[11px] font-medium capitalize"
+                  :class="applicationStatusBadges[interviewApplication.status] ?? ''"
+                >
+                  {{ interviewApplication.status }}
+                </span>
+              </div>
+              <NuxtLink
+                :to="$localePath(`/dashboard/candidates/${interview.candidateId}`)"
+                class="inline-flex items-center gap-1 text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
+              >
+                View Profile
+                <ExternalLink class="size-3" />
+              </NuxtLink>
+            </div>
+            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+              <div>
+                <dt class="text-surface-400">Name</dt>
+                <dd class="text-surface-700 dark:text-surface-200 font-medium">
+                  {{ formatPersonName(interview.candidateFirstName, interview.candidateLastName) }}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-surface-400">Email</dt>
+                <dd class="text-surface-700 dark:text-surface-200 font-medium break-all">{{ interview.candidateEmail }}</dd>
+              </div>
+              <div v-if="interview.candidatePhone">
+                <dt class="text-surface-400">Phone</dt>
+                <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ interview.candidatePhone }}</dd>
+              </div>
+              <div>
+                <dt class="text-surface-400">Job</dt>
+                <dd>
+                  <NuxtLink
+                    :to="$localePath(`/dashboard/jobs/${interview.jobId}`)"
+                    class="inline-flex items-center gap-1 font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
+                  >
+                    {{ interview.jobTitle }}
+                    <ExternalLink class="size-3" />
+                  </NuxtLink>
+                </dd>
+              </div>
+              <div v-if="interviewApplication?.score != null">
+                <dt class="text-surface-400">Score</dt>
+                <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ interviewApplication.score }} / 100</dd>
+              </div>
+              <div v-if="interviewApplication">
+                <dt class="text-surface-400">Applied</dt>
+                <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ formatDate(interviewApplication.createdAt) }}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <!-- Reviews (rating + notes, writable while scrolling the application) -->
+          <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5 max-h-[38vh] overflow-y-auto scrollbar-thin">
+            <div class="flex items-center gap-2 mb-3">
+              <Star class="size-4 text-surface-500 dark:text-surface-400" />
+              <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Reviews</h2>
+            </div>
+            <ReviewPanel :application-id="interview.applicationId" status="interview" />
+          </div>
+        </div>
+      </div>
+
+      <!-- The application, full width -->
+      <div class="mb-6 rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
+        <div class="flex items-center justify-between gap-2 mb-3">
+          <div class="flex items-center gap-2">
+            <FileText class="size-4 text-surface-500 dark:text-surface-400" />
+            <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Application</h2>
+          </div>
+          <NuxtLink
+            :to="$localePath(`/dashboard/applications/${interview.applicationId}`)"
+            class="inline-flex items-center gap-1 text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
+          >
+            Open Full Application
+            <ExternalLink class="size-3" />
+          </NuxtLink>
+        </div>
+
+        <div v-if="!interviewApplication" class="py-6 text-center text-sm text-surface-400">
+          Loading application…
+        </div>
+        <template v-else>
+          <!-- Cover letter -->
+          <div v-if="interviewApplication.coverLetterText" class="mb-5">
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-1.5">Cover letter</h3>
+            <p class="text-sm text-surface-600 dark:text-surface-300 whitespace-pre-wrap max-w-3xl">{{ interviewApplication.coverLetterText }}</p>
+          </div>
+
+          <!-- Question responses grouped by section -->
+          <div v-if="applicationResponseGroups.length" class="space-y-5">
+            <div v-for="group in applicationResponseGroups" :key="group.section?.id ?? 'default'">
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 border-b border-surface-100 dark:border-surface-800 pb-1 mb-3">
+                {{ group.section?.title ?? 'Responses' }}
+              </h3>
+              <div class="space-y-3">
+                <div v-for="r in group.responses" :key="(r as any).id">
+                  <div class="text-[13px] font-medium text-surface-700 dark:text-surface-300">{{ (r as any).question?.label }}</div>
+                  <div class="text-sm text-surface-600 dark:text-surface-400 whitespace-pre-wrap max-w-3xl">{{ formatResponseValue((r as any).value) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p v-else class="text-sm text-surface-400 italic">No question responses.</p>
+
+          <!-- Documents -->
+          <div v-if="interviewApplication.candidate?.documents?.length" class="mt-5">
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-1.5">Documents</h3>
+            <ul class="space-y-1">
+              <li
+                v-for="doc in interviewApplication.candidate.documents"
+                :key="doc.id"
+                class="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-300"
+              >
+                <FileText class="size-3.5 text-surface-400 shrink-0" />
+                <span class="truncate">{{ doc.originalFilename ?? doc.type }}</span>
+                <span class="text-xs text-surface-400">({{ doc.type }})</span>
+              </li>
+            </ul>
+          </div>
+        </template>
+      </div>
+
+      <!-- Interview management, below the application -->
       <div class="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
       <div>
       <!-- Reviewers -->
@@ -617,15 +755,6 @@ const localePath = useLocalePath()
             </button>
           </li>
         </ul>
-      </div>
-
-      <!-- Reviewer ratings -->
-      <div class="mb-6 rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
-        <div class="flex items-center gap-2 mb-3">
-          <Star class="size-4 text-surface-500 dark:text-surface-400" />
-          <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Reviews</h2>
-        </div>
-        <ReviewPanel :application-id="interview.applicationId" status="interview" />
       </div>
 
       <!-- Quick actions (managers only) -->
@@ -892,8 +1021,12 @@ const localePath = useLocalePath()
         </div>
       </div>
 
+      </div>
+
+      <!-- Second column: notes + danger zone -->
+      <div class="mt-6 lg:mt-0">
       <!-- Notes -->
-      <div class="mt-4 rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5 mb-4">
+      <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5 mb-4">
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2">
             <MessageSquare class="size-4 text-surface-500 dark:text-surface-400" />
@@ -952,132 +1085,6 @@ const localePath = useLocalePath()
           Delete Interview
         </button>
       </div>
-      </div>
-
-      <!-- RIGHT column: the application -->
-      <div class="mt-6 lg:mt-0 space-y-4">
-        <!-- Candidate info -->
-        <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
-          <div class="flex items-center justify-between gap-2 mb-3">
-            <div class="flex items-center gap-2">
-              <UserRound class="size-4 text-surface-500 dark:text-surface-400" />
-              <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Candidate</h2>
-            </div>
-            <NuxtLink
-              :to="$localePath(`/dashboard/candidates/${interview.candidateId}`)"
-              class="inline-flex items-center gap-1 text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
-            >
-              View Profile
-              <ExternalLink class="size-3" />
-            </NuxtLink>
-          </div>
-          <dl class="grid grid-cols-1 gap-3 text-sm">
-            <div>
-              <dt class="text-surface-400">Name</dt>
-              <dd class="text-surface-700 dark:text-surface-200 font-medium">
-                {{ formatPersonName(interview.candidateFirstName, interview.candidateLastName) }}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-surface-400">Email</dt>
-              <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ interview.candidateEmail }}</dd>
-            </div>
-            <div v-if="interview.candidatePhone">
-              <dt class="text-surface-400">Phone</dt>
-              <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ interview.candidatePhone }}</dd>
-            </div>
-            <div>
-              <dt class="text-surface-400">Job</dt>
-              <dd>
-                <NuxtLink
-                  :to="$localePath(`/dashboard/jobs/${interview.jobId}`)"
-                  class="inline-flex items-center gap-1 font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
-                >
-                  {{ interview.jobTitle }}
-                  <ExternalLink class="size-3" />
-                </NuxtLink>
-              </dd>
-            </div>
-          </dl>
-        </div>
-
-        <!-- Application -->
-        <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
-          <div class="flex items-center justify-between gap-2 mb-3">
-            <div class="flex items-center gap-2">
-              <FileText class="size-4 text-surface-500 dark:text-surface-400" />
-              <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Application</h2>
-              <span
-                v-if="interviewApplication?.status"
-                class="rounded-full px-2 py-0.5 text-[11px] font-medium capitalize"
-                :class="applicationStatusBadges[interviewApplication.status] ?? ''"
-              >
-                {{ interviewApplication.status }}
-              </span>
-            </div>
-            <NuxtLink
-              :to="$localePath(`/dashboard/applications/${interview.applicationId}`)"
-              class="inline-flex items-center gap-1 text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
-            >
-              Open Full Application
-              <ExternalLink class="size-3" />
-            </NuxtLink>
-          </div>
-
-          <div v-if="!interviewApplication" class="py-6 text-center text-sm text-surface-400">
-            Loading application…
-          </div>
-          <template v-else>
-            <dl class="flex flex-wrap gap-x-8 gap-y-2 text-sm mb-4">
-              <div v-if="interviewApplication.score != null">
-                <dt class="text-surface-400">Score</dt>
-                <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ interviewApplication.score }} / 100</dd>
-              </div>
-              <div>
-                <dt class="text-surface-400">Applied</dt>
-                <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ formatDate(interviewApplication.createdAt) }}</dd>
-              </div>
-            </dl>
-
-            <!-- Cover letter -->
-            <div v-if="interviewApplication.coverLetterText" class="mb-4">
-              <h3 class="text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-1.5">Cover letter</h3>
-              <p class="text-sm text-surface-600 dark:text-surface-300 whitespace-pre-wrap max-h-48 overflow-y-auto">{{ interviewApplication.coverLetterText }}</p>
-            </div>
-
-            <!-- Question responses grouped by section -->
-            <div v-if="applicationResponseGroups.length" class="space-y-4">
-              <div v-for="group in applicationResponseGroups" :key="group.section?.id ?? 'default'">
-                <h3 class="text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 border-b border-surface-100 dark:border-surface-800 pb-1 mb-2">
-                  {{ group.section?.title ?? 'Responses' }}
-                </h3>
-                <div class="space-y-2.5">
-                  <div v-for="r in group.responses" :key="(r as any).id">
-                    <div class="text-[13px] font-medium text-surface-700 dark:text-surface-300">{{ (r as any).question?.label }}</div>
-                    <div class="text-sm text-surface-600 dark:text-surface-400 whitespace-pre-wrap">{{ formatResponseValue((r as any).value) }}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <p v-else class="text-sm text-surface-400 italic">No question responses.</p>
-
-            <!-- Documents -->
-            <div v-if="interviewApplication.candidate?.documents?.length" class="mt-4">
-              <h3 class="text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-1.5">Documents</h3>
-              <ul class="space-y-1">
-                <li
-                  v-for="doc in interviewApplication.candidate.documents"
-                  :key="doc.id"
-                  class="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-300"
-                >
-                  <FileText class="size-3.5 text-surface-400 shrink-0" />
-                  <span class="truncate">{{ doc.originalFilename ?? doc.type }}</span>
-                  <span class="text-xs text-surface-400">({{ doc.type }})</span>
-                </li>
-              </ul>
-            </div>
-          </template>
-        </div>
       </div>
       </div>
     </template>
