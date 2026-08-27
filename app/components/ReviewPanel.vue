@@ -19,9 +19,24 @@ const STAGES: { key: ReviewStage, label: string }[] = [
 // The interview review only appears once the applicant has reached the
 // interview stage (interview / waitlist / offer / hired). Screening is always available.
 const INTERVIEW_REACHED = new Set(['interview', 'waitlist', 'offer', 'hired'])
-const visibleStages = computed(() =>
-  STAGES.filter(s => s.key !== 'interview' || INTERVIEW_REACHED.has(props.status ?? '')),
-)
+const interviewReached = computed(() => INTERVIEW_REACHED.has(props.status ?? ''))
+
+// Once the interview stage is reached, it leads and the screening review
+// drops below it as a condensed, read-only record of what was already said.
+const visibleStages = computed(() => {
+  const stages = STAGES.filter(s => s.key !== 'interview' || interviewReached.value)
+  return interviewReached.value ? [...stages].reverse() : stages
+})
+
+/** Past-stage reviews are history — shown condensed, no editing. */
+function isCondensed(stage: ReviewStage): boolean {
+  return stage === 'screening' && interviewReached.value
+}
+
+/** Every review for a stage (own + others), for the condensed record. */
+function reviewsFor(stage: ReviewStage) {
+  return reviews.value.filter(r => r.stage === stage)
+}
 
 // Local editable state per stage, seeded from the user's existing review.
 interface Draft { rating: number | null, notes: string }
@@ -76,19 +91,54 @@ function othersFor(stage: ReviewStage) {
     <div
       v-for="s in visibleStages"
       :key="s.key"
-      class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-950 p-4"
-      :class="status === s.key ? 'ring-1 ring-brand-300 dark:ring-brand-700' : ''"
+      class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-950"
+      :class="[
+        status === s.key ? 'ring-1 ring-brand-300 dark:ring-brand-700' : '',
+        isCondensed(s.key) ? 'p-3' : 'p-4',
+      ]"
     >
-      <div class="flex items-center justify-between mb-3">
-        <h4 class="text-sm font-semibold text-surface-800 dark:text-surface-200">{{ s.label }} review</h4>
+      <div class="flex items-center justify-between" :class="isCondensed(s.key) ? 'mb-2' : 'mb-3'">
+        <h4 class="text-sm font-semibold" :class="isCondensed(s.key) ? 'text-surface-500 dark:text-surface-400' : 'text-surface-800 dark:text-surface-200'">{{ s.label }} review</h4>
         <span
           v-if="status === s.key"
           class="text-[10px] font-medium uppercase tracking-wide text-brand-600 dark:text-brand-400"
         >Current stage</span>
+        <span
+          v-else-if="isCondensed(s.key)"
+          class="text-[10px] font-medium uppercase tracking-wide text-surface-400 dark:text-surface-500"
+        >Earlier stage</span>
+      </div>
+
+      <!-- Condensed read-only record for a stage already passed -->
+      <div v-if="isCondensed(s.key)" class="space-y-2">
+        <p v-if="!reviewsFor(s.key).length" class="text-xs text-surface-400 italic">No screening reviews were left.</p>
+        <div v-for="r in reviewsFor(s.key)" :key="r.id" class="flex items-start gap-2">
+          <img
+            v-if="r.reviewerImage"
+            :src="r.reviewerImage"
+            class="size-5 rounded-full shrink-0 mt-0.5"
+            :alt="r.reviewerName ?? r.reviewerEmail"
+          >
+          <div
+            v-else
+            class="size-5 rounded-full shrink-0 mt-0.5 bg-surface-200 dark:bg-surface-700 flex items-center justify-center text-[9px] font-medium text-surface-500 dark:text-surface-300"
+          >
+            {{ (r.reviewerName ?? r.reviewerEmail).charAt(0).toUpperCase() }}
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-medium text-surface-600 dark:text-surface-300 truncate">
+                {{ r.reviewerId === currentUserId ? 'You' : (r.reviewerName ?? r.reviewerEmail) }}
+              </span>
+              <StarRating v-if="r.rating != null" :model-value="r.rating" readonly :size="12" />
+            </div>
+            <p v-if="r.notes" class="text-xs text-surface-500 dark:text-surface-400 mt-0.5 whitespace-pre-wrap">{{ r.notes }}</p>
+          </div>
+        </div>
       </div>
 
       <!-- Your review -->
-      <div class="space-y-2">
+      <div v-else class="space-y-2">
         <div class="flex items-center gap-3">
           <span class="text-xs font-medium text-surface-500 dark:text-surface-400 w-16">Your rating</span>
           <StarRating v-model="drafts[s.key].rating" :size="20" />
@@ -112,7 +162,7 @@ function othersFor(stage: ReviewStage) {
       </div>
 
       <!-- Other reviewers -->
-      <div v-if="othersFor(s.key).length" class="mt-4 pt-3 border-t border-surface-100 dark:border-surface-800 space-y-2.5">
+      <div v-if="!isCondensed(s.key) && othersFor(s.key).length" class="mt-4 pt-3 border-t border-surface-100 dark:border-surface-800 space-y-2.5">
         <p class="text-[11px] font-semibold uppercase tracking-wide text-surface-400 dark:text-surface-500">Other reviewers</p>
         <div v-for="r in othersFor(s.key)" :key="r.id" class="flex items-start gap-2.5">
           <img
