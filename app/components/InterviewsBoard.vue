@@ -4,7 +4,7 @@ import {
   Building2, Code2, FileText, UsersRound, MoreHorizontal,
   CheckCircle2, XCircle, AlertTriangle, UserRound, Briefcase,
   Pencil, Trash2, MapPin, Users, CalendarDays,
-  Mail, ExternalLink, UserPlus, Check, Star,
+  Mail, ExternalLink, UserPlus, Check, Star, List, ArrowDownUp,
 } from 'lucide-vue-next'
 
 /**
@@ -39,6 +39,28 @@ type InterviewStatus = typeof STATUS_OPTIONS[number]
 
 const activeStatus = ref<InterviewStatus | undefined>(undefined)
 const activeView = ref<'list' | 'calendar'>('list')
+
+// Order the board reads in. "Up next" (the default) puts what's coming up
+// soonest at the top — upcoming interviews ascending, then past ones newest
+// first. "Latest first" is plain reverse-chronological; "Candidate name" is
+// alphabetical. Applies to every scope tab (all / mine / today).
+const SORT_OPTIONS = [
+  { value: 'next', label: 'Up next' },
+  { value: 'last', label: 'Latest first' },
+  { value: 'name', label: 'Candidate name' },
+] as const
+const activeSort = ref<'next' | 'last' | 'name'>('next')
+
+/** Soonest upcoming first, then past interviews newest-first. */
+function compareUpNext(a: { scheduledAt: string }, b: { scheduledAt: string }): number {
+  const now = Date.now()
+  const ta = new Date(a.scheduledAt).getTime()
+  const tb = new Date(b.scheduledAt).getTime()
+  const aUpcoming = ta >= now
+  const bUpcoming = tb >= now
+  if (aUpcoming !== bUpcoming) return aUpcoming ? -1 : 1
+  return aUpcoming ? ta - tb : tb - ta
+}
 
 // Scope: all / my interviews / today.
 const activeScope = ref<'all' | 'mine' | 'today'>('all')
@@ -77,7 +99,32 @@ const filteredInterviews = computed(() => {
     })
   }
 
+  // The API hands these back latest-first; re-sort so the chosen order holds
+  // for the list and for the day groups built from it.
+  list.sort((a, b) => {
+    if (activeSort.value === 'name') {
+      const nameDiff = `${a.candidateFirstName} ${a.candidateLastName}`
+        .localeCompare(`${b.candidateFirstName} ${b.candidateLastName}`, undefined, { sensitivity: 'base' })
+      return nameDiff !== 0 ? nameDiff : compareUpNext(a, b)
+    }
+    if (activeSort.value === 'next') return compareUpNext(a, b)
+    return new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime()
+  })
+
   return list
+})
+
+/** The interview coming up soonest — badged at the top of the "Up next" list. */
+const upNextId = computed(() => {
+  const now = Date.now()
+  let best: { id: string, t: number } | null = null
+  for (const i of interviews.value) {
+    if (i.status !== 'scheduled') continue
+    const t = new Date(i.scheduledAt).getTime()
+    if (t < now) continue
+    if (!best || t < best.t) best = { id: i.id, t }
+  }
+  return best?.id ?? null
 })
 
 // ─── Bulk reviewer assignment ────────────────────────────────────
@@ -149,10 +196,14 @@ const selectedJobIds = computed(() => {
   return [...ids]
 })
 
-// Group by date for calendar-style view
+// Group by date for calendar-style view. Always chronological — a name sort
+// shouldn't scramble the timeline's day ordering.
 const groupedByDate = computed(() => {
+  const dateOrdered = activeSort.value === 'name'
+    ? [...filteredInterviews.value].sort(compareUpNext)
+    : filteredInterviews.value
   const groups = new Map<string, typeof filteredInterviews.value>()
-  for (const interview of filteredInterviews.value) {
+  for (const interview of dateOrdered) {
     const dateKey = new Date(interview.scheduledAt).toLocaleDateString('en-US', {
       weekday: 'long',
       month: 'long',
@@ -477,8 +528,46 @@ const statusCounts = computed(() => {
 
 <template>
   <div class="mx-auto max-w-5xl">
-    <!-- Status filter pills + search -->
-    <div class="flex flex-wrap items-center gap-3 mb-5">
+    <!-- Header: which view of interviews, and the board-level actions -->
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+      <slot name="views">
+        <!-- Job-scoped boards get a Signup view toggle from the page instead. -->
+        <NuxtLink
+          v-if="!props.jobId"
+          :to="$localePath('/dashboard/interviews/signup')"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 dark:border-surface-700/80 bg-white dark:bg-surface-900 px-3 py-2 text-xs font-medium text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors no-underline"
+        >
+          <CalendarDays class="size-3.5" />
+          Interview Signup
+        </NuxtLink>
+      </slot>
+
+      <div class="ml-auto flex items-center gap-2">
+        <ExportMenu
+          :selected-count="selectedInterviewIds.size"
+          :total-count="total"
+          :busy="exporting"
+          :scope-labels="{
+            all: dayCount ? `All ${dayCount} day${dayCount === 1 ? '' : 's'}` : 'All interviews',
+            selected: selectedDayCount ? `Selected ${selectedDayCount} day${selectedDayCount === 1 ? '' : 's'}` : 'Selected days',
+          }"
+          compact
+          @export="onExport"
+        />
+
+        <NuxtLink
+          v-if="canReadEmailTemplates"
+          :to="$localePath('/dashboard/interviews/templates')"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 dark:border-surface-700/80 bg-white dark:bg-surface-900 px-3 py-2 text-xs font-medium text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors no-underline"
+        >
+          <Mail class="size-3.5" />
+          Email Templates
+        </NuxtLink>
+      </div>
+    </div>
+
+    <!-- Search + scope -->
+    <div class="flex flex-wrap items-center gap-3 mb-3">
       <!-- Search -->
       <div class="relative flex-1 min-w-[200px] max-w-sm">
         <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-surface-400" />
@@ -511,6 +600,33 @@ const statusCounts = computed(() => {
           {{ sc === 'mine' ? 'My interviews' : sc === 'today' ? 'Today' : 'All' }}
         </button>
       </div>
+    </div>
+
+    <!-- View, status filters and sort order -->
+    <div class="flex flex-wrap items-center gap-3 mb-5">
+      <!-- View toggle -->
+      <div class="flex rounded-lg border border-surface-200 dark:border-surface-700 overflow-hidden">
+        <button
+          class="px-3 py-1.5 text-xs font-medium transition-all cursor-pointer"
+          :class="activeView === 'list'
+            ? 'bg-brand-600 text-white'
+            : 'bg-white dark:bg-surface-800 text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-700'"
+          @click="activeView = 'list'"
+        >
+          <List class="inline size-3.5 mr-1 -mt-0.5" />
+          List
+        </button>
+        <button
+          class="px-3 py-1.5 text-xs font-medium transition-all cursor-pointer"
+          :class="activeView === 'calendar'
+            ? 'bg-brand-600 text-white'
+            : 'bg-white dark:bg-surface-800 text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-700'"
+          @click="activeView = 'calendar'"
+        >
+          <CalendarDays class="inline size-3.5 mr-1 -mt-0.5" />
+          Timeline
+        </button>
+      </div>
 
       <!-- Status pills -->
       <div class="flex items-center gap-1.5">
@@ -529,59 +645,17 @@ const statusCounts = computed(() => {
         </button>
       </div>
 
-      <!-- View toggle -->
-      <div class="flex rounded-lg border border-surface-200 dark:border-surface-700 overflow-hidden ml-auto">
-        <button
-          class="px-3 py-1.5 text-xs font-medium transition-all cursor-pointer"
-          :class="activeView === 'list'
-            ? 'bg-brand-600 text-white'
-            : 'bg-white dark:bg-surface-800 text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-700'"
-          @click="activeView = 'list'"
+      <!-- Sort order -->
+      <div class="relative ml-auto">
+        <ArrowDownUp class="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-surface-400" />
+        <select
+          v-model="activeSort"
+          class="cursor-pointer appearance-none rounded-lg border border-surface-200 dark:border-surface-700/80 bg-white dark:bg-surface-900 py-1.5 pl-8 pr-7 text-xs font-medium text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors"
         >
-          List
-        </button>
-        <button
-          class="px-3 py-1.5 text-xs font-medium transition-all cursor-pointer"
-          :class="activeView === 'calendar'
-            ? 'bg-brand-600 text-white'
-            : 'bg-white dark:bg-surface-800 text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-700'"
-          @click="activeView = 'calendar'"
-        >
-          <CalendarDays class="inline size-3.5 mr-1 -mt-0.5" />
-          Timeline
-        </button>
+          <option v-for="o in SORT_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+        </select>
+        <ChevronDown class="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-surface-400" />
       </div>
-
-      <ExportMenu
-        :selected-count="selectedInterviewIds.size"
-        :total-count="total"
-        :busy="exporting"
-        :scope-labels="{
-          all: dayCount ? `All ${dayCount} day${dayCount === 1 ? '' : 's'}` : 'All interviews',
-          selected: selectedDayCount ? `Selected ${selectedDayCount} day${selectedDayCount === 1 ? '' : 's'}` : 'Selected days',
-        }"
-        compact
-        @export="onExport"
-      />
-
-      <!-- Job-scoped boards get a Signup view toggle from the page instead. -->
-      <NuxtLink
-        v-if="!props.jobId"
-        :to="$localePath('/dashboard/interviews/signup')"
-        class="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 dark:border-surface-700/80 bg-white dark:bg-surface-900 px-3 py-2 text-xs font-medium text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors no-underline"
-      >
-        <CalendarDays class="size-3.5" />
-        Interview Signup
-      </NuxtLink>
-
-      <NuxtLink
-        v-if="canReadEmailTemplates"
-        :to="$localePath('/dashboard/interviews/templates')"
-        class="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 dark:border-surface-700/80 bg-white dark:bg-surface-900 px-3 py-2 text-xs font-medium text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors no-underline"
-      >
-        <Mail class="size-3.5" />
-        Email Templates
-      </NuxtLink>
     </div>
 
     <!-- Loading state -->
@@ -705,6 +779,13 @@ const statusCounts = computed(() => {
                   >
                     {{ interviewItem.title }}
                   </NuxtLink>
+                  <span
+                    v-if="interviewItem.id === upNextId"
+                    class="inline-flex items-center gap-1 rounded-full bg-brand-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm shadow-brand-600/25"
+                  >
+                    <Clock class="size-2.5" />
+                    Up next
+                  </span>
                   <span
                     class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset"
                     :class="statusConfig[interviewItem.status]?.class"
