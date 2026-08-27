@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { interviewSlot, interviewSlotSignup } from '../../../database/schema'
 import { slotIdParamSchema } from '../../../utils/schemas/interviewSlot'
-import { syncSlotInterviewers } from '../../../utils/reviewer-signup'
+import { syncSlotInterviewers, withdrawSlotReviewerAssignments } from '../../../utils/reviewer-signup'
 
 /**
  * DELETE /api/interview-slots/:id/signup
@@ -32,6 +32,7 @@ export default defineEventHandler(async (event) => {
 
   if (deleted.length) {
     await syncSlotInterviewers(orgId, id)
+    await withdrawSlotReviewerAssignments(orgId, id, session.user.id)
     recordActivity({
       organizationId: orgId,
       actorId: session.user.id,

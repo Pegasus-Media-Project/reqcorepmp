@@ -154,6 +154,18 @@ export default defineEventHandler(async (event) => {
     }
   })
 
+  // Signed-up reviewers become assigned reviewers on the new interview and get
+  // their calendar invites. Best-effort — never unwinds the committed booking.
+  try {
+    await reconcileSlotReviewerAssignments(app.organizationId, result.slot.id)
+  }
+  catch (err) {
+    logError('reviewer_signup.booking_reconcile_failed', {
+      slot_id: result.slot.id,
+      error_message: err instanceof Error ? err.message : String(err),
+    })
+  }
+
   // Best-effort confirmation email with an .ics for the chosen time. Failures
   // are logged inside sendEmail and never unwind the committed booking.
   if (app.candidate?.email) {

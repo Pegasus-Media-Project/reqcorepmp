@@ -1,7 +1,7 @@
 import { and, eq, gt } from 'drizzle-orm'
 import { interviewSlot, interviewSlotSignup } from '../../../database/schema'
 import { slotIdParamSchema } from '../../../utils/schemas/interviewSlot'
-import { MAX_SIGNUPS_PER_SLOT, syncSlotInterviewers } from '../../../utils/reviewer-signup'
+import { MAX_SIGNUPS_PER_SLOT, syncSlotInterviewers, reconcileSlotReviewerAssignments } from '../../../utils/reviewer-signup'
 
 /**
  * POST /api/interview-slots/:id/signup
@@ -53,6 +53,8 @@ export default defineEventHandler(async (event) => {
     .values({ organizationId: orgId, slotId: id, userId: session.user.id, source: 'manual' })
     .onConflictDoNothing()
   await syncSlotInterviewers(orgId, id)
+  // Assign onto any already-booked interviews of this slot + send the invite.
+  await reconcileSlotReviewerAssignments(orgId, id)
 
   recordActivity({
     organizationId: orgId,

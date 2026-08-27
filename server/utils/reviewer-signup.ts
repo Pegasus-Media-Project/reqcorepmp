@@ -1,8 +1,12 @@
 import { and, eq, gt, inArray } from 'drizzle-orm'
 import {
-  interview, interviewSlot, interviewSlotSignup, reviewerSlotAvailability,
+  interview, interviewReviewer, interviewSlot, interviewSlotSignup,
+  reviewerSlotAvailability, application, organization,
 } from '../database/schema'
 import { user } from '../database/schema/auth'
+import { addEventAttendees } from './google-calendar'
+import { generateInterviewICS } from './ical'
+import { sendReviewerInterviewInvitationEmail, getFromEmail } from './email'
 
 /**
  * Reviewer interview signup: members and guest reviewers assign THEMSELVES as
@@ -84,6 +88,135 @@ export async function syncSlotInterviewers(orgId: string, slotId: string): Promi
     ))
 }
 
+/** Future scheduled interviews materialized from a slot. */
+async function futureSlotInterviews(orgId: string, slotId: string) {
+  return db.query.interview.findMany({
+    where: and(
+      eq(interview.organizationId, orgId),
+      eq(interview.slotId, slotId),
+      eq(interview.status, 'scheduled'),
+      gt(interview.scheduledAt, new Date()),
+    ),
+  })
+}
+
+/**
+ * Make slot signups real interview assignments: every reviewer signed up for
+ * the slot gets an `interviewReviewer` row on each of the slot's future
+ * scheduled interviews — so they appear in the interview's Assigned section —
+ * and a calendar invite (Google attendee when the event is synced, otherwise
+ * an emailed .ics). Additive and idempotent: rows that already exist are left
+ * alone, and manually assigned reviewers are never touched.
+ */
+export async function reconcileSlotReviewerAssignments(orgId: string, slotId: string): Promise<void> {
+  const signups = await db.select({ userId: interviewSlotSignup.userId, name: user.name, email: user.email })
+    .from(interviewSlotSignup)
+    .innerJoin(user, eq(interviewSlotSignup.userId, user.id))
+    .where(and(
+      eq(interviewSlotSignup.organizationId, orgId),
+      eq(interviewSlotSignup.slotId, slotId),
+    ))
+  if (!signups.length) return
+
+  const interviews = await futureSlotInterviews(orgId, slotId)
+  if (!interviews.length) return
+
+  const org = await db.query.organization.findFirst({
+    where: eq(organization.id, orgId),
+    columns: { name: true },
+  })
+  const orgName = org?.name ?? 'Pegasus Media Project'
+  const organizerEmail = getFromEmail().replace(/^.*</, '').replace(/>$/, '')
+
+  for (const iv of interviews) {
+    const app = await db.query.application.findFirst({
+      where: eq(application.id, iv.applicationId),
+      with: { candidate: { columns: { firstName: true, lastName: true } }, job: { columns: { title: true } } },
+    })
+    const candidateName = app?.candidate ? `${app.candidate.firstName} ${app.candidate.lastName}`.trim() : 'Candidate'
+    const scheduledAt = new Date(iv.scheduledAt)
+    const tz = iv.timezone ?? 'UTC'
+
+    for (const s of signups) {
+      const [inserted] = await db.insert(interviewReviewer)
+        .values({ organizationId: orgId, interviewId: iv.id, userId: s.userId })
+        .onConflictDoNothing()
+        .returning({ id: interviewReviewer.id })
+      if (!inserted) continue // already assigned (manually or by an earlier sync)
+
+      // Calendar invite. The Google attendee path uses the interview creator's
+      // integration (the likely event owner); self-signup reviewers may not
+      // have Google connected themselves.
+      let calendarSynced = false
+      if (iv.googleCalendarEventId) {
+        calendarSynced = await addEventAttendees(iv.createdById, iv.googleCalendarEventId, [s.email])
+          .catch(() => false)
+      }
+      if (!calendarSynced) {
+        try {
+          const ics = generateInterviewICS({
+            interviewId: iv.id,
+            summary: `${iv.title} — ${candidateName}`,
+            description: [
+              `Interview: ${iv.title}`,
+              `Position: ${app?.job.title ?? ''}`,
+              `Candidate: ${candidateName}`,
+              `Type: ${iv.type}`,
+              `Duration: ${iv.duration} minutes`,
+              ...(iv.location ? [`Location: ${iv.location}`] : []),
+            ].join('\n'),
+            startTime: scheduledAt,
+            durationMinutes: iv.duration,
+            location: iv.location,
+            organizerName: orgName,
+            organizerEmail,
+            attendeeEmail: s.email,
+            attendeeName: s.name ?? s.email,
+          })
+          await sendReviewerInterviewInvitationEmail({
+            to: s.email,
+            reviewerName: s.name,
+            interviewTitle: iv.title,
+            jobTitle: app?.job.title ?? '',
+            candidateName,
+            interviewDate: scheduledAt.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: tz }),
+            interviewTime: scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: tz }),
+            interviewLocation: iv.location,
+            organizationName: orgName,
+            icsContent: ics,
+          })
+        }
+        catch (err) {
+          logError('reviewer_signup.invite_failed', {
+            interview_id: iv.id,
+            user_id: s.userId,
+            error_message: err instanceof Error ? err.message : String(err),
+          })
+        }
+      }
+
+      await db.update(interviewReviewer)
+        .set({ invitedAt: new Date(), calendarSynced })
+        .where(eq(interviewReviewer.id, inserted.id))
+    }
+  }
+}
+
+/**
+ * Withdraw a reviewer from the assignments their slot signup created: removes
+ * their `interviewReviewer` rows on the slot's future scheduled interviews.
+ * (Google attendee removal isn't exposed — same as manual unassignment.)
+ */
+export async function withdrawSlotReviewerAssignments(orgId: string, slotId: string, userId: string): Promise<void> {
+  const interviews = await futureSlotInterviews(orgId, slotId)
+  if (!interviews.length) return
+  await db.delete(interviewReviewer).where(and(
+    eq(interviewReviewer.organizationId, orgId),
+    inArray(interviewReviewer.interviewId, interviews.map(i => i.id)),
+    eq(interviewReviewer.userId, userId),
+  ))
+}
+
 /**
  * Auto-assign reviewers to slots from their stored availability ranges.
  * Considers only future, non-cancelled slots; existing signups (either source)
@@ -146,6 +279,7 @@ export async function applyAvailabilitySignups(params: {
   const changed = [...new Set(inserted.map(r => r.slotId))]
   for (const slotId of changed) {
     await syncSlotInterviewers(orgId, slotId)
+    await reconcileSlotReviewerAssignments(orgId, slotId)
   }
   return changed
 }
@@ -204,6 +338,7 @@ export async function replaceReviewerAvailability(params: {
       .where(inArray(interviewSlotSignup.id, stale.map(s => s.signupId)))
     for (const s of stale) {
       await syncSlotInterviewers(orgId, s.slotId)
+      await withdrawSlotReviewerAssignments(orgId, s.slotId, userId)
     }
   }
 
