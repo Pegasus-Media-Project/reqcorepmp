@@ -3,6 +3,7 @@ import { interview, application } from '../../../database/schema'
 import { interviewIdParamSchema, updateInterviewSchema } from '../../../utils/schemas/interview'
 import { INTERVIEW_STATUS_TRANSITIONS } from '~~/shared/status-transitions'
 import { updateCalendarEvent, cancelCalendarEvent } from '../../../utils/google-calendar'
+import { releaseSlotSeatForInterview, reclaimSlotSeatForInterview } from '../../../utils/slot-scheduling'
 
 export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { interview: ['update'] })
@@ -14,7 +15,7 @@ export default defineEventHandler(async (event) => {
   // Fetch current interview for validation
   const current = await db.query.interview.findFirst({
     where: and(eq(interview.id, id), eq(interview.organizationId, orgId)),
-    columns: { id: true, status: true, googleCalendarEventId: true, createdById: true, timezone: true },
+    columns: { id: true, status: true, slotId: true, googleCalendarEventId: true, createdById: true, timezone: true },
   })
 
   if (!current) {
@@ -29,6 +30,23 @@ export default defineEventHandler(async (event) => {
         statusCode: 422,
         statusMessage: `Cannot transition from "${current.status}" to "${body.status}"`,
       })
+    }
+  }
+
+  // Slot-linked interviews hold a seat on their slot: cancelling frees it so
+  // someone else can be invited; restoring to scheduled takes it back.
+  if (current.slotId && body.status && body.status !== current.status) {
+    if (body.status === 'cancelled' && current.status === 'scheduled') {
+      await releaseSlotSeatForInterview(orgId, id, current.slotId)
+    }
+    else if (body.status === 'scheduled' && current.status === 'cancelled') {
+      const reclaimed = await reclaimSlotSeatForInterview(orgId, id, current.slotId)
+      if (!reclaimed) {
+        throw createError({
+          statusCode: 409,
+          statusMessage: 'That slot has since been filled. Reschedule the interview to a new time instead.',
+        })
+      }
     }
   }
 

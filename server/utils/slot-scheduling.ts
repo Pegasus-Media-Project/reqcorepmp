@@ -4,7 +4,7 @@
  * Used by the send-slot-invitation endpoint, slot deletion, bulk deletion,
  * and availability regeneration ("rebook" flow).
  */
-import { and, eq } from 'drizzle-orm'
+import { and, eq, gt, lt, sql } from 'drizzle-orm'
 import {
   application, candidate, job, organization, careerPage,
   interview, interviewSlot, interviewSlotBooking, jobInterviewAvailability, emailTemplate,
@@ -264,4 +264,64 @@ export async function cancelSlotBookings(params: {
   }
 
   return { applicationIds }
+}
+
+/**
+ * Release the seat one interview holds on its slot: the confirmed booking (if
+ * any) → cancelled, and the slot's counter decremented so the spot can be
+ * offered again. Callers gate on the interview still being 'scheduled' —
+ * that is what guarantees the seat is currently held and prevents a
+ * cancel-then-delete sequence from decrementing twice.
+ */
+export async function releaseSlotSeatForInterview(orgId: string, interviewId: string, slotId: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.update(interviewSlotBooking)
+      .set({ status: 'cancelled', updatedAt: new Date() })
+      .where(and(
+        eq(interviewSlotBooking.interviewId, interviewId),
+        eq(interviewSlotBooking.organizationId, orgId),
+        eq(interviewSlotBooking.status, 'confirmed'),
+      ))
+    await tx.update(interviewSlot)
+      .set({ bookedCount: sql`${interviewSlot.bookedCount} - 1`, updatedAt: new Date() })
+      .where(and(
+        eq(interviewSlot.id, slotId),
+        eq(interviewSlot.organizationId, orgId),
+        gt(interviewSlot.bookedCount, 0),
+      ))
+  })
+}
+
+/**
+ * Re-claim the seat when a cancelled slot-linked interview is restored to
+ * 'scheduled'. Returns false when the spot can no longer be taken back —
+ * the slot has since filled, or the candidate holds a confirmed booking
+ * elsewhere (the partial unique index on confirmed bookings rolls the
+ * transaction back).
+ */
+export async function reclaimSlotSeatForInterview(orgId: string, interviewId: string, slotId: string): Promise<boolean> {
+  try {
+    return await db.transaction(async (tx) => {
+      const [claimed] = await tx.update(interviewSlot)
+        .set({ bookedCount: sql`${interviewSlot.bookedCount} + 1`, updatedAt: new Date() })
+        .where(and(
+          eq(interviewSlot.id, slotId),
+          eq(interviewSlot.organizationId, orgId),
+          lt(interviewSlot.bookedCount, sql`${interviewSlot.capacity}`),
+        ))
+        .returning({ id: interviewSlot.id })
+      if (!claimed) return false
+      await tx.update(interviewSlotBooking)
+        .set({ status: 'confirmed', updatedAt: new Date() })
+        .where(and(
+          eq(interviewSlotBooking.interviewId, interviewId),
+          eq(interviewSlotBooking.organizationId, orgId),
+          eq(interviewSlotBooking.status, 'cancelled'),
+        ))
+      return true
+    })
+  }
+  catch {
+    return false
+  }
 }

@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import { interview } from '../../../database/schema'
 import { interviewIdParamSchema } from '../../../utils/schemas/interview'
 import { cancelCalendarEvent } from '../../../utils/google-calendar'
+import { releaseSlotSeatForInterview } from '../../../utils/slot-scheduling'
 
 export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { interview: ['delete'] })
@@ -11,7 +12,7 @@ export default defineEventHandler(async (event) => {
 
   const current = await db.query.interview.findFirst({
     where: and(eq(interview.id, id), eq(interview.organizationId, orgId)),
-    columns: { id: true, googleCalendarEventId: true, createdById: true },
+    columns: { id: true, status: true, slotId: true, googleCalendarEventId: true, createdById: true },
   })
 
   if (!current) {
@@ -26,6 +27,12 @@ export default defineEventHandler(async (event) => {
         error_message: err instanceof Error ? err.message : String(err),
       })
     })
+  }
+
+  // A still-scheduled slot-linked interview holds a seat on its slot — free it
+  // (booking → cancelled, counter decremented) before the FK nulls the link.
+  if (current.slotId && current.status === 'scheduled') {
+    await releaseSlotSeatForInterview(orgId, id, current.slotId)
   }
 
   await db.delete(interview).where(
