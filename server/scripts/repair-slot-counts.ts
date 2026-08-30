@@ -1,9 +1,15 @@
 /**
- * Recomputes `interview_slot.booked_count` for future slots from what actually
- * holds a seat, repairing counters left stale by interviews that were
- * cancelled or deleted before seat release existed:
+ * Repairs slot-booking state left stale by interviews that were cancelled or
+ * deleted before seat release existed, in two passes:
  *
- *   booked_count = confirmed bookings on the slot
+ * 1. Cancels orphaned confirmed bookings — those whose interview was deleted
+ *    (interview_id nulled by the FK) or cancelled. These no longer hold a
+ *    seat, and while confirmed they block the candidate from booking again.
+ *
+ * 2. Recomputes `interview_slot.booked_count` for future slots from what
+ *    actually holds a seat:
+ *
+ *   booked_count = confirmed bookings whose interview is still scheduled
  *                + scheduled interviews linked to the slot that have no
  *                  booking row (recruiter-scheduled one-off/reschedule seats)
  *
@@ -38,36 +44,55 @@ const apply = process.argv.includes('--apply')
 const client = postgres(connectionString, { max: 1 })
 const db = drizzle(client, { schema })
 
+/**
+ * A seat is genuinely held by: a confirmed booking whose interview still
+ * exists and is scheduled, or a scheduled slot-linked interview with no
+ * booking row at all (recruiter one-off / reschedule seats).
+ */
+const actualCountSql = sql`
+  (SELECT count(*) FROM interview_slot_booking b
+    JOIN interview bi ON bi.id = b.interview_id
+    WHERE b.slot_id = s.id AND b.status = 'confirmed' AND bi.status = 'scheduled')
+  +
+  (SELECT count(*) FROM interview i
+    WHERE i.slot_id = s.id AND i.status = 'scheduled'
+      AND NOT EXISTS (
+        SELECT 1 FROM interview_slot_booking b2 WHERE b2.interview_id = i.id
+      ))
+`
+
 async function main() {
+  // Pass 1: orphaned confirmed bookings (interview deleted or cancelled).
+  const orphans = await db.execute(sql`
+    SELECT b.id, b.slot_id, b.interview_id
+    FROM interview_slot_booking b
+    LEFT JOIN interview i ON i.id = b.interview_id
+    WHERE b.status = 'confirmed'
+      AND (b.interview_id IS NULL OR i.id IS NULL OR i.status = 'cancelled')
+  `)
+  for (const b of orphans) {
+    console.log(`${apply ? 'FIX' : 'DRY-RUN'}: booking ${b.id} on slot ${b.slot_id} is confirmed but its interview is ${b.interview_id ? 'cancelled' : 'deleted'} — marking booking cancelled`)
+    if (apply) {
+      await db.execute(sql`
+        UPDATE interview_slot_booking
+        SET status = 'cancelled', updated_at = now()
+        WHERE id = ${b.id as string} AND status = 'confirmed'
+      `)
+    }
+  }
+
+  // Pass 2: recount future slots.
   const stale = await db.execute(sql`
     SELECT s.id, s.title, s.starts_at, s.booked_count,
-      (
-        (SELECT count(*) FROM interview_slot_booking b
-          WHERE b.slot_id = s.id AND b.status = 'confirmed')
-        +
-        (SELECT count(*) FROM interview i
-          WHERE i.slot_id = s.id AND i.status = 'scheduled'
-            AND NOT EXISTS (
-              SELECT 1 FROM interview_slot_booking b2 WHERE b2.interview_id = i.id
-            ))
-      ) AS actual_count
+      (${actualCountSql}) AS actual_count
     FROM interview_slot s
     WHERE s.starts_at > now()
-      AND s.booked_count <> (
-        (SELECT count(*) FROM interview_slot_booking b
-          WHERE b.slot_id = s.id AND b.status = 'confirmed')
-        +
-        (SELECT count(*) FROM interview i
-          WHERE i.slot_id = s.id AND i.status = 'scheduled'
-            AND NOT EXISTS (
-              SELECT 1 FROM interview_slot_booking b2 WHERE b2.interview_id = i.id
-            ))
-      )
+      AND s.booked_count <> (${actualCountSql})
     ORDER BY s.starts_at
   `)
 
-  if (!stale.length) {
-    console.log('All future slot counters are consistent — nothing to do.')
+  if (!orphans.length && !stale.length) {
+    console.log('All bookings and future slot counters are consistent — nothing to do.')
     return
   }
 
@@ -83,8 +108,8 @@ async function main() {
   }
 
   console.log(apply
-    ? `Repaired ${stale.length} slot(s).`
-    : `${stale.length} slot(s) would be repaired. Re-run with --apply to fix.`)
+    ? `Repaired ${orphans.length} orphaned booking(s) and ${stale.length} slot counter(s).`
+    : `${orphans.length} orphaned booking(s) and ${stale.length} slot counter(s) would be repaired. Re-run with --apply to fix.`)
 }
 
 main()
