@@ -23,6 +23,7 @@ export default defineNitroPlugin(async () => {
     } else {
       console.error(`[Reqcore] STORAGE AUTH FAILED for bucket "${env.S3_BUCKET}" — uploads will fail until credentials are fixed and the service is redeployed: ${health.error}`)
       logError('s3.storage_auth_failed', { bucket: env.S3_BUCKET, error_message: health.error, phase: 'startup' })
+      await alertStorageAuthFailure({ error: health.error, phase: 'startup' })
     }
     return
   }

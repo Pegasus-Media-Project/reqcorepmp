@@ -130,6 +130,35 @@ async function sendEmail(msg: EmailMessage): Promise<void> {
 // ─── Public send functions ────────────────────────────────────────────────────
 
 /**
+ * Send an operational alert to the configured ALERT_EMAIL address.
+ * No-ops (with a log) when ALERT_EMAIL is unset. Never throws — an alert
+ * failure must not take down the code path that detected the problem.
+ */
+export async function sendAdminAlertEmail(params: {
+  subject: string
+  text: string
+}): Promise<void> {
+  const to = env.ALERT_EMAIL
+  if (!to) {
+    logWarn('alert_email.not_configured', { subject: params.subject })
+    return
+  }
+  try {
+    await sendEmail({
+      to,
+      subject: `[Reqcore alert] ${params.subject}`,
+      html: `<pre style="font-family: monospace; white-space: pre-wrap;">${escapeHtml(params.text)}</pre>`,
+      text: params.text,
+      resendTags: [{ name: 'category', value: 'admin_alert' }],
+      logFallback: `ADMIN ALERT (no mail transport): ${params.subject} — ${params.text}`,
+      errorCategory: 'alert_email.send_failed',
+    })
+  } catch (err) {
+    // Already logged by sendEmail with errorCategory; swallow so callers stay safe.
+  }
+}
+
+/**
  * Send an email verification link.
  * Called by Better Auth when requireEmailVerification is enabled.
  * Not awaited by the caller (fire-and-forget) to prevent timing attacks.

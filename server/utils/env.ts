@@ -130,6 +130,8 @@ export const envSchema = z
       (val) => typeof val === 'string' && val.trim() === '' ? false : val === 'true',
       z.boolean().default(false),
     ),
+    /** Recipient for operational alert emails (e.g. storage auth failures). When not set, alerts are logged only. */
+    ALERT_EMAIL: emptyToUndefined.pipe(z.email()).optional(),
     /** Google OAuth2 Client ID for Calendar integration. Obtain from Google Cloud Console. */
     GOOGLE_CLIENT_ID: emptyToUndefined.pipe(z.string().min(1)).optional(),
     /** Google OAuth2 Client Secret for Calendar integration. */

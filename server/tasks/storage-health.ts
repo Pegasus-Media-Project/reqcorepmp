@@ -19,6 +19,7 @@ export default defineTask({
     } else {
       console.error(`[Reqcore] STORAGE AUTH FAILED for bucket "${env.S3_BUCKET}" — uploads are failing; fix credentials and redeploy: ${health.error}`)
       logError('s3.storage_auth_failed', { bucket: env.S3_BUCKET, error_message: health.error, phase: 'scheduled_task' })
+      await alertStorageAuthFailure({ error: health.error, phase: 'scheduled_task' })
     }
     return { result: health }
   },
