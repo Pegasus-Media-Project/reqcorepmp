@@ -44,6 +44,7 @@ const applyRateLimit = createRateLimiter({
  * 6. Create application linking candidate → job
  * 7. Store question responses
  * 8. Upload files to S3 and create document records
+ * 9. Email the applicant their confirmation code (only once nothing can roll back)
  */
 export default defineEventHandler(async (event) => {
   // Enforce rate limit before any processing.
@@ -495,77 +496,6 @@ export default defineEventHandler(async (event) => {
     confirmationCode,
   }).returning({ id: application.id })
 
-  // Email the applicant their confirmation code + status link (best-effort;
-  // logs to console when no mail transport is configured).
-  const origin = getRequestURL(event).origin
-  const statusUrl = `${origin}/status?code=${confirmationCode}`
-
-  // Resolve org name + an absolute logo URL for the email header. Prefer the
-  // branded career-page logo (served publicly), fall back to the org logo when
-  // it's already an absolute URL.
-  const org = await db.query.organization.findFirst({
-    where: eq(organization.id, orgId),
-    columns: { name: true, logo: true, slug: true },
-  })
-  const cp = await db.query.careerPage.findFirst({
-    where: eq(careerPage.organizationId, orgId),
-    columns: { slug: true, logoStorageKey: true, updatedAt: true, enabled: true },
-  })
-  let logoUrl: string | undefined
-  const cpSlug = cp?.slug ?? org?.slug ?? null
-  if (cp?.logoStorageKey && cpSlug && (cp.enabled ?? true)) {
-    logoUrl = `${origin}/api/public/career-page/${cpSlug}/asset?kind=logo&v=${new Date(cp.updatedAt).getTime()}`
-  } else if (org?.logo && /^https?:\/\//i.test(org.logo)) {
-    logoUrl = org.logo
-  }
-
-  // Build a read-only copy of the submitted application for the email.
-  const questionById = new Map(questions.map((q) => [q.id, q]))
-  const formatAnswer = (value: string | string[] | number | boolean | Record<string, number>): string => {
-    if (Array.isArray(value)) return value.join(', ')
-    if (typeof value === 'boolean') return value ? 'Yes' : 'No'
-    // `rating` grids answer as { row → score }.
-    if (value && typeof value === 'object') {
-      return Object.entries(value).map(([row, score]) => `${row}: ${score}`).join('; ')
-    }
-    return String(value)
-  }
-  const summary: Array<{ label: string, value: string }> = [
-    { label: 'Name', value: `${firstName} ${lastName}`.trim() },
-    { label: 'Email', value: email },
-  ]
-  if (phone) summary.push({ label: 'Phone', value: phone })
-  for (const r of validResponses) {
-    const q = questionById.get(r.questionId)
-    if (q) summary.push({ label: q.label, value: formatAnswer(r.value) })
-  }
-  for (const [questionId, file] of uploadedFiles) {
-    const q = questionById.get(questionId)
-    if (q) summary.push({ label: q.label, value: file.filename })
-  }
-  if (resumeUpload) summary.push({ label: 'Resume', value: resumeUpload.filename })
-  if (coverLetterText) summary.push({ label: 'Cover letter', value: coverLetterText })
-
-  const feeReminder = (existingJob.applicationFeeEnabled && existingJob.applicationFeeUrl)
-    ? {
-        url: existingJob.applicationFeeUrl,
-        amount: existingJob.applicationFeeAmount,
-        currency: existingJob.applicationFeeCurrency,
-      }
-    : undefined
-
-  void sendApplicationConfirmationEmail({
-    to: email,
-    firstName,
-    jobTitle: existingJob.title,
-    code: confirmationCode,
-    statusUrl,
-    organizationName: org?.name ?? undefined,
-    logoUrl,
-    summary,
-    fee: feeReminder,
-  }).catch((e) => console.error('[Pegasus] Failed to send application confirmation email:', e))
-
   // ─────────────────────────────────────────────
   // 8b. Record source attribution
   // ─────────────────────────────────────────────
@@ -783,7 +713,84 @@ export default defineEventHandler(async (event) => {
   }
 
   // ─────────────────────────────────────────────
-  // 12. Fire-and-forget auto AI scoring if enabled
+  // 12. Email the applicant their confirmation code + status link
+  // ─────────────────────────────────────────────
+
+  // Sent only now, after every write that can roll the application back (the
+  // resume upload above deletes the application on failure). Sending earlier
+  // mailed applicants a confirmation code for an application that no longer
+  // existed. Best-effort; logs to console when no mail transport is configured.
+  const origin = getRequestURL(event).origin
+  const statusUrl = `${origin}/status?code=${confirmationCode}`
+
+  // Resolve org name + an absolute logo URL for the email header. Prefer the
+  // branded career-page logo (served publicly), fall back to the org logo when
+  // it's already an absolute URL.
+  const org = await db.query.organization.findFirst({
+    where: eq(organization.id, orgId),
+    columns: { name: true, logo: true, slug: true },
+  })
+  const cp = await db.query.careerPage.findFirst({
+    where: eq(careerPage.organizationId, orgId),
+    columns: { slug: true, logoStorageKey: true, updatedAt: true, enabled: true },
+  })
+  let logoUrl: string | undefined
+  const cpSlug = cp?.slug ?? org?.slug ?? null
+  if (cp?.logoStorageKey && cpSlug && (cp.enabled ?? true)) {
+    logoUrl = `${origin}/api/public/career-page/${cpSlug}/asset?kind=logo&v=${new Date(cp.updatedAt).getTime()}`
+  } else if (org?.logo && /^https?:\/\//i.test(org.logo)) {
+    logoUrl = org.logo
+  }
+
+  // Build a read-only copy of the submitted application for the email.
+  const questionById = new Map(questions.map((q) => [q.id, q]))
+  const formatAnswer = (value: string | string[] | number | boolean | Record<string, number>): string => {
+    if (Array.isArray(value)) return value.join(', ')
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+    // `rating` grids answer as { row → score }.
+    if (value && typeof value === 'object') {
+      return Object.entries(value).map(([row, score]) => `${row}: ${score}`).join('; ')
+    }
+    return String(value)
+  }
+  const summary: Array<{ label: string, value: string }> = [
+    { label: 'Name', value: `${firstName} ${lastName}`.trim() },
+    { label: 'Email', value: email },
+  ]
+  if (phone) summary.push({ label: 'Phone', value: phone })
+  for (const r of validResponses) {
+    const q = questionById.get(r.questionId)
+    if (q) summary.push({ label: q.label, value: formatAnswer(r.value) })
+  }
+  for (const [questionId, file] of uploadedFiles) {
+    const q = questionById.get(questionId)
+    if (q) summary.push({ label: q.label, value: file.filename })
+  }
+  if (resumeUpload) summary.push({ label: 'Resume', value: resumeUpload.filename })
+  if (coverLetterText) summary.push({ label: 'Cover letter', value: coverLetterText })
+
+  const feeReminder = (existingJob.applicationFeeEnabled && existingJob.applicationFeeUrl)
+    ? {
+        url: existingJob.applicationFeeUrl,
+        amount: existingJob.applicationFeeAmount,
+        currency: existingJob.applicationFeeCurrency,
+      }
+    : undefined
+
+  void sendApplicationConfirmationEmail({
+    to: email,
+    firstName,
+    jobTitle: existingJob.title,
+    code: confirmationCode,
+    statusUrl,
+    organizationName: org?.name ?? undefined,
+    logoUrl,
+    summary,
+    fee: feeReminder,
+  }).catch((e) => console.error('[Pegasus] Failed to send application confirmation email:', e))
+
+  // ─────────────────────────────────────────────
+  // 13. Fire-and-forget auto AI scoring if enabled
   // ─────────────────────────────────────────────
 
   if (existingJob.autoScoreOnApply && newApplication) {

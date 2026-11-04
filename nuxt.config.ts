@@ -318,6 +318,8 @@ export default defineNuxtConfig({
       // Daily at 03:00 UTC. External cron remains supported for platforms that
       // suspend long-running processes or do not execute Nitro task timers.
       "0 3 * * *": ["retention-cleanup"],
+      // Hourly storage-auth probe — catches credentials rotated after deploy.
+      "15 * * * *": ["storage-health"],
     },
     routeRules: {
       "/**": {

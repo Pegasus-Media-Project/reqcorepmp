@@ -12,10 +12,18 @@ export default defineNitroPlugin(async () => {
   if (import.meta.prerender) return
 
   // Managed S3 providers (Railway Buckets, AWS S3) pre-provision buckets
-  // and enforce privacy at the platform level — skip bucket initialization
+  // and enforce privacy at the platform level — skip bucket initialization,
+  // but still probe auth: rotated credentials otherwise go unnoticed until
+  // an applicant's upload fails.
   if (!env.S3_FORCE_PATH_STYLE) {
-    console.log(`[Reqcore] S3 bucket "${env.S3_BUCKET}" — managed provider detected, skipping initialization`)
     logInfo('s3.managed_provider_detected', { bucket: env.S3_BUCKET })
+    const health = await checkStorageHealth()
+    if (health.ok) {
+      console.log(`[Reqcore] S3 bucket "${env.S3_BUCKET}" — managed provider, auth verified`)
+    } else {
+      console.error(`[Reqcore] STORAGE AUTH FAILED for bucket "${env.S3_BUCKET}" — uploads will fail until credentials are fixed and the service is redeployed: ${health.error}`)
+      logError('s3.storage_auth_failed', { bucket: env.S3_BUCKET, error_message: health.error, phase: 'startup' })
+    }
     return
   }
 

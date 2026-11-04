@@ -120,6 +120,25 @@ export async function bucketExists(): Promise<boolean> {
 }
 
 /**
+ * Probe storage auth end-to-end with the credentials this process is running
+ * with. Credentials rotated after deploy keep passing env-var checks while the
+ * running process still signs with the old ones (every upload then fails with
+ * SignatureDoesNotMatch until a redeploy), so this is the check that catches it.
+ *
+ * @returns `{ ok: true }` when the bucket answers, else the error name/message
+ */
+export async function checkStorageHealth(): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await getS3Client().send(new HeadBucketCommand({ Bucket: env.S3_BUCKET }))
+    return { ok: true }
+  } catch (error) {
+    const name = error instanceof Error ? error.name : 'Error'
+    const message = error instanceof Error ? error.message : String(error)
+    return { ok: false, error: `${name}: ${message}` }
+  }
+}
+
+/**
  * Create the configured bucket if it doesn't exist, then enforce
  * private access by deleting any public policy. Idempotent — safe
  * to call repeatedly.
