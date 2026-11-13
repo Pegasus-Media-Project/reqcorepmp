@@ -7,7 +7,7 @@ import {
   CheckCircle2, XCircle, AlertTriangle, ArrowUpDown, ListFilter,
   Maximize2, Minimize2, Brain, History, SlidersHorizontal,
   ChevronLeft, ChevronRight, UnfoldHorizontal, FoldHorizontal,
-  StickyNote, MoreHorizontal, Star,
+  StickyNote, MoreHorizontal, Star, Upload,
 } from 'lucide-vue-next'
 import type { Component } from 'vue'
 import type { PropertyEntry, PropertyFilter } from '~~/shared/properties'
@@ -1519,7 +1519,41 @@ const isLoading = computed(() => {
 // Document preview
 // ─────────────────────────────────────────────
 
-const { getPreviewUrl } = useDocuments()
+const { getPreviewUrl, uploadDocument } = useDocuments()
+
+// ─────────────────────────────────────────────
+// Document upload (staff attaches files for the open candidate)
+// ─────────────────────────────────────────────
+
+const { allowed: canManageDocuments } = usePermission({ document: ['create'] })
+
+const docUploadInput = ref<HTMLInputElement | null>(null)
+const docUploadType = ref<'resume' | 'cover_letter' | 'other'>('resume')
+const isUploadingDoc = ref(false)
+const docUploadError = ref<string | null>(null)
+
+function triggerDocUpload() {
+  docUploadInput.value?.click()
+}
+
+async function handleDocUploadSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  const candidateId = resolvedCurrentApplication.value?.candidate.id
+  if (!file || !candidateId) return
+
+  docUploadError.value = null
+  isUploadingDoc.value = true
+  try {
+    await uploadDocument(candidateId, file, docUploadType.value)
+    await executeDetailFetch()
+  } catch (err: any) {
+    docUploadError.value = err.data?.statusMessage ?? err.statusMessage ?? 'Upload failed'
+  } finally {
+    isUploadingDoc.value = false
+    input.value = ''
+  }
+}
 
 const showDocPreview = ref(false)
 const docPreviewUrl = ref<string | null>(null)
@@ -2788,10 +2822,44 @@ function closeDocPreview() {
 
               <!-- DOCUMENTS SECTION -->
               <div v-if="showSection.documents" ref="documentsRef" class="space-y-3 mx-auto" :class="[detailWidthClass, detailTab === 'overview' ? 'mt-6' : '']">
-                <h2 class="text-sm font-semibold text-surface-800 dark:text-surface-200 flex items-center gap-2 mb-3">
-                  <Paperclip class="size-4 text-surface-400 dark:text-surface-500" />
-                  Documents
-                </h2>
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <h2 class="text-sm font-semibold text-surface-800 dark:text-surface-200 flex items-center gap-2">
+                    <Paperclip class="size-4 text-surface-400 dark:text-surface-500" />
+                    Documents
+                  </h2>
+                  <div v-if="canManageDocuments" class="flex items-center gap-2">
+                    <select
+                      v-model="docUploadType"
+                      class="rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 px-2.5 py-1.5 text-xs text-surface-600 dark:text-surface-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    >
+                      <option value="resume">Resume</option>
+                      <option value="cover_letter">Cover Letter</option>
+                      <option value="other">Other</option>
+                    </select>
+                    <button
+                      :disabled="isUploadingDoc"
+                      class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-surface-200 px-3 py-1.5 text-xs font-medium text-surface-600 hover:bg-surface-50 hover:border-surface-300 dark:border-surface-700 dark:text-surface-300 dark:hover:bg-surface-800 dark:hover:border-surface-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150"
+                      @click="triggerDocUpload"
+                    >
+                      <Upload class="size-3.5" />
+                      {{ isUploadingDoc ? 'Uploading…' : 'Upload' }}
+                    </button>
+                    <input
+                      ref="docUploadInput"
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      class="hidden"
+                      @change="handleDocUploadSelected"
+                    >
+                  </div>
+                </div>
+                <div
+                  v-if="docUploadError"
+                  class="rounded-lg border border-danger-200 dark:border-danger-800 bg-danger-50 dark:bg-danger-950 px-3.5 py-2.5 text-xs text-danger-700 dark:text-danger-400"
+                >
+                  {{ docUploadError }}
+                  <button class="underline ml-1" @click="docUploadError = null">Dismiss</button>
+                </div>
                 <div v-if="resolvedCurrentApplication?.candidate.documents?.length" class="space-y-3">
                   <div
                     v-for="doc in resolvedCurrentApplication.candidate.documents"
