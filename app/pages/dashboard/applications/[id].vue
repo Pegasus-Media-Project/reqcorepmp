@@ -457,6 +457,11 @@ const statusBadgeClasses: Record<string, string> = {
         <p v-else class="text-sm text-surface-400 italic">No notes yet.</p>
       </div>
 
+      <!-- Candidate documents (resume, cover letter, staff-uploaded files) -->
+      <div class="mt-4 mb-4">
+        <CandidateDocumentsCard :candidate-id="application.candidate.id" />
+      </div>
+
       <!-- Onboarding steps (fee / signed documents) -->
       <div class="mt-4 mb-4">
         <ApplicationOnboardingSection
